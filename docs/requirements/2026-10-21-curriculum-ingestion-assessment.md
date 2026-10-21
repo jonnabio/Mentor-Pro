@@ -9,7 +9,8 @@
 ## Overview
 
 Read-only assessment of worksheets `07 Catálogo` and `06 Evidencias` in
-`references/original/PNE Tracker 2026 — Alejandro _ Objetivos MEP.xlsx`.
+the PNE Tracker 2026 workbook (generic reference `PNE-Tracker-2026-workbook.xlsx`
+in `references/MANIFEST.sha256`).
 The workbook was opened with openpyxl and never saved. Curricular text is quoted
 in its original Spanish.
 

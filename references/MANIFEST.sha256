@@ -1,4 +1,5 @@
 # SHA-256 manifest of references/original (files not committed)
+# Generic names replace student-identifying file names; match local files by checksum.
 bf8553fd91bc159f91e7064b60ef15bc501d1962fe89c23bca1053c3b78c7b82 *50-ejercicios-de-comprension-lectora-.pdf
 b157f1b29a41b3eb380f38bfa24d511991f7a9f2f8c4554a119d4637a8f91232 *6° ESPAÑOL.pdf
 c46342ee27dfa10da0184d42554ef1e123f98f5f6267be93e4fed2f6e6654ca8 *6° ESTUDIOS SOCIALES.pdf
@@ -22,7 +23,7 @@ f5ee039fb8b29e81c65966944e75ffc37f53ced0afc003b723eafbe57fd33890 *Examen_Diagnos
 7b74c56d9498de6024ebbb24079da5cc875b4b86fa9ecbcef4667c9bdac4b003 *Marco-de-referencia-Pruebas-Nacionales-Estandarizadas-diagnosticas-2026.pdf
 577b2bf471ff35a41a22694d805ee39f1f3f3e5800a46236fecc94614092736d *Matemática.pdf
 5406448e3b6f194bd598bb533ad5fcfe172f697b306ae096fc62a2a5558e4612 *Morpho_PruebasEstandarizadas.pdf
-cce57db40afacdb2f6d2492c39ba9df6c1bc398941c1c7fb9cff8ec28bcc19d3 *PNE Tracker 2026 — Alejandro _ Objetivos MEP.xlsx
+cce57db40afacdb2f6d2492c39ba9df6c1bc398941c1c7fb9cff8ec28bcc19d3 *PNE-Tracker-2026-workbook.xlsx
 86a86e30b2bc7e5ed8e6591cc219a7bb82131b07de6005edea0530a3922eaafa *PNE_Practica_1.pdf
 0a7925c35f894b99b499db6bee9800bcfe5fec6b4525b6d9dc4d077a135364f9 *PNE_Practica_2.pdf
 18d2b7ca0ba0cb6b2ddbd2f06a18258cc8d4a828aa3466afcd1c7072449e40a4 *PRUEBA NACIONAL ESTANDARIZADA PRIMARIA TEORÍA Y PRÁCTICA MATEMÁTICAS.pdf
