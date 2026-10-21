@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mentor-pro.local/schemas/question-engine/question-item.schema.json",
+  "title": "QuestionItem",
+  "description": "One generated multiple-choice item with provenance and generation metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "item_id", "subject", "curriculum_ref", "source_refs", "difficulty", "cognitive_verb", "stimulus", "stem", "options", "answer_key", "explanation", "distractor_rationales", "language", "generation"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "item_id": { "type": "string", "pattern": "^Q-PNE[0-9]{4}-PRI-(ESP|MAT|CIE|EST)-(DIAG|SUM)-B[0-9]+-A[0-9]+-E[0-9]+-[0-9a-f]{8}$" },
+    "subject": { "enum": ["espanol", "matematicas", "ciencias", "estudios_sociales"] },
+    "curriculum_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spec_version", "application", "bloque_id", "afirmacion_id", "evidencia_id"],
+      "properties": {
+        "spec_version": { "type": "string", "pattern": "^PNE[0-9]{4}$" },
+        "application": { "enum": ["diagnostica", "sumativa"] },
+        "bloque_id": { "type": "string" },
+        "afirmacion_id": { "type": "string" },
+        "evidencia_id": { "type": "string" }
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["record_id", "excerpt"],
+        "properties": {
+          "record_id": { "type": "string" },
+          "excerpt": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+    "cognitive_verb": { "type": "string", "minLength": 1 },
+    "stimulus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["none", "text", "table", "image"] },
+        "text": { "type": "string" },
+        "source_note": { "type": "string" },
+        "assets": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "stem": { "type": "string", "minLength": 5 },
+    "options": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "text"],
+        "properties": {
+          "label": { "enum": ["A", "B", "C", "D", "E"] },
+          "text": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "answer_key": { "enum": ["A", "B", "C", "D", "E"] },
+    "explanation": { "type": "string", "minLength": 10 },
+    "distractor_rationales": {
+      "type": "object",
+      "propertyNames": { "enum": ["A", "B", "C", "D", "E"] },
+      "additionalProperties": { "type": "string", "minLength": 3 }
+    },
+    "language": { "const": "es-CR" },
+    "subject_checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "math": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expression"],
+          "properties": {
+            "expression": { "type": "string", "description": "Exact arithmetic using + - * / ( ) and es-CR or ASCII numbers." },
+            "unit": { "type": "string" }
+          }
+        },
+        "reading": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "quoted_spans": { "type": "array", "items": { "type": "string" } },
+            "key_support_span": { "type": "string" }
+          }
+        },
+        "facts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["support_terms"],
+          "properties": {
+            "support_terms": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["model_requested", "model_used", "provider", "prompt_id", "prompt_version", "generated_at"],
+      "properties": {
+        "model_requested": { "type": "string" },
+        "model_used": { "type": "string" },
+        "provider": { "type": "string" },
+        "prompt_id": { "type": "string" },
+        "prompt_version": { "type": "string" },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "request_id": { "type": "string" },
+        "coverage_plan_id": { "type": "string" },
+        "slot": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

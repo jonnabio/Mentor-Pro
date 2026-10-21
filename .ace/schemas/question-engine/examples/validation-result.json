@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "item_id": "Q-PNE2025-PRI-ESP-DIAG-B1-A1-E8-7b21e0aa",
+  "checker_version": "1.0.0",
+  "deterministic_status": "pass",
+  "checks": [
+    { "id": "C01", "status": "pass", "message": "schema valid" },
+    { "id": "G02", "status": "pass", "message": "every excerpt is verbatim official text" },
+    { "id": "R03", "status": "pass", "message": "key is supported by a verbatim passage span" }
+  ],
+  "math_proven": false,
+  "requires_independent_solve": true,
+  "independent_solve": { "performed": true, "model_used": "example/solver-model", "chosen_label": "B", "agrees_with_key": true },
+  "rubric": { "alignment": 2, "clarity": 2, "distractor_quality": 1, "language": 2, "difficulty_match": 2 },
+  "verdict": "accept",
+  "reasons": []
+}

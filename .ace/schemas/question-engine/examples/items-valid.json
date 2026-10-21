@@ -1,0 +1,87 @@
+[
+  {
+    "schema_version": "1.0",
+    "item_id": "Q-PNE2025-PRI-MAT-DIAG-B1-A3-E2-3f9a1c20",
+    "subject": "matematicas",
+    "curriculum_ref": { "spec_version": "PNE2025", "application": "diagnostica", "bloque_id": "PNE2025-PRI-MAT-DIAG-B1", "afirmacion_id": "PNE2025-PRI-MAT-DIAG-B1-A3", "evidencia_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E2" },
+    "source_refs": [ { "record_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E2", "excerpt": "Aplica los conceptos de divisibilidad, divisor o factor de un número natural" } ],
+    "difficulty": "easy",
+    "cognitive_verb": "Aplica",
+    "stimulus": { "type": "none" },
+    "stem": "Una escuela tiene 144 estudiantes de sexto grado. Se quieren formar grupos de 12 estudiantes cada uno, sin que sobre ninguno. ¿Cuántos grupos se forman?",
+    "options": [
+      { "label": "A", "text": "10" },
+      { "label": "B", "text": "12" },
+      { "label": "C", "text": "14" },
+      { "label": "D", "text": "132" }
+    ],
+    "answer_key": "B",
+    "explanation": "Como 12 es divisor de 144, se divide 144 entre 12 y se obtienen 12 grupos completos.",
+    "distractor_rationales": {
+      "A": "Error de cálculo al dividir.",
+      "C": "Se estima en lugar de dividir exactamente.",
+      "D": "Se resta 144 − 12 en lugar de dividir."
+    },
+    "language": "es-CR",
+    "subject_checks": { "math": { "expression": "144 / 12" } },
+    "generation": { "model_requested": "example/free-model", "model_used": "example/free-model", "provider": "example", "prompt_id": "item-generation", "prompt_version": "1.0.0", "generated_at": "2026-10-21T14:05:00Z" }
+  },
+  {
+    "schema_version": "1.0",
+    "item_id": "Q-PNE2025-PRI-ESP-DIAG-B1-A1-E8-7b21e0aa",
+    "subject": "espanol",
+    "curriculum_ref": { "spec_version": "PNE2025", "application": "diagnostica", "bloque_id": "PNE2025-PRI-ESP-DIAG-B1", "afirmacion_id": "PNE2025-PRI-ESP-DIAG-B1-A1", "evidencia_id": "PNE2025-PRI-ESP-DIAG-B1-A1-E8" },
+    "source_refs": [ { "record_id": "PNE2025-PRI-ESP-DIAG-B1-A1-E8", "excerpt": "Identifica las ideas fundamentales en textos no literarios." } ],
+    "difficulty": "medium",
+    "cognitive_verb": "Identifica",
+    "stimulus": {
+      "type": "text",
+      "text": "Las tortugas baula llegan cada año a las playas de Guanacaste para desovar. Durante la noche, cada hembra cava un nido en la arena y deposita sus huevos. Por eso, proteger estas playas es necesario para que la especie sobreviva. Los guardaparques vigilan la zona y evitan que se usen luces fuertes.",
+      "source_note": "Texto original creado para práctica."
+    },
+    "stem": "¿Cuál es la idea fundamental del texto?",
+    "options": [
+      { "label": "A", "text": "Los guardaparques usan luces fuertes en la playa." },
+      { "label": "B", "text": "Proteger las playas de Guanacaste permite que las tortugas baula sobrevivan." },
+      { "label": "C", "text": "Las tortugas baula cavan nidos durante el día." },
+      { "label": "D", "text": "Guanacaste es la provincia más grande de Costa Rica." }
+    ],
+    "answer_key": "B",
+    "explanation": "El texto explica el desove de las tortugas baula para concluir que proteger las playas es necesario para que la especie sobreviva; las demás ideas lo complementan.",
+    "distractor_rationales": {
+      "A": "Contradice el texto: los guardaparques evitan las luces fuertes.",
+      "C": "Contradice el texto: el desove ocurre durante la noche.",
+      "D": "No aparece en el texto."
+    },
+    "language": "es-CR",
+    "subject_checks": { "reading": { "quoted_spans": [], "key_support_span": "proteger estas playas es necesario para que la especie sobreviva" } },
+    "generation": { "model_requested": "example/free-model", "model_used": "example/free-model", "provider": "example", "prompt_id": "item-generation", "prompt_version": "1.0.0", "generated_at": "2026-10-21T14:06:00Z" }
+  },
+  {
+    "schema_version": "1.0",
+    "item_id": "Q-PNE2025-PRI-EST-DIAG-B2-A6-E1-c40d9e12",
+    "subject": "estudios_sociales",
+    "curriculum_ref": { "spec_version": "PNE2025", "application": "diagnostica", "bloque_id": "PNE2025-PRI-EST-DIAG-B2", "afirmacion_id": "PNE2025-PRI-EST-DIAG-B2-A6", "evidencia_id": "PNE2025-PRI-EST-DIAG-B2-A6-E1" },
+    "source_refs": [ { "record_id": "PNE2025-PRI-EST-DIAG-B2-A6-E1", "excerpt": "Relaciona la importancia de los símbolos nacionales de Costa Rica con su significado (Escudo, Bandera e Himno Nacional)." } ],
+    "difficulty": "easy",
+    "cognitive_verb": "Relaciona",
+    "stimulus": { "type": "none" },
+    "stem": "En el acto cívico del 15 de setiembre, la escuela canta el símbolo nacional que se interpreta con música y letra. ¿Cuál es ese símbolo?",
+    "options": [
+      { "label": "A", "text": "El Escudo" },
+      { "label": "B", "text": "La Bandera" },
+      { "label": "C", "text": "El Himno Nacional" },
+      { "label": "D", "text": "El mapa de Costa Rica" }
+    ],
+    "answer_key": "C",
+    "explanation": "De los símbolos nacionales mencionados en la evidencia (Escudo, Bandera e Himno Nacional), solo el Himno Nacional tiene música y letra y se canta.",
+    "distractor_rationales": {
+      "A": "El Escudo es un símbolo visual; no se canta.",
+      "B": "La Bandera se iza, no se canta.",
+      "D": "El mapa no es uno de los símbolos nacionales citados."
+    },
+    "language": "es-CR",
+    "subject_checks": { "facts": { "support_terms": ["Himno Nacional"] } },
+    "generation": { "model_requested": "example/free-model", "model_used": "example/free-model", "provider": "example", "prompt_id": "item-generation", "prompt_version": "1.0.0", "generated_at": "2026-10-21T14:07:00Z" }
+  }
+]
