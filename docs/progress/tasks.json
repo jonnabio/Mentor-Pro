@@ -110,6 +110,39 @@
       "result_file": "docs/progress/task_T003_result.md",
       "failures": [],
       "notes": "Product Owner label T002.1. Tracker IDs must match ^T[0-9]{3}$, so the PO's next task 'T003' is tracked as T004."
+    },
+    {
+      "id": "T004",
+      "name": "T003 — Practice configuration UI and API",
+      "objective": "FastAPI endpoints and plain HTML/CSS/JS page to configure practice (subject, one/several/all objectives, difficulty, 5/10/20/30 questions) with validated, deterministic, balanced allocation; no question generation.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/main.py",
+          "app/allocation.py",
+          "app/static/",
+          "tests/app/",
+          "scripts/dev/ui_smoke.py",
+          "docs/adr/ADR-008-practice-configuration-api.md",
+          "docs/runbooks/practice-ui.md"
+        ],
+        "modify": [
+          "requirements.txt",
+          "requirements-dev.txt",
+          ".aceconfig",
+          "docs/adr/ADR-004-web-app-stack.md"
+        ]
+      },
+      "depends_on": [
+        "T003"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T004_result.md",
+      "failures": [],
+      "notes": "Product Owner label T003. Browser (desktop/mobile) check not executed: Edge cannot start under automation on this machine."
     }
   ]
 }

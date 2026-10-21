@@ -1,6 +1,7 @@
 # ADR-004: Web Application Stack
 
-> **Status:** Proposed
+> **Status:** Accepted in part — FastAPI and PostgreSQL in use; frontend amended
+> by [ADR-008](ADR-008-practice-configuration-api.md) (plain HTML/CSS/JS for now)
 > **Date:** 2026-10-21
 
 ---

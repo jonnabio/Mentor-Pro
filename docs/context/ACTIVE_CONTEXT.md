@@ -12,7 +12,8 @@ Curriculum baseline `PNE2026-SUM-v1.0` in the PostgreSQL catalog
 (T002; T003 = PO label T002.1;
 [ADR-006](../adr/ADR-006-curriculum-baseline-v1.md),
 [ADR-007](../adr/ADR-007-postgresql-curriculum-catalog.md)). No OpenRouter
-integration, question generation or frontend yet.
+integration or question generation yet. Practice configuration UI and API
+(tracker T004 = PO T003, [ADR-008](../adr/ADR-008-practice-configuration-api.md)).
 
 ## Current State
 
@@ -29,6 +30,8 @@ integration, question generation or frontend yet.
   objectives, 344 evidencias; 78 multiple-choice, 20 `EE` rubric), loaded with
   `python -m curriculum.importer` via `DATABASE_URL`; approved-baseline
   grounding (T002, T003). Test database `mentor_pro_test`.
+- Practice UI/API: `uvicorn app.main:app` (`docs/runbooks/practice-ui.md`);
+  deterministic balanced allocation; desktop/mobile check still manual.
 
 ### In Progress
 
@@ -44,12 +47,13 @@ integration, question generation or frontend yet.
 1. [ ] Owner runs `python scripts/dev/setup_secrets.py` (Postgres password,
        OpenRouter key into `.env`).
 2. [ ] Accept or amend [ADR-004](../adr/ADR-004-web-app-stack.md) (stack).
-3. [ ] PO task T003 (tracker T004, needs approval): OpenRouter
-       integration, coverage planning and generation over the catalog.
-4. [ ] Build the evaluation dataset (`question-evaluation`).
-5. [ ] Decide whether to rewrite Git history to remove the student name in
+3. [ ] Manual UI check at 1280 px and 390 px (automation blocked).
+4. [ ] Next PO task (tracker T005, needs approval): OpenRouter integration
+       and question generation.
+5. [ ] Build the evaluation dataset (`question-evaluation`).
+6. [ ] Decide whether to rewrite Git history to remove the student name in
        commit `42adbe7` (separate approval).
-6. [ ] Reduce baseline markdown lint debt (`docs/TODO-markdown-lint.md`).
+7. [ ] Reduce baseline markdown lint debt (`docs/TODO-markdown-lint.md`).
 
 ## Active Constraints
 
