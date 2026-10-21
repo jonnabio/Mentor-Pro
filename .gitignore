@@ -40,3 +40,6 @@ references/original/
 # Python caches
 __pycache__/
 .pytest_cache/
+
+# Local curriculum catalog (rebuilt by curriculum.importer)
+data/
