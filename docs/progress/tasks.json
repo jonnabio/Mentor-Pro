@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
+  "created": "2026-10-21T15:00:00Z",
+  "updated": "2026-10-21T16:00:00Z",
+  "defaults": {
+    "max_attempts": 3,
+    "runner": "claude-code",
+    "verify_cmd": ".ace/scripts/verify.sh"
+  },
+  "tasks": [
+    {
+      "id": "T001",
+      "name": "Question engine ACE skills",
+      "objective": "Nine discoverable, validated question-engine skills with a shared standard, JSON Schema contracts, one deterministic checker for all four subjects, a skill validator and passing tests.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          ".ace/standards/question-engine.md",
+          ".ace/knowledge/mep-pne-curriculum.md",
+          ".ace/schemas/question-engine/",
+          ".ace/skills/mep-curriculum-grounding/SKILL.md",
+          ".ace/skills/mep-question-design/SKILL.md",
+          ".ace/skills/question-quality-review/SKILL.md",
+          ".ace/skills/question-quality-review/scripts/item_checker.py",
+          ".ace/skills/question-quality-review/scripts/cr_math.py",
+          ".ace/skills/math-answer-verification/SKILL.md",
+          ".ace/skills/evidence-coverage-planning/SKILL.md",
+          ".ace/skills/question-evaluation/SKILL.md",
+          ".ace/skills/openrouter-model-routing/SKILL.md",
+          ".ace/skills/llm-cost-observability/SKILL.md",
+          ".ace/skills/curriculum-data-ingestion/SKILL.md",
+          ".ace/scripts/validate_skills.py",
+          "tests/ace/",
+          "docs/adr/ADR-004-web-app-stack.md",
+          "docs/adr/ADR-005-question-engine-skill-suite.md"
+        ],
+        "modify": [".aceconfig", "docs/context/ACTIVE_CONTEXT.md"]
+      },
+      "depends_on": [],
+      "complexity": "L",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T001_result.md",
+      "failures": []
+    }
+  ]
+}
