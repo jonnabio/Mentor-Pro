@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import sys
+import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 import openpyxl
@@ -72,3 +75,40 @@ def register(manifest: Path, workbook: Path, name: str = "synthetic-workbook.xls
     digest = hashlib.sha256(workbook.read_bytes()).hexdigest()
     with manifest.open("a", encoding="utf-8") as handle:
         handle.write(f"{digest} *{name}\n")
+
+
+# PostgreSQL test database. Each test gets its own schema, dropped afterwards.
+# The database name must end in "_test" so tests can never touch the real catalog.
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql://mentor_pro_admin@127.0.0.1:5432/mentor_pro_test")
+
+
+@dataclass(frozen=True)
+class PgTarget:
+    url: str
+    schema: str
+
+
+def new_target() -> PgTarget:
+    database = TEST_DATABASE_URL.rsplit("/", 1)[-1].split("?", 1)[0]
+    if not database.endswith("_test"):
+        raise RuntimeError(f"refusing to run tests against non-test database {database!r}")
+    return PgTarget(TEST_DATABASE_URL, f"t_{uuid.uuid4().hex[:12]}")
+
+
+def drop_target(target: PgTarget) -> None:
+    import psycopg
+    from psycopg import sql
+
+    with psycopg.connect(target.url, autocommit=True) as conn:
+        conn.execute(sql.SQL("DROP SCHEMA IF EXISTS {} CASCADE").format(sql.Identifier(target.schema)))
+
+
+def query(target: PgTarget, statement: str, *args) -> list[tuple]:
+    """Run a query in the target schema and return tuples (creates tables if missing)."""
+    from psycopg.rows import tuple_row
+
+    from curriculum import db
+
+    with db.connect(target.url, target.schema) as conn:
+        return conn.cursor(row_factory=tuple_row).execute(statement, args or None).fetchall()

@@ -7,7 +7,7 @@ from typing import Callable
 
 import pytest
 
-from workbook_fixtures import catalog_rows, evidence_rows, register, write_workbook
+from workbook_fixtures import PgTarget, catalog_rows, drop_target, evidence_rows, new_target, register, write_workbook
 
 
 @pytest.fixture()
@@ -30,5 +30,14 @@ def build(tmp_path) -> Callable[..., tuple[Path, Path]]:
 
 
 @pytest.fixture()
-def db(tmp_path) -> Path:
-    return tmp_path / "catalog.sqlite"
+def db() -> PgTarget:
+    """A fresh PostgreSQL schema in the test database; fails (never skips) if unreachable."""
+    import psycopg
+
+    target = new_target()
+    try:
+        psycopg.connect(target.url, connect_timeout=5).close()
+    except psycopg.OperationalError as exc:
+        pytest.fail(f"PostgreSQL test database unreachable ({type(exc).__name__}); set TEST_DATABASE_URL")
+    yield target
+    drop_target(target)

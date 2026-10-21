@@ -7,11 +7,13 @@ practice; `written_rubric` criteria are retrieved separately.
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
 from typing import Any
+
+import psycopg
+
+from curriculum import db
 
 
 class PracticeScope(str, Enum):
@@ -43,53 +45,51 @@ _OBJECTIVE_SQL = """
            b.id AS block_id, b.name_es AS block_name_es, b.assessment_type, b.subject_code
     FROM assertion a
     JOIN block b ON b.baseline_version = a.baseline_version AND b.id = a.block_id
-    WHERE a.baseline_version = ?
+    WHERE a.baseline_version = %s
 """
 
 
-def open_catalog(db_path: Path) -> sqlite3.Connection:
-    """Open the catalog read-only."""
-    conn = sqlite3.connect(f"file:{db_path.as_posix()}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
+def open_catalog(url: str | None = None, schema: str = db.DEFAULT_SCHEMA) -> psycopg.Connection:
+    """Open the catalog read-only (writes are rejected by the server)."""
+    return db.connect(url or db.database_url(), schema, read_only=True)
 
 
-def _with_evidences(conn: sqlite3.Connection, version: str, rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
+def _with_evidences(conn: psycopg.Connection, version: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     objectives = []
     for row in rows:
         evidences = conn.execute(
             "SELECT id, ordinal, text_es, provenance, verification_status FROM evidence "
-            "WHERE baseline_version = ? AND assertion_id = ? ORDER BY ordinal",
+            "WHERE baseline_version = %s AND assertion_id = %s ORDER BY ordinal",
             (version, row["id"]),
         ).fetchall()
-        objectives.append({**dict(row), "evidences": [dict(e) for e in evidences]})
+        objectives.append({**row, "evidences": list(evidences)})
     return objectives
 
 
-def list_objectives(conn: sqlite3.Connection, version: str, subject_code: str,
+def list_objectives(conn: psycopg.Connection, version: str, subject_code: str,
                     assessment_type: AssessmentType = AssessmentType.MULTIPLE_CHOICE) -> list[dict[str, Any]]:
     """All objectives of one subject and assessment type, in workbook code order, with evidences."""
     rows = conn.execute(
-        _OBJECTIVE_SQL + " AND b.subject_code = ? AND b.assessment_type = ? "
+        _OBJECTIVE_SQL + " AND b.subject_code = %s AND b.assessment_type = %s "
         "AND a.baseline_status = 'approved' ORDER BY a.workbook_code",
         (version, subject_code, assessment_type.value),
     ).fetchall()
     return _with_evidences(conn, version, rows)
 
 
-def get_objective(conn: sqlite3.Connection, version: str, workbook_code: str) -> dict[str, Any] | None:
+def get_objective(conn: psycopg.Connection, version: str, workbook_code: str) -> dict[str, Any] | None:
     """One objective by its workbook code (e.g. "M07"), with evidences; None if absent."""
-    rows = conn.execute(_OBJECTIVE_SQL + " AND a.workbook_code = ?", (version, workbook_code)).fetchall()
+    rows = conn.execute(_OBJECTIVE_SQL + " AND a.workbook_code = %s", (version, workbook_code)).fetchall()
     found = _with_evidences(conn, version, rows)
     return found[0] if found else None
 
 
-def list_rubric_criteria(conn: sqlite3.Connection, version: str) -> list[dict[str, Any]]:
+def list_rubric_criteria(conn: psycopg.Connection, version: str) -> list[dict[str, Any]]:
     """Written-production rubric criteria (Español EE); never part of practice selection."""
     return list_objectives(conn, version, "espanol", AssessmentType.WRITTEN_RUBRIC)
 
 
-def select_objectives(conn: sqlite3.Connection, version: str, scope: PracticeScope | str,
+def select_objectives(conn: psycopg.Connection, version: str, scope: PracticeScope | str,
                       subject_code: str, codes: list[str] | None = None) -> Selection:
     """Resolve a practice selection to objectives with their evidences.
 

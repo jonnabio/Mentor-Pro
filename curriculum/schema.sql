@@ -1,8 +1,7 @@
--- Mentor Pro curriculum catalog (SQLite), schema version 1.
--- Five tables per ADR-006. Curricular text columns store workbook cells verbatim.
--- No student data is stored here.
-
-PRAGMA foreign_keys = ON;
+-- Mentor Pro curriculum catalog (PostgreSQL), schema version 2.
+-- Same five-table logical model as ADR-006; migrated from SQLite per ADR-007.
+-- Tables are created in the schema selected by search_path (default "curriculum").
+-- Curricular text columns store workbook cells verbatim. No student data is stored here.
 
 CREATE TABLE IF NOT EXISTS subject (
     code     TEXT PRIMARY KEY CHECK (code IN ('espanol', 'matematicas', 'ciencias', 'estudios_sociales')),
@@ -18,10 +17,10 @@ CREATE TABLE IF NOT EXISTS source_document (
     kind              TEXT NOT NULL CHECK (kind IN ('workbook', 'spec_table', 'rubric')),
     year              INTEGER NOT NULL,
     file_ref          TEXT,              -- generic manifest name; never a student-identifying name
-    sha256            TEXT CHECK (sha256 IS NULL OR length(sha256) = 64),
+    sha256            TEXT CHECK (sha256 IS NULL OR sha256 ~ '^[0-9a-f]{64}$'),
     provenance        TEXT NOT NULL CHECK (provenance IN ('official', 'secondary')),
     availability      TEXT NOT NULL CHECK (availability IN ('held', 'cited_not_held')),
-    imported_at       TEXT,              -- set for the imported workbook only
+    imported_at       TIMESTAMPTZ,       -- set for the imported workbook only
     PRIMARY KEY (baseline_version, id)
 );
 

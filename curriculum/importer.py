@@ -1,4 +1,4 @@
-"""Repeatable import of the PNE Tracker workbook into the SQLite curriculum catalog.
+"""Repeatable import of the PNE Tracker workbook into the PostgreSQL curriculum catalog.
 
 Reads only `07 Catálogo` and `06 Evidencias`. Curricular cells are stored
 verbatim. The `Logrado ✓` column (student progress) is never stored.
@@ -10,10 +10,11 @@ Idempotent per baseline version:
 Every structural or consistency problem aborts the whole import (fail closed);
 nothing is written unless all checks pass.
 
+Database: DATABASE_URL (environment or .env); schema "curriculum" (ADR-007).
+
 Usage:
-    python -m curriculum.importer --workbook PATH [--db data/curriculum.sqlite]
-        [--version PNE2026-SUM-v1.0] [--manifest references/MANIFEST.sha256]
-        [--report report.json]
+    python -m curriculum.importer --workbook PATH [--version PNE2026-SUM-v1.0]
+        [--manifest references/MANIFEST.sha256] [--schema curriculum] [--report report.json]
 """
 
 from __future__ import annotations
@@ -22,7 +23,6 @@ import argparse
 import hashlib
 import json
 import re
-import sqlite3
 import sys
 from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
@@ -30,13 +30,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import psycopg
+from psycopg import sql
+
+from curriculum import db
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_PATH = Path(__file__).resolve().parent / "schema.sql"
-DEFAULT_DB = REPO_ROOT / "data" / "curriculum.sqlite"
 DEFAULT_MANIFEST = REPO_ROOT / "references" / "MANIFEST.sha256"
 DEFAULT_VERSION = "PNE2026-SUM-v1.0"
 SPEC = "PNE2026"
-IMPORTER_VERSION = "1.0.0"
+IMPORTER_VERSION = "2.0.0"
 
 CATALOG_SHEET = "07 Catálogo"
 EVIDENCE_SHEET = "06 Evidencias"
@@ -298,113 +301,131 @@ def parse(workbook: Any) -> ParsedBaseline:
 
 # --------------------------------------------------------------------------- writing
 
-def connect(db_path: Path) -> sqlite3.Connection:
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-    return conn
+_INSERT_SOURCE = """INSERT INTO source_document (baseline_version, id, title, kind, year, file_ref, sha256,
+    provenance, availability, imported_at)
+    VALUES (%(v)s, %(id)s, %(title)s, %(kind)s, 2026, %(file_ref)s, %(sha)s, %(provenance)s,
+    %(availability)s, %(imported_at)s)"""
 
 
-def _write(conn: sqlite3.Connection, version: str, parsed: ParsedBaseline, sha: str, file_ref: str) -> None:
-    conn.executemany(
-        "INSERT OR IGNORE INTO subject (code, name_es, id_code) VALUES (?, ?, ?)",
-        [(code, name, id_code) for name, (code, id_code) in SUBJECTS.items()],
-    )
-    conn.execute(
-        "INSERT INTO source_document VALUES (?, ?, ?, 'workbook', 2026, ?, ?, 'secondary', 'held', ?)",
-        (version, WORKBOOK_DOC_ID, "PNE Tracker 2026 — Objetivos MEP (workbook)", file_ref, sha,
-         datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
-    )
-    conn.executemany(
-        "INSERT INTO source_document VALUES (?, ?, ?, ?, 2026, NULL, NULL, 'official', 'cited_not_held', NULL)",
-        [(version, doc_id, title, kind) for doc_id, title, kind in parsed.cited_documents.values()],
-    )
-    conn.executemany(
-        "INSERT INTO block VALUES (:v, :id, :subject_code, :assessment_type, :ordinal, :name_es, :weight_pct)",
-        [dict(b, v=version) for b in parsed.blocks],
-    )
-    conn.executemany(
-        """INSERT INTO assertion VALUES (:v, :id, :workbook_code, :block_id, :ordinal, :numbering_es,
-           :text_es, :concepts_es, :check_activity_es, :source_citation_es, :source_document_id,
-           :source_table, :source_page, :planned_items_raw, :planned_items, :evidence_count,
-           'secondary', 'approved', 'unverified')""",
-        [dict(a, v=version) for a in parsed.assertions],
-    )
-    conn.executemany(
-        "INSERT INTO evidence VALUES (:v, :id, :assertion_id, :ordinal, :text_es, 'secondary', 'unverified')",
-        [dict(e, v=version) for e in parsed.evidences],
-    )
+def _write(conn: psycopg.Connection, version: str, parsed: ParsedBaseline, sha: str, file_ref: str) -> None:
+    with conn.cursor() as cur:
+        cur.executemany(
+            "INSERT INTO subject (code, name_es, id_code) VALUES (%s, %s, %s) ON CONFLICT (code) DO NOTHING",
+            [(code, name, id_code) for name, (code, id_code) in SUBJECTS.items()],
+        )
+        cur.execute(_INSERT_SOURCE, {
+            "v": version, "id": WORKBOOK_DOC_ID, "title": "PNE Tracker 2026 — Objetivos MEP (workbook)",
+            "kind": "workbook", "file_ref": file_ref, "sha": sha, "provenance": "secondary",
+            "availability": "held", "imported_at": datetime.now(timezone.utc),
+        })
+        cur.executemany(_INSERT_SOURCE, [
+            {"v": version, "id": doc_id, "title": title, "kind": kind, "file_ref": None, "sha": None,
+             "provenance": "official", "availability": "cited_not_held", "imported_at": None}
+            for doc_id, title, kind in parsed.cited_documents.values()
+        ])
+        cur.executemany(
+            """INSERT INTO block (baseline_version, id, subject_code, assessment_type, ordinal, name_es, weight_pct)
+               VALUES (%(v)s, %(id)s, %(subject_code)s, %(assessment_type)s, %(ordinal)s, %(name_es)s,
+                       %(weight_pct)s)""",
+            [dict(b, v=version) for b in parsed.blocks],
+        )
+        cur.executemany(
+            """INSERT INTO assertion (baseline_version, id, workbook_code, block_id, ordinal, numbering_es, text_es,
+                   concepts_es, check_activity_es, source_citation_es, source_document_id, source_table,
+                   source_page, planned_items_raw, planned_items, evidence_count, provenance,
+                   baseline_status, verification_status)
+               VALUES (%(v)s, %(id)s, %(workbook_code)s, %(block_id)s, %(ordinal)s, %(numbering_es)s, %(text_es)s,
+                   %(concepts_es)s, %(check_activity_es)s, %(source_citation_es)s, %(source_document_id)s,
+                   %(source_table)s, %(source_page)s, %(planned_items_raw)s, %(planned_items)s,
+                   %(evidence_count)s, 'secondary', 'approved', 'unverified')""",
+            [dict(a, v=version) for a in parsed.assertions],
+        )
+        cur.executemany(
+            """INSERT INTO evidence (baseline_version, id, assertion_id, ordinal, text_es, provenance,
+                   verification_status)
+               VALUES (%(v)s, %(id)s, %(assertion_id)s, %(ordinal)s, %(text_es)s, 'secondary', 'unverified')""",
+            [dict(e, v=version) for e in parsed.evidences],
+        )
 
 
-def summarize(conn: sqlite3.Connection, version: str) -> dict[str, Any]:
+def summarize(conn: psycopg.Connection, version: str) -> dict[str, Any]:
     components = conn.execute(
         """SELECT s.name_es AS subject, b.assessment_type, COUNT(DISTINCT a.id) AS objectives,
                   COUNT(e.id) AS evidences, COUNT(DISTINCT b.id) AS blocks
            FROM assertion a JOIN block b ON b.baseline_version = a.baseline_version AND b.id = a.block_id
            JOIN subject s ON s.code = b.subject_code
            LEFT JOIN evidence e ON e.baseline_version = a.baseline_version AND e.assertion_id = a.id
-           WHERE a.baseline_version = ? GROUP BY s.name_es, b.assessment_type ORDER BY 1, 2""",
+           WHERE a.baseline_version = %s GROUP BY s.name_es, b.assessment_type ORDER BY 1, 2""",
         (version,),
     ).fetchall()
-    one = lambda sql: conn.execute(sql, (version,)).fetchone()[0]  # noqa: E731
+
+    def count(table: str) -> int:
+        query = sql.SQL("SELECT COUNT(*) AS n FROM {} WHERE baseline_version = %s").format(sql.Identifier(table))
+        return conn.execute(query, (version,)).fetchone()["n"]
+
     return {
         "baseline_version": version,
-        "assertions": one("SELECT COUNT(*) FROM assertion WHERE baseline_version = ?"),
-        "evidences": one("SELECT COUNT(*) FROM evidence WHERE baseline_version = ?"),
-        "blocks": one("SELECT COUNT(*) FROM block WHERE baseline_version = ?"),
-        "source_documents": one("SELECT COUNT(*) FROM source_document WHERE baseline_version = ?"),
+        "assertions": count("assertion"),
+        "evidences": count("evidence"),
+        "blocks": count("block"),
+        "source_documents": count("source_document"),
         "components": [dict(r) for r in components],
     }
 
 
-def import_workbook(workbook_path: Path, db_path: Path = DEFAULT_DB, version: str = DEFAULT_VERSION,
-                    manifest: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
-    """Import the workbook as baseline `version`. Returns an import report dict."""
+def import_workbook(workbook_path: Path, url: str | None = None, version: str = DEFAULT_VERSION,
+                    manifest: Path = DEFAULT_MANIFEST, schema: str = db.DEFAULT_SCHEMA) -> dict[str, Any]:
+    """Import the workbook as baseline `version` into PostgreSQL. Returns an import report dict.
+
+    The existing-baseline check and all inserts run in one transaction under an
+    advisory lock, so concurrent imports of the same version cannot race.
+    """
     import openpyxl  # local import: only the importer needs it
 
     sha = sha256_file(workbook_path)
     file_ref = manifest_name(manifest, sha)
-    conn = connect(db_path)
+    workbook = openpyxl.load_workbook(workbook_path, read_only=True, data_only=True)
     try:
-        existing = conn.execute(
-            "SELECT sha256 FROM source_document WHERE baseline_version = ? AND id = ?",
-            (version, WORKBOOK_DOC_ID),
-        ).fetchone()
-        if existing and existing["sha256"] == sha:
-            return {"status": "unchanged", "workbook_sha256": sha, "warnings": [], **summarize(conn, version)}
-        if existing:
-            raise WorkbookImportError([f"baseline {version} already imported from a different workbook "
-                                f"({existing['sha256'][:12]}…); create a new baseline version"])
-
-        workbook = openpyxl.load_workbook(workbook_path, read_only=True, data_only=True)
-        try:
-            parsed = parse(workbook)
-        finally:
-            workbook.close()
-        with conn:  # single transaction: all or nothing
-            _write(conn, version, parsed, sha, file_ref)
-        return {"status": "imported", "workbook_sha256": sha, "importer_version": IMPORTER_VERSION,
-                "warnings": parsed.warnings, **summarize(conn, version)}
+        parsed = parse(workbook)  # fail closed before touching the database
     finally:
-        conn.close()
+        workbook.close()
+
+    with db.connect(url or db.database_url(), schema) as conn:
+        with conn.transaction():  # all or nothing
+            conn.execute("SELECT pg_advisory_xact_lock(hashtext(%s))", (f"{schema}:{version}",))
+            existing = conn.execute(
+                "SELECT sha256 FROM source_document WHERE baseline_version = %s AND id = %s",
+                (version, WORKBOOK_DOC_ID),
+            ).fetchone()
+            if existing and existing["sha256"] == sha:
+                return {"status": "unchanged", "workbook_sha256": sha, "warnings": [], **summarize(conn, version)}
+            if existing:
+                raise WorkbookImportError([f"baseline {version} already imported from a different workbook "
+                                           f"({existing['sha256'][:12]}…); create a new baseline version"])
+            _write(conn, version, parsed, sha, file_ref)
+            report = summarize(conn, version)
+    return {"status": "imported", "workbook_sha256": sha, "importer_version": IMPORTER_VERSION,
+            "warnings": parsed.warnings, **report}
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Import the PNE Tracker workbook into the curriculum catalog.")
     parser.add_argument("--workbook", required=True, type=Path)
-    parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--version", default=DEFAULT_VERSION)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--schema", default=db.DEFAULT_SCHEMA, help="PostgreSQL schema (default: curriculum)")
     parser.add_argument("--report", type=Path, help="write the JSON report here")
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     try:
-        report = import_workbook(args.workbook, args.db, args.version, args.manifest)
+        report = import_workbook(args.workbook, None, args.version, args.manifest, args.schema)
     except WorkbookImportError as exc:
         print(json.dumps({"status": "failed", "problems": exc.problems}, ensure_ascii=False, indent=2))
         return 1
+    except (db.ConfigurationError, psycopg.OperationalError) as exc:
+        # Error class only: never echo the connection string.
+        print(json.dumps({"status": "failed", "problems": [f"database: {type(exc).__name__}"]}, indent=2))
+        return 2
     text = json.dumps(report, ensure_ascii=False, indent=2)
     if args.report:
         args.report.write_text(text + "\n", encoding="utf-8")

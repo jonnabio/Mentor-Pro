@@ -14,8 +14,8 @@ V = "TEST-v1"
 @pytest.fixture()
 def conn(build, db):
     workbook, manifest = build()
-    importer.import_workbook(workbook, db, V, manifest)
-    connection = open_catalog(db)
+    importer.import_workbook(workbook, db.url, V, manifest, db.schema)
+    connection = open_catalog(db.url, db.schema)
     yield connection
     connection.close()
 
@@ -85,7 +85,7 @@ def test_get_objective_and_types(conn):
 
 
 def test_catalog_is_read_only(conn):
-    import sqlite3
+    import psycopg
 
-    with pytest.raises(sqlite3.OperationalError):
+    with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
         conn.execute("DELETE FROM evidence")
