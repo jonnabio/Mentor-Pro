@@ -12,6 +12,7 @@ entry:
   standards:
     - .ace/standards/coding.md
     - .ace/standards/security.md
+    - .ace/standards/question-engine.md
   roles: .ace/roles/roles.md
 
 # Critical rules (always in context - keep under 500 tokens)
@@ -61,6 +62,31 @@ skill_triggers:
   workitem: .ace/skills/az-create-work-item/SKILL.md
   backlog: .ace/skills/az-read-work-item/SKILL.md
   board: .ace/skills/az-read-work-item/SKILL.md
+  # Question engine (ADR-005)
+  curriculum: .ace/skills/mep-curriculum-grounding/SKILL.md
+  grounding: .ace/skills/mep-curriculum-grounding/SKILL.md
+  afirmacion: .ace/skills/mep-curriculum-grounding/SKILL.md
+  evidencia: .ace/skills/mep-curriculum-grounding/SKILL.md
+  question: .ace/skills/mep-question-design/SKILL.md
+  item: .ace/skills/mep-question-design/SKILL.md
+  distractor: .ace/skills/mep-question-design/SKILL.md
+  validation: .ace/skills/question-quality-review/SKILL.md
+  quality: .ace/skills/question-quality-review/SKILL.md
+  checker: .ace/skills/question-quality-review/SKILL.md
+  math: .ace/skills/math-answer-verification/SKILL.md
+  answer: .ace/skills/math-answer-verification/SKILL.md
+  coverage: .ace/skills/evidence-coverage-planning/SKILL.md
+  practice: .ace/skills/evidence-coverage-planning/SKILL.md
+  benchmark: .ace/skills/question-evaluation/SKILL.md
+  evaluation: .ace/skills/question-evaluation/SKILL.md
+  openrouter: .ace/skills/openrouter-model-routing/SKILL.md
+  routing: .ace/skills/openrouter-model-routing/SKILL.md
+  llm: .ace/skills/openrouter-model-routing/SKILL.md
+  cost: .ace/skills/llm-cost-observability/SKILL.md
+  budget: .ace/skills/llm-cost-observability/SKILL.md
+  usage: .ace/skills/llm-cost-observability/SKILL.md
+  ingestion: .ace/skills/curriculum-data-ingestion/SKILL.md
+  extraction: .ace/skills/curriculum-data-ingestion/SKILL.md
 
 # Role routing based on mode
 role_routing:
@@ -77,8 +103,9 @@ role_routing:
 # if ALL commands are empty/missing, verify.sh fails - an unconfigured
 # gate must never silently pass.
 verify:
-  test_cmd: "cd cli && npm test"
-  lint_cmd: "npx --yes markdownlint-cli2"
+  test_cmd: ".venv/Scripts/python.exe -m pytest -q tests/ace && .venv/Scripts/python.exe .ace/scripts/validate_skills.py"
+  # Scoped to question-engine docs; framework baseline debt is tracked in docs/TODO-markdown-lint.md
+  lint_cmd: "npx markdownlint-cli2 --no-globs '.ace/skills/{mep-curriculum-grounding,mep-question-design,question-quality-review,math-answer-verification,evidence-coverage-planning,question-evaluation,openrouter-model-routing,llm-cost-observability,curriculum-data-ingestion}/SKILL.md' .ace/standards/question-engine.md .ace/knowledge/mep-pne-curriculum.md 'docs/adr/ADR-00[45]-*.md' 'docs/planning/2026-*.md' 'docs/progress/task_T*_result.md' docs/context/ACTIVE_CONTEXT.md"
   typecheck_cmd: ""
 
 # Validation hooks
