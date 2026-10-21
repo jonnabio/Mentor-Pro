@@ -36,3 +36,7 @@ secrets.yaml
 
 # MEP source documents: distribution rights unverified; tracked by checksum manifest only
 references/original/
+
+# Python caches
+__pycache__/
+.pytest_cache/
