@@ -1,0 +1,29 @@
+# Minimal local PostgreSQL for Mentor Pro (ADR-007).
+#
+#   POSTGRES_PASSWORD=<choose one> docker compose up -d
+#   DATABASE_URL=postgresql://mentor_pro_admin:<password>@127.0.0.1:5433/mentor_pro
+#
+# Host port defaults to 5433 so it does not clash with a native PostgreSQL on 5432.
+# The test suite uses a separate database ending in "_test" (created below).
+services:
+  postgres:
+    image: postgres:17.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mentor_pro_admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: mentor_pro
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - mentor_pro_pg:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mentor_pro_admin -d mentor_pro"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mentor_pro_pg:
