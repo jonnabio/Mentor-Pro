@@ -64,8 +64,8 @@ One ValidationResult per item:
 | C07 | All | Stem ≤ 120 words, options ≤ 30 words |
 | C08 | All | Stimulus present when the stem refers to one |
 | C09 | All | Key length cue (warning) |
-| G01 | All | Bloque → afirmación → evidencia chain, subject, application, official |
-| G02 | All | Every excerpt verbatim in an official record |
+| G01 | All | Chain, subject, application; record official or approved baseline (ADR-006) |
+| G02 | All | Every excerpt verbatim in a groundable record |
 | G03 | All | Cognitive verb appears in the evidencia (warning) |
 | D01 | All | No exact or near duplicate (bank and siblings) |
 | M01–M03 | Matemáticas | Exact expression; es-CR numbers and units; only the key equals the value |

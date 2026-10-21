@@ -96,6 +96,19 @@ record against the PDF page and sets `accepted` or `rejected` with notes.
 
 ---
 
+### 6. Workbook baseline (PNE2026-SUM-v1.0)
+
+```bash
+.venv/Scripts/python.exe -m curriculum.importer --workbook <path-to-workbook.xlsx>
+```
+
+- Reads `07 Catálogo` and `06 Evidencias` only; stores cells verbatim.
+- Never stores `Logrado ✓`; the file is referenced by its generic manifest name.
+- Idempotent per baseline version; a changed workbook needs a new version.
+- Fails closed on any structural or consistency problem; nothing is written.
+
+---
+
 ## Dependencies
 
 | Skill | Relationship |

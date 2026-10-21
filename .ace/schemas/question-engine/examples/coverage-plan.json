@@ -1,23 +1,49 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "plan_id": "CP-20261021-0001",
   "request": {
     "subject": "matematicas",
     "spec_version": "PNE2025",
     "application": "diagnostica",
-    "target_ids": ["PNE2025-PRI-MAT-DIAG-B1-A3"],
+    "target_ids": [
+      "PNE2025-PRI-MAT-DIAG-B1-A3"
+    ],
     "difficulty": "mixed",
     "question_count": 3,
     "option_count": 4,
-    "mode": "focused"
+    "scope": "single_objective",
+    "baseline_version": "PNE2025-DIAG-v0.1"
   },
   "slots": [
-    { "slot": 1, "evidencia_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E2", "difficulty": "easy", "cognitive_verb": "Aplica", "task_format": "contextual_division" },
-    { "slot": 2, "evidencia_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E2", "difficulty": "medium", "cognitive_verb": "Aplica", "task_format": "identify_divisor" },
-    { "slot": 3, "evidencia_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E2", "difficulty": "hard", "cognitive_verb": "Aplica", "task_format": "multi_step_grouping" }
+    {
+      "slot": 1,
+      "evidencia_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E2",
+      "difficulty": "easy",
+      "cognitive_verb": "Aplica",
+      "task_format": "contextual_division"
+    },
+    {
+      "slot": 2,
+      "evidencia_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E2",
+      "difficulty": "medium",
+      "cognitive_verb": "Aplica",
+      "task_format": "identify_divisor"
+    },
+    {
+      "slot": 3,
+      "evidencia_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E2",
+      "difficulty": "hard",
+      "cognitive_verb": "Aplica",
+      "task_format": "multi_step_grouping"
+    }
   ],
-  "coverage": { "PNE2025-PRI-MAT-DIAG-B1-A3-E2": 3 },
+  "coverage": {
+    "PNE2025-PRI-MAT-DIAG-B1-A3-E2": 3
+  },
   "insufficient": [
-    { "target_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E1", "reason": "evidencia not present in grounding bundle" }
+    {
+      "target_id": "PNE2025-PRI-MAT-DIAG-B1-A3-E1",
+      "reason": "evidencia not present in grounding bundle"
+    }
   ]
 }

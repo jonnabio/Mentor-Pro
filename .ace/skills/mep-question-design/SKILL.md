@@ -1,6 +1,6 @@
 ---
 name: mep-question-design
-description: Designs original Spanish (Costa Rica) multiple-choice PNE practice items for sixth grade, each tied to one official evidencia, with configurable option count, cognitive-demand difficulty, plausible distractors, exactly one correct answer, explanations and provenance metadata in the QuestionItem JSON contract. Use when writing generation prompts or producing candidate items.
+description: Designs original Spanish (Costa Rica) multiple-choice PNE practice items for sixth grade, each tied to one groundable evidencia (official or approved baseline), with configurable option count, cognitive-demand difficulty, plausible distractors, exactly one correct answer, explanations and provenance metadata in the QuestionItem JSON contract. Use when writing generation prompts or producing candidate items.
 ---
 
 # Skill: MEP Question Design
@@ -105,7 +105,8 @@ concept; it must not introduce facts absent from the grounding.
 
 ### 6. Attach provenance
 
-Fill `curriculum_ref`, `source_refs` (verbatim excerpt), and `generation`
+Fill `curriculum_ref`, `source_refs` (verbatim excerpt), `grounding_basis`
+(`official` or `approved_baseline`, from the grounding bundle) and `generation`
 (model requested and used, prompt ID and version, timestamp).
 
 ---

@@ -94,10 +94,16 @@ For each target ID:
 ### 2. Enforce authority
 
 ```markdown
-1. Keep only records with provenance = official and review.status != rejected.
-2. Confirm source.file_sha256 appears in references/MANIFEST.sha256.
-3. Secondary records may be attached as context, never as the grounding basis.
+1. Keep multiple_choice records that are official OR baseline_status = approved
+   (ADR-006), and review.status != rejected.
+2. Record grounding_basis per evidencia: official | approved_baseline.
+3. Official records: confirm source.file_sha256 is in references/MANIFEST.sha256.
+4. Other secondary records may be context only, never the grounding basis.
+5. written_rubric records (Español EE) are never grounding for items.
 ```
+
+Baseline `PNE2026-SUM-v1.0` lives in the SQLite catalog (`curriculum/`);
+resolve workbook codes (`M07`) with `curriculum/catalog.py`.
 
 ### 3. Detect unsupported links
 
@@ -132,7 +138,7 @@ The verb definitions live in the componente's *infinitivos verbales* table.
 |-----------|--------|
 | Unknown target ID | Add to `rejected_targets` with reason `unknown_id` |
 | Broken parent chain | Reject target, reason `broken_chain` |
-| Only secondary sources | Reject target, reason `no_official_source` |
+| Neither official nor approved baseline | Reject target, reason `not_groundable` |
 | Checksum not in manifest | Reject target, reason `unverified_source` |
 | All targets rejected | Return `status: abstain`; generation must not start |
 
@@ -161,7 +167,8 @@ Sample records: `.ace/schemas/question-engine/examples/curriculum-records.json`.
 1. **Paraphrasing curricular text**: breaks verbatim excerpt checks downstream.
 2. **Ignoring the application**: diagnóstica and sumativa tables differ.
 3. **Evidencia numbers without afirmación**: numbering restarts per afirmación.
-4. **Treating guides as official**: workbooks and item collections are secondary.
+4. **Relabelling approved baseline text as official**: approval is not
+   provenance; keep `secondary` and set `grounding_basis: approved_baseline`.
 5. **Using printed page numbers**: `source.page` is the PDF page index.
 
 ---

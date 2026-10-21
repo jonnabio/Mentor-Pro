@@ -5,7 +5,7 @@ import json
 import jsonschema
 import pytest
 
-from conftest import EXAMPLES, SCHEMAS, load
+from ace_paths import EXAMPLES, SCHEMAS, load
 
 CASES = [
     ("curriculum-record.schema.json", "curriculum-records.json"),
@@ -63,7 +63,7 @@ def test_item_difficulty_cannot_be_mixed_but_request_can():
 
 
 def test_example_records_match_manifest_checksum():
-    from conftest import REPO_ROOT
+    from ace_paths import REPO_ROOT
 
     manifest = (REPO_ROOT / "references" / "MANIFEST.sha256").read_text(encoding="utf-8")
     for record in load(EXAMPLES / "curriculum-records.json"):

@@ -5,7 +5,7 @@ import shutil
 import pytest
 
 import validate_skills
-from conftest import REPO_ROOT
+from ace_paths import REPO_ROOT
 
 DOMAIN_SKILLS = [
     "mep-curriculum-grounding", "mep-question-design", "question-quality-review",

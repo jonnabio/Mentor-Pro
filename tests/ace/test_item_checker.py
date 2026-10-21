@@ -6,7 +6,7 @@ import json
 import pytest
 
 import item_checker
-from conftest import EXAMPLES, SCRIPTS
+from ace_paths import EXAMPLES, SCRIPTS
 
 
 def failing_ids(result: dict) -> set[str]:
@@ -240,3 +240,38 @@ def test_every_subject_has_subject_checks(subject, item_by_subject, records_by_i
     ids = {c["id"][0] for c in run(item, records_by_id, validator)["checks"]}
     expected = {"espanol": "R", "matematicas": "M", "ciencias": "F", "estudios_sociales": "F"}[subject]
     assert expected in ids
+
+
+# ---------------------------------------------------------------- approved baseline (ADR-006)
+
+def baseline_records(records_by_id, **overrides):
+    records = copy.deepcopy(records_by_id)
+    for rid in ("PNE2025-PRI-MAT-DIAG-B1-A3-E2",):
+        records[rid].update({"provenance": "secondary", "baseline_status": "approved",
+                             "verification_status": "unverified", **overrides})
+    return records
+
+
+def test_approved_baseline_secondary_record_grounds(item_by_subject, records_by_id, validator):
+    result = run(item_by_subject["matematicas"], baseline_records(records_by_id), validator)
+    assert result["deterministic_status"] == "pass", result["reasons"]
+    g01 = next(c for c in result["checks"] if c["id"] == "G01")
+    assert "approved_baseline" in g01["message"]
+
+
+def test_withdrawn_baseline_record_does_not_ground(item_by_subject, records_by_id, validator):
+    records = baseline_records(records_by_id, baseline_status="withdrawn")
+    assert {"G01", "G02"} <= failing_ids(run(item_by_subject["matematicas"], records, validator))
+
+
+def test_rubric_records_never_ground_items(item_by_subject, records_by_id, validator):
+    records = baseline_records(records_by_id, assessment_type="written_rubric")
+    assert "G01" in failing_ids(run(item_by_subject["matematicas"], records, validator))
+
+
+def test_item_cannot_claim_official_basis_for_baseline_record(item_by_subject, records_by_id, validator):
+    item = item_by_subject["matematicas"]
+    item["grounding_basis"] = "official"
+    assert "G01" in failing_ids(run(item, baseline_records(records_by_id), validator))
+    item["grounding_basis"] = "approved_baseline"
+    assert "G01" not in failing_ids(run(item, baseline_records(records_by_id), validator))

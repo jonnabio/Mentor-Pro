@@ -86,6 +86,8 @@ skill_triggers:
   budget: .ace/skills/llm-cost-observability/SKILL.md
   usage: .ace/skills/llm-cost-observability/SKILL.md
   ingestion: .ace/skills/curriculum-data-ingestion/SKILL.md
+  import: .ace/skills/curriculum-data-ingestion/SKILL.md
+  baseline: .ace/skills/mep-curriculum-grounding/SKILL.md
   extraction: .ace/skills/curriculum-data-ingestion/SKILL.md
 
 # Role routing based on mode
@@ -103,9 +105,9 @@ role_routing:
 # if ALL commands are empty/missing, verify.sh fails - an unconfigured
 # gate must never silently pass.
 verify:
-  test_cmd: ".venv/Scripts/python.exe -m pytest -q tests/ace && .venv/Scripts/python.exe .ace/scripts/validate_skills.py"
+  test_cmd: ".venv/Scripts/python.exe -m pytest -q tests/ace tests/curriculum && .venv/Scripts/python.exe .ace/scripts/validate_skills.py"
   # Scoped to question-engine docs; framework baseline debt is tracked in docs/TODO-markdown-lint.md
-  lint_cmd: "npx markdownlint-cli2 --no-globs '.ace/skills/{mep-curriculum-grounding,mep-question-design,question-quality-review,math-answer-verification,evidence-coverage-planning,question-evaluation,openrouter-model-routing,llm-cost-observability,curriculum-data-ingestion}/SKILL.md' .ace/standards/question-engine.md .ace/knowledge/mep-pne-curriculum.md 'docs/adr/ADR-00[45]-*.md' 'docs/planning/2026-*.md' 'docs/progress/task_T*_result.md' docs/context/ACTIVE_CONTEXT.md"
+  lint_cmd: "npx markdownlint-cli2 --no-globs '.ace/skills/{mep-curriculum-grounding,mep-question-design,question-quality-review,math-answer-verification,evidence-coverage-planning,question-evaluation,openrouter-model-routing,llm-cost-observability,curriculum-data-ingestion}/SKILL.md' .ace/standards/question-engine.md .ace/knowledge/mep-pne-curriculum.md 'docs/adr/ADR-00[456]-*.md' 'docs/requirements/2026-*.md' 'docs/planning/2026-*.md' 'docs/progress/task_T*_result.md' docs/context/ACTIVE_CONTEXT.md"
   typecheck_cmd: ""
 
 # Validation hooks

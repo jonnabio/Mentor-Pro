@@ -49,6 +49,7 @@ classification of files in `references/original/`:
 | `Marco-de-especificaciones-*.pdf` | `official` |
 | `*-PRIMARIA-DIURNA.pdf` (Programas de Estudio) | `official` |
 | Guías, cuadernos, workbooks, `Examen_Diagnostico_*`, item collections | `secondary` |
+| `PNE-Tracker-2026-workbook.xlsx` (generic name) | `secondary`, approved baseline `PNE2026-SUM-v1.0` (ADR-006) |
 
 Checksums: `references/MANIFEST.sha256`.
 

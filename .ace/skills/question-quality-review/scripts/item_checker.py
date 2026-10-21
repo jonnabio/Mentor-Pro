@@ -28,7 +28,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cr_math import AmbiguousNumberError, evaluate, parse_quantity  # noqa: E402
 
-CHECKER_VERSION = "1.0.0"
+CHECKER_VERSION = "1.1.0"
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "question-engine" / "question-item.schema.json"
 
 SUBJECT_CODES = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
@@ -178,6 +178,17 @@ def check_lengths_and_stimulus(item: dict[str, Any]) -> list[Check]:
     return checks
 
 
+def grounding_basis(record: dict[str, Any]) -> str | None:
+    """Return "official", "approved_baseline" or None (not groundable). See ADR-006."""
+    if record.get("assessment_type", "multiple_choice") != "multiple_choice":
+        return None
+    if record.get("provenance") == "official":
+        return "official"
+    if record.get("baseline_status") == "approved":
+        return "approved_baseline"
+    return None
+
+
 def check_grounding(item: dict[str, Any], records: dict[str, dict[str, Any]]) -> list[Check]:
     checks: list[Check] = []
     ref = item.get("curriculum_ref", {})
@@ -200,24 +211,27 @@ def check_grounding(item: dict[str, Any], records: dict[str, dict[str, Any]]) ->
             problems.append("subject mismatch")
         if evid.get("application") != ref.get("application") or evid.get("spec_version") != ref.get("spec_version"):
             problems.append("application/spec_version mismatch")
-        if evid.get("provenance") != "official":
-            problems.append("evidencia is not official")
+        basis = grounding_basis(evid)
+        if basis is None:
+            problems.append("evidencia is neither official nor in an approved baseline")
+        elif item.get("grounding_basis") not in (None, basis):
+            problems.append(f"item grounding_basis {item.get('grounding_basis')!r} != record basis {basis!r}")
         if evid.get("review", {}).get("status") == "rejected":
             problems.append("evidencia record was rejected in review")
     if not item.get("item_id", "").startswith(f"Q-{evid_id}-"):
         problems.append("item_id does not embed the evidencia_id")
     checks.append(_check("G01", "fail", "; ".join(problems)) if problems
-                  else _check("G01", "pass", "curriculum chain is consistent and official"))
+                  else _check("G01", "pass", f"curriculum chain is consistent (basis: {grounding_basis(evid)})"))
 
     bad_refs = []
     for src in item.get("source_refs", []):
         rec = records.get(src.get("record_id", ""))
-        if rec is None or rec.get("provenance") != "official":
-            bad_refs.append(f"{src.get('record_id')}: unknown or not official")
+        if rec is None or grounding_basis(rec) is None:
+            bad_refs.append(f"{src.get('record_id')}: unknown, or neither official nor approved baseline")
         elif squash(src.get("excerpt", "")) not in squash(rec.get("text_es", "")):
             bad_refs.append(f"{src.get('record_id')}: excerpt not verbatim")
     checks.append(_check("G02", "fail", "; ".join(bad_refs)) if bad_refs
-                  else _check("G02", "pass", "every excerpt is verbatim official text"))
+                  else _check("G02", "pass", "every excerpt is verbatim text of a groundable record"))
 
     verb = item.get("cognitive_verb", "")
     if evid is not None and verb and normalize(verb) not in normalize(evid.get("text_es", "")):

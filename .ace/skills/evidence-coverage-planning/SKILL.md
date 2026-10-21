@@ -1,6 +1,6 @@
 ---
 name: evidence-coverage-planning
-description: Turns a practice request (subject, afirmaciones or evidencias, difficulty including mixed, question count, option count, focused or mixed mode) into a deterministic coverage plan that allocates questions across official evidencias, limits repetition, varies task formats and reports insufficient coverage. Use before any generation run.
+description: Turns a practice request (subject, afirmaciones or evidencias, difficulty including mixed, question count, option count, practice scope: single objective, selected objectives or subject simulation) into a deterministic coverage plan that allocates questions across official evidencias, limits repetition, varies task formats and reports insufficient coverage. Use before any generation run.
 ---
 
 # Skill: Evidence Coverage Planning
@@ -15,6 +15,9 @@ description: Turns a practice request (subject, afirmaciones or evidencias, diff
 - Allocate fairly across selected objectives; avoid repetition.
 - Resolve `mixed` difficulty into concrete levels.
 - Report targets that cannot be covered.
+- Support practice scopes `single_objective`, `selected_objectives` and
+  `subject_simulation` (ADR-006); scope is independent of assessment type and
+  only `multiple_choice` objectives are eligible.
 
 Shared rules: `.ace/standards/question-engine.md`.
 
@@ -60,8 +63,10 @@ A CoveragePlan valid against
 
 ```markdown
 1. Order evidencias by record_id.
-2. focused mode: round-robin over evidencias of the selected afirmación(es).
-   mixed mode: round-robin over afirmaciones first, then their evidencias.
+2. single_objective: round-robin over that objective's evidencias.
+   selected_objectives: round-robin over objectives first, then their evidencias.
+   subject_simulation: allocate per coverage_strategy —
+   proportional_planned_items (weights = planned_items) or round_robin.
 3. Prefer evidencias with the lowest `history` count (ties by record_id).
 4. Repetition limit: no evidencia gets more than ceil(count / n_evidencias) + 1 slots.
 5. Sumativa requests: weight afirmaciones by `item_count` when present.
@@ -110,7 +115,8 @@ selected evidencia that received zero slots, with the reason.
 
 ## Examples
 
-Request: Matemáticas, afirmación B1-A3, `mixed`, 3 questions, 4 options →
+Request: `single_objective`, Matemáticas, afirmación B1-A3, `mixed`, 3
+questions, 4 options →
 three slots on evidencia E2 at easy / medium / hard, with three formats; E1
 reported in `insufficient` because it was not in the bundle.
 

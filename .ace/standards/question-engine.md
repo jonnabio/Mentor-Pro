@@ -45,10 +45,15 @@ Domain vocabulary: [See: .ace/knowledge/mep-pne-curriculum.md]
 | Field | Allowed values |
 |-------|----------------|
 | `subject` | `espanol`, `matematicas`, `ciencias`, `estudios_sociales` |
-| `application` | `diagnostica`, `sumativa` |
+| `application` | `diagnostica`, `sumativa`, `produccion_escrita` |
 | `difficulty` (item) | `easy`, `medium`, `hard` |
 | `difficulty` (request) | `easy`, `medium`, `hard`, `mixed` |
 | `provenance` | `official`, `secondary` |
+| `baseline_status` | `approved`, `withdrawn` |
+| `verification_status` | `unverified`, `verified`, `discrepancy` |
+| `grounding_basis` (item) | `official`, `approved_baseline` |
+| `assessment_type` | `multiple_choice`, `written_rubric` |
+| `scope` (practice) | `single_objective`, `selected_objectives`, `subject_simulation` |
 | `verdict` | `accept`, `revise`, `regenerate`, `reject` |
 
 Subject display names: Español, Matemáticas, Ciencias, Estudios Sociales.
@@ -69,11 +74,14 @@ PNE2025-PRI-ESP-DIAG-B1-A2-E9
 | `SPEC` | Spec family and year, e.g. `PNE2025` |
 | `LEVEL` | `PRI` |
 | `SUBJ` | `ESP`, `MAT`, `CIE`, `EST` |
-| `APP` | `DIAG`, `SUM` |
+| `APP` | `DIAG`, `SUM`, `PE` (producción escrita rubric) |
 | `B/A/E` | Ordinals as printed in the source table |
 
 - Evidencia numbering restarts per afirmación; the afirmación ordinal is required.
 - Item IDs: `Q-{evidencia_id}-{8 hex}`; content changes create a new item version.
+- Baseline versions: `{SPEC}-{APP}-v{major}.{minor}`, e.g. `PNE2026-SUM-v1.0`.
+- Workbook objective codes (`EL01`, `M07`, `C01`, `ES01`) are the stable
+  user-facing identifiers and are never renumbered.
 
 ---
 
@@ -85,7 +93,18 @@ PNE2025-PRI-ESP-DIAG-B1-A2-E9
 | `secondary` | Workbooks, guides, item collections, third-party material | Context only; never sole basis for a link |
 
 - AI interpretations are stored in a separate field and are never `official`.
-- Every item cites at least one `official` record ID and a verbatim excerpt.
+
+### Grounding authority (ADR-006)
+
+A `multiple_choice` record may ground items when it is `official` **or** has
+`baseline_status: approved` (Product Owner approved baseline, e.g.
+`PNE2026-SUM-v1.0`). Approval never changes `provenance`.
+
+- Every item cites at least one groundable record ID and a verbatim excerpt.
+- Items record `grounding_basis`; `approved_baseline` items must not be shown
+  as official MEP wording.
+- `written_rubric` records never ground multiple-choice items.
+- Official discrepancies are resolved in a new baseline version.
 
 ---
 
@@ -102,7 +121,8 @@ PNE2025-PRI-ESP-DIAG-B1-A2-E9
 
 An item is **not publishable** when any of these holds:
 
-1. Unknown or `secondary`-only source.
+1. Unknown source, or a record that is neither `official` nor in an
+   approved baseline.
 2. Excerpt not found verbatim in the cited record.
 3. Missing stimulus (text, table, image) that the stem refers to.
 4. Zero or more than one defensible correct option.
@@ -134,4 +154,5 @@ checker version and verdict.
 ---
 
 *Last Updated: 2026-10-21*
-*Requires ADR to modify ([ADR-005](../../docs/adr/ADR-005-question-engine-skill-suite.md))*
+*Requires ADR to modify ([ADR-005](../../docs/adr/ADR-005-question-engine-skill-suite.md),
+[ADR-006](../../docs/adr/ADR-006-curriculum-baseline-v1.md))*
