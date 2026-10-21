@@ -112,3 +112,14 @@ def query(target: PgTarget, statement: str, *args) -> list[tuple]:
 
     with db.connect(target.url, target.schema) as conn:
         return conn.cursor(row_factory=tuple_row).execute(statement, args or None).fetchall()
+
+
+BASELINE_WORKBOOK_SHA = "cce57db40afacdb2f6d2492c39ba9df6c1bc398941c1c7fb9cff8ec28bcc19d3"
+
+
+def baseline_workbook() -> Path | None:
+    """The real baseline workbook, located by checksum (not in Git), or None."""
+    for path in (REPO_ROOT / "references" / "original").glob("*.xlsx"):
+        if hashlib.sha256(path.read_bytes()).hexdigest() == BASELINE_WORKBOOK_SHA:
+            return path
+    return None

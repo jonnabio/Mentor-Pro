@@ -1,3 +1,6 @@
 -r requirements.txt
 jsonschema==4.23.0
 pytest==8.3.5
+httpx==0.28.1
+# Optional: browser smoke test (scripts/dev/ui_smoke.py), uses installed Edge
+playwright==1.49.1

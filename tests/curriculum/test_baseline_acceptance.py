@@ -5,18 +5,16 @@ by its SHA-256 from references/MANIFEST.sha256. Without it these tests skip
 with an explicit reason; the import report records the run that passed.
 """
 
-import hashlib
 from collections import Counter
 
 import openpyxl
 import pytest
 from psycopg.rows import tuple_row
 
-from workbook_fixtures import REPO_ROOT, drop_target, new_target
+from workbook_fixtures import baseline_workbook, drop_target, new_target
 from curriculum import importer
 from curriculum.catalog import list_objectives, list_rubric_criteria, open_catalog, select_objectives
 
-WORKBOOK_SHA = "cce57db40afacdb2f6d2492c39ba9df6c1bc398941c1c7fb9cff8ec28bcc19d3"
 V = importer.DEFAULT_VERSION
 EXPECTED_COMPONENTS = {
     ("Español", "multiple_choice"): (8, 53),
@@ -29,14 +27,7 @@ SUBJECT_CODES = {"Español": "espanol", "Matemáticas": "matematicas", "Ciencias
                  "Estudios Sociales": "estudios_sociales"}
 
 
-def find_workbook():
-    for path in (REPO_ROOT / "references" / "original").glob("*.xlsx"):
-        if hashlib.sha256(path.read_bytes()).hexdigest() == WORKBOOK_SHA:
-            return path
-    return None
-
-
-WORKBOOK = find_workbook()
+WORKBOOK = baseline_workbook()
 pytestmark = pytest.mark.skipif(WORKBOOK is None, reason="baseline workbook not present in references/original/")
 
 
