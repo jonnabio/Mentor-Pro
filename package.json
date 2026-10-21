@@ -1,0 +1,8 @@
+{
+  "name": "mentor-pro-tooling",
+  "private": true,
+  "description": "Pinned developer tooling (markdown lint) for the ACE verify gate.",
+  "devDependencies": {
+    "markdownlint-cli2": "0.23.2"
+  }
+}

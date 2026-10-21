@@ -1,4 +1,18 @@
-# Markdown Lint — Resolved
+# Markdown Lint — Reopened (baseline debt)
+
+## Reopened 2026-10-21
+
+This repository was re-scaffolded without `.markdownlint-cli2.jsonc` or the
+pinned `package.json`, and the framework documents predate the fixes below.
+
+- Restored: `.markdownlint-cli2.jsonc` (MD060 off; MD013 exempts tables and
+  code blocks) and `package.json` pinning `markdownlint-cli2` 0.23.2.
+- Baseline: `npx markdownlint-cli2` reports about 700 issues in 68 framework
+  files (`ACE-SPEC.md`, `USER_GUIDE.md`, `az-*` skills, v2.x planning docs).
+- Interim gate: `lint_cmd` in `.aceconfig` lints the question-engine documents
+  only (zero issues). Widen it as baseline files are fixed.
+
+## History (2026-08-26)
 
 Status: **resolved** on 2026-08-26. Markdown lint now runs, is identical
 locally and in CI, reports zero errors, and fails the build on regression.

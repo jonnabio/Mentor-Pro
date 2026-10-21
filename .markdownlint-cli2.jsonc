@@ -1,0 +1,18 @@
+// Single markdownlint configuration for local runs, CI and the verify gate.
+// Restored 2026-10-21 per docs/TODO-markdown-lint.md.
+{
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules/**",
+    ".venv/**",
+    ".ace/packs/**",
+    "references/original/**"
+  ],
+  "config": {
+    "default": true,
+    // Autofix strips table padding; tables render identically (see TODO-markdown-lint.md).
+    "MD060": false,
+    // Tables and code blocks cannot wrap; prose lines stay at 80.
+    "MD013": { "tables": false, "code_blocks": false }
+  }
+}
