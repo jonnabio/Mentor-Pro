@@ -1,0 +1,68 @@
+{
+  // Editor Settings
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.rulers": [100],
+
+  // File Associations
+  "files.associations": {
+    ".aceconfig": "yaml",
+    "*.md": "markdown"
+  },
+
+  // Exclude from Search
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/.git": true
+  },
+
+  // Search Settings
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "package-lock.json": true
+  },
+
+  // TypeScript Settings
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "typescript.suggest.autoImports": true,
+
+  // Terminal Settings
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+
+  // Git Settings
+  "git.enableSmartCommit": true,
+  "git.confirmSync": false,
+  "git.autofetch": true,
+
+  // AI Assistant Settings (GitHub Copilot / Similar)
+  "github.copilot.enable": {
+    "*": true,
+    "yaml": true,
+    "markdown": true
+  },
+
+  // Workspace Specific
+  "workbench.colorCustomizations": {
+    "statusBar.background": "#1a1a2e",
+    "statusBar.foreground": "#ffffff"
+  },
+
+  // ACE-Framework Specific
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "other": true,
+      "comments": false,
+      "strings": false
+    }
+  }
+}

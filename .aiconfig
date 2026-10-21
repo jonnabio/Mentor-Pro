@@ -1,0 +1,72 @@
+# Generic AI Configuration
+# Works with various AI assistants
+
+framework: ace
+version: "2.7.0"
+
+# Context files to always include
+context:
+  always_load:
+    - .aceconfig
+    - .ace/roles/roles.md
+    - docs/context/ACTIVE_CONTEXT.md
+
+  on_demand:
+    - .ace/standards/*
+    - .ace/skills/*
+    - docs/adr/*
+    - docs/rca/regression-guards.yaml
+
+# Core rules
+rules:
+  - "Follow BMAD: Analyze → Plan → Execute → Verify"
+  - "Check regression guards before modifying files"
+  - "Create ADR for architectural decisions"
+  - "Update ACTIVE_CONTEXT.md after each session"
+  - "Every issue requires RCA"
+
+# Role activation
+roles:
+  planning: Architect
+  execution: Developer
+  verification: QA Engineer
+  incident: Incident Responder
+
+# Skill triggers
+skills:
+  database: .ace/skills/database-operations/SKILL.md
+  api: .ace/skills/api-design/SKILL.md
+  testing: .ace/skills/testing-strategy/SKILL.md
+  migration: .ace/skills/migration-logic/SKILL.md
+  refactor: .ace/skills/refactoring/SKILL.md
+  review: .ace/skills/code-review/SKILL.md
+  incident: .ace/skills/root-cause-analysis/SKILL.md
+  transcript: .ace/skills/transcript-analysis/SKILL.md
+  pipeline: .ace/skills/data-pipeline-design/SKILL.md
+  prompt: .ace/skills/prompt-engineering/SKILL.md
+  model: .ace/skills/model-evaluation/SKILL.md
+  feature: .ace/skills/feature-engineering/SKILL.md
+  security: .ace/skills/security-audit/SKILL.md
+  performance: .ace/skills/performance-optimization/SKILL.md
+  accessibility: .ace/skills/accessibility-audit/SKILL.md
+  cicd: .ace/skills/ci-cd-pipeline/SKILL.md
+  error: .ace/skills/error-handling/SKILL.md
+  documentation: .ace/skills/documentation-generation/SKILL.md
+  state: .ace/skills/state-management/SKILL.md
+  agent: .ace/skills/agent-design/SKILL.md
+  a2a: .ace/skills/a2a-communication/SKILL.md
+  mcp: .ace/skills/mcp-implementation/SKILL.md
+  packet: .ace/skills/phantom-link/SKILL.md
+
+# Standards to enforce
+standards:
+  required:
+    - .ace/standards/coding.md
+    - .ace/standards/security.md
+  optional:
+    - .ace/standards/architecture.md
+    - .ace/standards/documentation.md
+    - .ace/standards/git-workflow.md
+    - .ace/standards/environment.md
+    - .ace/standards/observability.md
+
