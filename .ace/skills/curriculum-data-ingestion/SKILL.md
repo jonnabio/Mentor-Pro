@@ -102,6 +102,7 @@ record against the PDF page and sets `accepted` or `rejected` with notes.
 .venv/Scripts/python.exe -m curriculum.importer --workbook <path-to-workbook.xlsx>
 ```
 
+- Target: PostgreSQL via `DATABASE_URL`, schema `curriculum` (ADR-007).
 - Reads `07 Catálogo` and `06 Evidencias` only; stores cells verbatim.
 - Never stores `Logrado ✓`; the file is referenced by its generic manifest name.
 - Idempotent per baseline version; a changed workbook needs a new version.

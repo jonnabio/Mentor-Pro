@@ -78,6 +78,38 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T002_result.md",
       "failures": []
+    },
+    {
+      "id": "T003",
+      "name": "T002.1 — PostgreSQL migration of the curriculum catalog",
+      "objective": "Move the five-table catalog to PostgreSQL via DATABASE_URL with idempotent, transactional, checksum-protected imports; 98 objectives, 344 evidencias, 78 selectable multiple-choice objectives; Docker Compose setup.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "curriculum/db.py",
+          "docker-compose.yml",
+          "db/init/01-test-database.sql",
+          "docs/adr/ADR-007-postgresql-curriculum-catalog.md"
+        ],
+        "modify": [
+          "curriculum/schema.sql",
+          "curriculum/importer.py",
+          "curriculum/catalog.py",
+          "tests/curriculum/",
+          "requirements.txt",
+          ".env.example"
+        ]
+      },
+      "depends_on": [
+        "T002"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T003_result.md",
+      "failures": [],
+      "notes": "Product Owner label T002.1. Tracker IDs must match ^T[0-9]{3}$, so the PO's next task 'T003' is tracked as T004."
     }
   ]
 }

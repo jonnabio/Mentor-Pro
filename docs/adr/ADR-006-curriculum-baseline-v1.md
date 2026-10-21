@@ -64,6 +64,9 @@ generic file names. Git history is not rewritten without separate approval.
 
 ### 6. Storage
 
+> Amended by [ADR-007](ADR-007-postgresql-curriculum-catalog.md): the catalog now
+> lives in PostgreSQL (schema `curriculum`); the model below is unchanged.
+
 v1.0 catalog: SQLite (`curriculum/schema.sql`), five tables `source_document`,
 `subject`, `block`, `assertion`, `evidence`, rebuilt by
 `python -m curriculum.importer`. The catalog is read-only reference data; the

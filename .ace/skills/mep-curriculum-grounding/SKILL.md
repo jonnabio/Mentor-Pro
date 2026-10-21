@@ -102,7 +102,8 @@ For each target ID:
 5. written_rubric records (Español EE) are never grounding for items.
 ```
 
-Baseline `PNE2026-SUM-v1.0` lives in the SQLite catalog (`curriculum/`);
+Baseline `PNE2026-SUM-v1.0` lives in the PostgreSQL catalog
+(schema `curriculum`, ADR-007);
 resolve workbook codes (`M07`) with `curriculum/catalog.py`.
 
 ### 3. Detect unsupported links
