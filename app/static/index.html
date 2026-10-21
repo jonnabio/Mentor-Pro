@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es-CR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mentor Pro · Configurar práctica</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <p class="brand">Mentor Pro</p>
+      <h1>Configurar práctica</h1>
+      <p class="lead">Prueba Nacional Estandarizada · Sexto grado</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <p id="load-error" class="alert" role="alert" hidden></p>
+
+    <form id="practice-form" novalidate>
+      <fieldset class="card">
+        <legend><span class="step">1</span> Materia</legend>
+        <div id="subjects" class="choice-grid" role="radiogroup" aria-label="Materia">
+          <p class="muted">Cargando materias…</p>
+        </div>
+      </fieldset>
+
+      <fieldset class="card" id="objectives-card" disabled>
+        <legend><span class="step">2</span> Objetivos</legend>
+        <div class="segmented" role="radiogroup" aria-label="Alcance de la práctica">
+          <label><input type="radio" name="scope" value="single_objective" checked> Un objetivo</label>
+          <label><input type="radio" name="scope" value="selected_objectives"> Varios objetivos</label>
+          <label><input type="radio" name="scope" value="subject_simulation"> Todos los objetivos</label>
+        </div>
+        <p id="objectives-hint" class="muted">Elija primero una materia.</p>
+        <div id="objectives" class="objective-list"></div>
+      </fieldset>
+
+      <fieldset class="card" id="settings-card" disabled>
+        <legend><span class="step">3</span> Dificultad y cantidad</legend>
+        <div class="settings">
+          <div>
+            <p class="field-label" id="difficulty-label">Dificultad</p>
+            <div class="segmented" role="radiogroup" aria-labelledby="difficulty-label">
+              <label><input type="radio" name="difficulty" value="easy"> Fácil</label>
+              <label><input type="radio" name="difficulty" value="medium" checked> Intermedia</label>
+              <label><input type="radio" name="difficulty" value="hard"> Difícil</label>
+              <label><input type="radio" name="difficulty" value="mixed"> Mixta</label>
+            </div>
+          </div>
+          <div>
+            <p class="field-label" id="count-label">Cantidad de preguntas</p>
+            <div class="segmented" role="radiogroup" aria-labelledby="count-label">
+              <label><input type="radio" name="question_count" value="5"> 5</label>
+              <label><input type="radio" name="question_count" value="10" checked> 10</label>
+              <label><input type="radio" name="question_count" value="20"> 20</label>
+              <label><input type="radio" name="question_count" value="30"> 30</label>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+
+      <p id="form-error" class="alert" role="alert" hidden></p>
+      <button type="submit" id="submit" class="primary" disabled>Generar práctica</button>
+    </form>
+
+    <section id="summary" class="card summary" aria-live="polite" hidden>
+      <h2>Resumen de la práctica</h2>
+      <dl id="summary-meta" class="meta"></dl>
+      <p id="summary-coverage" class="muted"></p>
+      <table class="allocation">
+        <thead><tr><th scope="col">Objetivo</th><th scope="col">Preguntas</th><th scope="col">Evidencias</th></tr></thead>
+        <tbody id="summary-rows"></tbody>
+      </table>
+      <p class="note">Esta versión muestra solo la distribución de preguntas. Las preguntas se generarán en una próxima etapa.</p>
+    </section>
+
+    <p id="notice" class="notice"></p>
+  </main>
+</body>
+</html>
