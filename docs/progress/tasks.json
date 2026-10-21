@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-10-21T16:00:00Z",
+  "updated": "2026-10-21T21:00:00Z",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -36,13 +36,47 @@
           "docs/adr/ADR-004-web-app-stack.md",
           "docs/adr/ADR-005-question-engine-skill-suite.md"
         ],
-        "modify": [".aceconfig", "docs/context/ACTIVE_CONTEXT.md"]
+        "modify": [
+          ".aceconfig",
+          "docs/context/ACTIVE_CONTEXT.md"
+        ]
       },
       "depends_on": [],
       "complexity": "L",
       "acceptance_cmd": "bash .ace/scripts/verify.sh",
       "attempts": 1,
       "result_file": "docs/progress/task_T001_result.md",
+      "failures": []
+    },
+    {
+      "id": "T002",
+      "name": "Curriculum catalog import (PNE2026-SUM-v1.0)",
+      "objective": "SQLite five-table catalog and idempotent, verbatim workbook import with 98 objectives and 344 evidencias, practice-scope selection, rubric separation, no student data, and approved-baseline grounding rules (ADR-006).",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "curriculum/schema.sql",
+          "curriculum/importer.py",
+          "curriculum/catalog.py",
+          "tests/curriculum/",
+          "docs/adr/ADR-006-curriculum-baseline-v1.md"
+        ],
+        "modify": [
+          ".ace/standards/question-engine.md",
+          ".ace/schemas/question-engine/",
+          ".ace/skills/question-quality-review/scripts/item_checker.py",
+          "references/MANIFEST.sha256",
+          ".aceconfig"
+        ]
+      },
+      "depends_on": [
+        "T001"
+      ],
+      "complexity": "L",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T002_result.md",
       "failures": []
     }
   ]
