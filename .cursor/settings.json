@@ -1,0 +1,15 @@
+{
+  "ai": {
+    "contextFiles": [
+      ".aceconfig",
+      ".ace/roles/roles.md",
+      "docs/context/ACTIVE_CONTEXT.md",
+      "docs/rca/regression-guards.yaml"
+    ],
+    "alwaysInclude": [
+      ".ace/standards/coding.md",
+      ".ace/standards/security.md"
+    ],
+    "systemPrompt": "This project uses ACE-Framework v2.0. Follow BMAD methodology. Check .aceconfig for rules."
+  }
+}

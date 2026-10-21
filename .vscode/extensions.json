@@ -1,0 +1,31 @@
+{
+  "recommendations": [
+    // Essentials
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "editorconfig.editorconfig",
+
+    // Git
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+
+    // Markdown
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+
+    // YAML
+    "redhat.vscode-yaml",
+
+    // AI Assistants
+    "github.copilot",
+    "github.copilot-chat",
+
+    // Testing
+    "orta.vscode-jest",
+
+    // Code Quality
+    "sonarsource.sonarlint-vscode",
+    "streetsidesoftware.code-spell-checker"
+  ],
+  "unwantedRecommendations": []
+}

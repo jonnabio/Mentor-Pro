@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+vendor/
+.venv/
+venv/
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Secrets (never commit!)
+*.pem
+*.key
+credentials.json
+secrets.yaml
+
+# MEP source documents: distribution rights unverified; tracked by checksum manifest only
+references/original/
