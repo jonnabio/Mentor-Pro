@@ -173,6 +173,38 @@
       "result_file": "docs/progress/task_T005_result.md",
       "failures": [],
       "notes": "Live connectivity test not run: OPENROUTER_API_KEY not configured (.env missing)."
+    },
+    {
+      "id": "T006",
+      "name": "First curriculum-grounded question",
+      "objective": "Generate and validate one multiple-choice question per request from the PostgreSQL catalog via OpenRouter, with grounding, deterministic and math checks, blind solve, rubric, usage/cost records and a dev-only endpoint.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/generation/",
+          "app/dev_routes.py",
+          "tests/app/test_generation.py",
+          "scripts/dev/generate_examples.py",
+          "docs/adr/ADR-010-single-question-generation.md"
+        ],
+        "modify": [
+          "app/main.py",
+          "app/llm/",
+          ".ace/skills/question-quality-review/",
+          ".ace/schemas/question-engine/question-item.schema.json",
+          ".env.example"
+        ]
+      },
+      "depends_on": [
+        "T005"
+      ],
+      "complexity": "L",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T006_result.md",
+      "failures": [],
+      "notes": "Live: ES01 and EL01 valid; M02 not validated (hollow proof withdrawn by M04); C01 rejected. Cost $0.00 over 52 calls. Daily request budget reached."
     }
   ]
 }

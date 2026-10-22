@@ -8,8 +8,9 @@
 
 ## Current Objective
 
-T005 OpenRouter integration done (mocked; live check pending the key,
-[ADR-009](../adr/ADR-009-openrouter-integration.md)). Next: question generation.
+T006 single-question generation implemented
+([ADR-010](../adr/ADR-010-single-question-generation.md)); live validation
+partial. Next: regenerate M02 and C01, then decide next PO task.
 
 ## Handoff Summary
 
@@ -39,6 +40,9 @@ T005 OpenRouter integration done (mocked; live check pending the key,
   confirmed the web interface is available.
 - T005 — OpenRouter client, free-first routing, paid gate, budgets, usage
   records in `llm.usage_record`, CLI `python -m app.llm.connectivity`.
+- T006 — grounded single-question pipeline, blind solve, rubric, checker 1.3.0,
+  dev endpoint `POST /api/dev/questions/generate`; live: ES01, EL01 valid;
+  M02 not validated; C01 rejected; cost $0.00 (`docs/progress/task_T006_result.md`).
 
 ### Current State
 
@@ -48,26 +52,21 @@ T005 OpenRouter integration done (mocked; live check pending the key,
 - App: `app/main.py` (FastAPI) + `app/static/`; endpoints
   `GET /api/subjects`, `GET /api/objectives`, `POST /api/practice/configure`.
   Returns allocation slots (objective, evidencia, difficulty); no questions yet.
-- Tests: 211 passing (`tests/ace` 99, `tests/curriculum` 44, `tests/app` 68).
+- Tests: 246 passing (`tests/ace`, `tests/curriculum`, `tests/app`).
   ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Owner runs `.venv/Scripts/python.exe scripts/dev/setup_secrets.py`
-   (Postgres password and `OPENROUTER_API_KEY` into `.env`).
-2. Run `.venv/Scripts/python.exe -m app.llm.connectivity` and record model,
-   tokens, cost and latency.
-3. Owner sets budget and model policy for generation: free-only or paid fallback,
-   daily/monthly USD and request limits (`openrouter-model-routing` skill).
-4. T006 plan (Architect): generation from allocation slots (`mep-question-design`);
-   deterministic checker + independent solve (`question-quality-review`);
-   usage/cost records (`llm-cost-observability`); storage tables for items and
-   usage. Write ADR-010 before code.
-5. Implement T006 after plan approval; keep `/api/practice/configure` contract.
+1. After the daily budget resets (UTC), regenerate M02 and C01:
+   `scripts/dev/generate_examples.py --out <file> --only M02` (then C01).
+2. PO decisions: C09 key-length cue warn vs reject; daily request budget.
+3. Next PO task (practice sessions / batch generation) after approval.
 
 ### Blockers/Issues
 
-- `OPENROUTER_API_KEY` not configured yet (`.env` missing).
+- Daily request budget (50) reached on 2026-10-22.
+- Some free models rate-limit (Gemma 429) or are unavailable to this
+  account (Nemotron Super 404, Inkling 403).
 - Local `pg_hba.conf` uses `trust`; `mentor_pro_admin` has no password.
 - Automated browser checks impossible on this machine (Edge exits under
   automation); `scripts/dev/ui_smoke.py` never ran successfully.

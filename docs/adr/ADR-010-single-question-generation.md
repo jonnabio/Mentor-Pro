@@ -39,6 +39,18 @@ rejected, and the key must not reach students before they answer.
   checker computes the answer from the option values.
 - An `expression` must contain an operator; a bare number would restate the
   model's key and is rejected.
+- Checker 1.3.0 (M04): expression operands must appear in the item text or be
+  2–10, 100 or 1000; otherwise the key is not proven and a blind solve is
+  required (e.g. `148/100` for a key of 1,48).
+
+### Live hardening (2026-10-22)
+
+- Candidates: free, text-input, text-only-output models; pin with
+  `OPENROUTER_FREE_MODELS`.
+- 401 stops routing; 403 skips the model; truncated replies are
+  `invalid_output`.
+- Token limits: generation 4000, solve 2000, rubric 3000.
+- Parsers ignore leaked reasoning; `subject_checks` keeps only known keys.
 
 ### Records
 
