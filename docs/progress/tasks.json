@@ -142,7 +142,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T004_result.md",
       "failures": [],
-      "notes": "Product Owner label T003. Browser (desktop/mobile) check not executed: Edge cannot start under automation on this machine."
+      "notes": "Product Owner label T003. Web interface confirmed available by the Product Owner (2026-10-21); automated browser check not executed (Edge cannot start under automation)."
     }
   ]
 }

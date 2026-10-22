@@ -1,63 +1,96 @@
-# Active Context: Curriculum Baseline v1.0
+# Active Context: Session Handoff 2026-10-21
 
 ## Session Metadata
 
 - **Last Updated:** 2026-10-21
-- **Active Role:** QA Engineer
-- **Mode:** VERIFICATION
+- **Active Role:** Architect (next: Developer)
+- **Mode:** PLANNING
 
 ## Current Objective
 
-Curriculum baseline `PNE2026-SUM-v1.0` in the PostgreSQL catalog
-(T002; T003 = PO label T002.1;
-[ADR-006](../adr/ADR-006-curriculum-baseline-v1.md),
-[ADR-007](../adr/ADR-007-postgresql-curriculum-catalog.md)). No OpenRouter
-integration or question generation yet. Practice configuration UI and API
-(tracker T004 = PO T003, [ADR-008](../adr/ADR-008-practice-configuration-api.md)).
+Next task: OpenRouter integration and question generation over the approved
+curriculum catalog (tracker T005). Not started.
 
-## Current State
+## Handoff Summary
 
-### Working
+### Completed
 
-- Fresh repository (`main`), ACE 2.7.0 baseline; MEP PDFs excluded from Git,
-  checksums in `references/MANIFEST.sha256`.
-- Local PostgreSQL 17: role `mentor_pro_admin` owns empty database
-  `mentor_pro`; passwords set privately with `scripts/dev/setup_secrets.py`.
-- Nine question-engine skills, shared standard, knowledge file, schemas,
-  deterministic checker for all four subjects, skill validator, tests
-  (T001, [ADR-005](../adr/ADR-005-question-engine-skill-suite.md)).
-- Curriculum catalog in PostgreSQL `mentor_pro`, schema `curriculum` (98
-  objectives, 344 evidencias; 78 multiple-choice, 20 `EE` rubric), loaded with
-  `python -m curriculum.importer` via `DATABASE_URL`; approved-baseline
-  grounding (T002, T003). Test database `mentor_pro_test`.
-- Practice UI/API: `uvicorn app.main:app` (`docs/runbooks/practice-ui.md`);
-  deterministic balanced allocation; desktop/mobile check still manual.
+- Repository reset: fresh ACE 2.7.0 baseline on `main`; GitHub history
+  replaced. MEP source files kept out of Git (`references/original/` ignored;
+  checksums in `references/MANIFEST.sha256`, generic names).
+- PostgreSQL 17 takeover: old database and roles removed; role
+  `mentor_pro_admin` owns `mentor_pro` and `mentor_pro_test`.
+  `scripts/dev/setup_secrets.py` for private passwords and the OpenRouter key.
+- T001 — nine question-engine skills, standard
+  `.ace/standards/question-engine.md`, knowledge file, JSON Schemas,
+  deterministic item checker for all four subjects, skill validator
+  ([ADR-005](../adr/ADR-005-question-engine-skill-suite.md)).
+- Workbook ingestion assessment
+  (`docs/requirements/2026-10-21-curriculum-ingestion-assessment.md`).
+- T002 — curriculum baseline `PNE2026-SUM-v1.0` (98 objectives, 344
+  evidencias; 78 multiple-choice, 20 `EE` rubric); approved-baseline grounding
+  rule ([ADR-006](../adr/ADR-006-curriculum-baseline-v1.md)).
+- T003 (PO label T002.1) — catalog migrated to PostgreSQL, schema `curriculum`,
+  advisory-locked idempotent imports, Docker Compose file
+  ([ADR-007](../adr/ADR-007-postgresql-curriculum-catalog.md)).
+- T004 (PO label T003) — practice configuration API and Spanish UI with
+  deterministic balanced allocation
+  ([ADR-008](../adr/ADR-008-practice-configuration-api.md)). Product Owner
+  confirmed the web interface is available.
 
-### In Progress
+### Current State
 
-- None.
+- `main` pushed to `origin/main`; working tree clean; no task locks.
+- Catalog: PostgreSQL `mentor_pro`, schema `curriculum`; re-import reports
+  `unchanged`.
+- App: `app/main.py` (FastAPI) + `app/static/`; endpoints
+  `GET /api/subjects`, `GET /api/objectives`, `POST /api/practice/configure`.
+  Returns allocation slots (objective, evidencia, difficulty); no questions yet.
+- Tests: 183 passing (`tests/ace` 99, `tests/curriculum` 44, `tests/app` 40).
+  ACE gate `VERIFY_RESULT=pass gate=all`.
 
-### Blocked
+### Next Steps
 
-- Local `pg_hba.conf` uses `trust`; passwords are not enforced (owner
-  accepted for development).
+1. Owner runs `.venv/Scripts/python.exe scripts/dev/setup_secrets.py`
+   (Postgres password and `OPENROUTER_API_KEY` into `.env`).
+2. Owner sets budget and model policy for T005: free-only or paid fallback,
+   daily/monthly USD and request limits (`openrouter-model-routing` skill).
+3. T005 plan (Architect): OpenRouter client with runtime model discovery and
+   free-first routing; generation from allocation slots (`mep-question-design`);
+   deterministic checker + independent solve (`question-quality-review`);
+   usage/cost records (`llm-cost-observability`); storage tables for items and
+   usage. Write ADR-009 before code.
+4. Implement T005 after plan approval; keep `/api/practice/configure` contract.
 
-## Next Steps
+### Blockers/Issues
 
-1. [ ] Owner runs `python scripts/dev/setup_secrets.py` (Postgres password,
-       OpenRouter key into `.env`).
-2. [ ] Accept or amend [ADR-004](../adr/ADR-004-web-app-stack.md) (stack).
-3. [ ] Manual UI check at 1280 px and 390 px (automation blocked).
-4. [ ] Next PO task (tracker T005, needs approval): OpenRouter integration
-       and question generation.
-5. [ ] Build the evaluation dataset (`question-evaluation`).
-6. [ ] Decide whether to rewrite Git history to remove the student name in
-       commit `42adbe7` (separate approval).
-7. [ ] Reduce baseline markdown lint debt (`docs/TODO-markdown-lint.md`).
+- `OPENROUTER_API_KEY` not configured yet (`.env` missing).
+- Local `pg_hba.conf` uses `trust`; `mentor_pro_admin` has no password.
+- Automated browser checks impossible on this machine (Edge exits under
+  automation); `scripts/dev/ui_smoke.py` never ran successfully.
+- Docker not installed; `docker-compose.yml` untested.
+- Student first name remains in pushed commit `42adbe7`; history rewrite needs
+  separate approval.
+- Remote branch `origin/copilot/clean-repository` (merged PR #1) still exists.
+- Framework markdown lint debt (~700 issues; `docs/TODO-markdown-lint.md`).
+- Pending decision: balanced vs planned-item-weighted simulation allocation.
+
+### Notes
+
+- Tracker IDs must match `^T[0-9]{3}$`; PO labels are kept in task names/notes.
+- Start the app (Git Bash):
+  `DATABASE_URL=postgresql://mentor_pro_admin@127.0.0.1:5432/mentor_pro
+  .venv/Scripts/python.exe -m uvicorn app.main:app --port 8000`
+- Re-import catalog: `.venv/Scripts/python.exe -m curriculum.importer
+  --workbook <workbook.xlsx>` (located by checksum).
+- Gate: `bash .ace/scripts/verify.sh` (tests need `mentor_pro_test`).
+- Approved-baseline items must carry `grounding_basis: approved_baseline` and
+  never be shown as official MEP wording.
+- Never send student data to models; secrets only via `.env`.
 
 ## Active Constraints
 
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
-- [ADR-005](../adr/ADR-005-question-engine-skill-suite.md), [ADR-006](../adr/ADR-006-curriculum-baseline-v1.md)
-- Plan: `docs/planning/2026-10-21-question-engine-skills-plan.md`
+- [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
+  [ADR-008](../adr/ADR-008-practice-configuration-api.md)
