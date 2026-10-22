@@ -311,3 +311,18 @@ def test_expression_and_select_together_are_rejected(item_by_subject, records_by
     item = item_by_subject["matematicas"]
     item["subject_checks"] = {"math": {"expression": "144 / 12", "select": "max"}}
     assert "M01" in failing_ids(run(item, records_by_id, validator))
+
+
+def test_expression_that_restates_key_is_not_a_proof(item_by_subject, records_by_id, validator):
+    item = item_by_subject["matematicas"]  # stem mentions 144 and 12; key is 12
+    item["subject_checks"] = {"math": {"expression": "1200 / 100"}}
+    result = run(item, records_by_id, validator)
+    assert result["deterministic_status"] == "pass"
+    assert result["math_proven"] is False and result["requires_independent_solve"] is True
+    assert any(c["id"] == "M04" and c["status"] == "warn" for c in result["checks"])
+
+
+def test_expression_from_item_numbers_is_a_proof(item_by_subject, records_by_id, validator):
+    result = run(item_by_subject["matematicas"], records_by_id, validator)  # "144 / 12"
+    assert result["math_proven"] is True
+    assert any(c["id"] == "M04" and c["status"] == "pass" for c in result["checks"])

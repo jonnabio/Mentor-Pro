@@ -28,7 +28,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cr_math import AmbiguousNumberError, evaluate, parse_quantity  # noqa: E402
 
-CHECKER_VERSION = "1.2.0"
+CHECKER_VERSION = "1.3.0"
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "question-engine" / "question-item.schema.json"
 
 SUBJECT_CODES = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
@@ -45,6 +45,10 @@ OPTION_SIMILARITY_THRESHOLD = 0.9
 # Grounding failures cannot be fixed by regenerating the same slot.
 GROUNDING_CHECKS = {"G01", "G02"}
 RE_OPERATOR = re.compile(r"[-+*/×÷]")
+RE_EXPR_NUMBER = re.compile(r"\d+(?:,\d+)?")
+RE_TEXT_NUMBER = re.compile(r"\d{1,3}(?: \d{3})+(?:,\d+)?|\d+(?:,\d+)?")
+# Constants an expression may use without them appearing in the item text.
+ALLOWED_CONSTANTS = {Fraction(n) for n in (*range(2, 11), 100, 1000)}
 
 Check = dict[str, str]
 
@@ -294,10 +298,27 @@ def check_math(item: dict[str, Any]) -> tuple[list[Check], bool]:
             return [_check("M01", "fail", f"expression not evaluable: {exc}")], False
     distinct = len(set(values.values())) == len(values)
     matches = [lbl for lbl, v in values.items() if v == expected]
+    grounded_proof = True
+    if spec.get("expression"):
+        text = f"{item.get('stimulus', {}).get('text', '')} {item.get('stem', '')}"
+        text_values = set()
+        for token in RE_TEXT_NUMBER.findall(text):
+            try:
+                text_values.add(parse_quantity(token)[0])
+            except ValueError:
+                pass
+        operands = [Fraction(t.replace(",", ".")) for t in RE_EXPR_NUMBER.findall(spec["expression"])]
+        foreign = [o for o in operands if o not in text_values and o not in ALLOWED_CONSTANTS]
+        grounded_proof = bool(operands) and not foreign and any(o in text_values for o in operands)
     checks = [_check("M02", "pass" if distinct else "fail",
                      "option values are distinct" if distinct else "two options have the same value")]
     if matches == [item.get("answer_key")] and distinct:
-        checks.append(_check("M03", "pass", f"expression = {expected}; only the key matches"))
+        checks.append(_check("M03", "pass", f"expected value {expected}; only the key matches"))
+        if not grounded_proof:
+            # e.g. "148/100" restates the key: consistent, but not a proof; require an independent solve.
+            checks.append(_check("M04", "warn", "expression operands not taken from the item text; key not proven"))
+            return checks, False
+        checks.append(_check("M04", "pass", "expression operands come from the item text"))
         return checks, True
     checks.append(_check("M03", "fail", f"expression = {expected}; matching options {matches}, key {item.get('answer_key')}"))
     return checks, False
