@@ -47,7 +47,9 @@ def free_candidates(client: OpenRouterClient) -> list[str]:
 
 
 def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]], purpose: str,
-          max_tokens: int | None = None, request_id: str | None = None) -> RouteResult:
+          max_tokens: int | None = None, request_id: str | None = None,
+          avoid: frozenset[str] = frozenset()) -> RouteResult:
+    """Route one request. Models in `avoid` are tried last (e.g. the generator, for a blind solve)."""
     ctx = UsageContext(request_id=request_id or f"req-{uuid.uuid4().hex[:16]}", purpose=purpose)
     result = RouteResult(status="exhausted")
     settings = client.settings
@@ -58,6 +60,7 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
         return RouteResult(status="auth_error", message=str(exc))
     except TransientError as exc:
         return RouteResult(status="discovery_error", message=str(exc))
+    free = [m for m in free if m not in avoid] + [m for m in free if m in avoid]
     plan = [(m, "free") for m in free]
     if settings.allow_paid and settings.paid_model:
         plan.append((settings.paid_model, "paid"))

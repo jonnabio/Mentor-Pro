@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.allocation import allocate
+from app.dev_routes import LlmFactory, build_dev_router
 from curriculum import db
 from curriculum.catalog import PracticeScope, SelectionError, list_objectives, open_catalog, select_objectives
 
@@ -58,8 +59,10 @@ class PracticeConfig(BaseModel):
 
 
 def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
-               baseline: str = BASELINE_VERSION) -> FastAPI:
+               baseline: str = BASELINE_VERSION, dev_endpoints: bool | None = None,
+               llm_factory: LlmFactory | None = None) -> FastAPI:
     app = FastAPI(title="Mentor Pro", version="0.3.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
+    app.state.catalog_target = (database_url, schema)
 
     def catalog() -> Iterator[psycopg.Connection]:
         conn = open_catalog(database_url or db.database_url(), schema)
@@ -131,6 +134,12 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
             **result,
         }
 
+    if dev_endpoints is None:
+        dev_endpoints = os.environ.get("MENTOR_PRO_DEV_ENDPOINTS", "").lower() in ("1", "true", "yes")
+    if dev_endpoints:
+        app.include_router(build_dev_router(catalog, baseline, llm_factory or _default_llm_factory(database_url),
+                                            ApiError))
+
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     @app.get("/", include_in_schema=False)
@@ -138,6 +147,19 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
         return FileResponse(STATIC_DIR / "index.html")
 
     return app
+
+
+def _default_llm_factory(database_url: str | None) -> LlmFactory:
+    """Real OpenRouter client with PostgreSQL usage and generation stores."""
+    def factory():
+        from app.generation.store import GenerationStore
+        from app.llm.client import OpenRouterClient
+        from app.llm.settings import LlmSettings
+        from app.llm.usage import UsageStore
+
+        url = database_url or db.database_url()
+        return OpenRouterClient(LlmSettings.load()), UsageStore(url), GenerationStore(url)
+    return factory
 
 
 def _selection_message(scope: PracticeScope, detail: str) -> str:
