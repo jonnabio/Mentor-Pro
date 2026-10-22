@@ -36,12 +36,13 @@ class RouteResult:
 def free_candidates(client: OpenRouterClient) -> list[str]:
     """Configured free models that are currently listed and free, else top discovered free models."""
     models = {m.id: m for m in client.list_models()}
-    configured = [m for m in client.settings.free_models if m in models and models[m].is_free]
+    usable = {k: m for k, m in models.items() if m.is_free and m.is_text_chat}
+    configured = [m for m in client.settings.free_models if m in usable]
     if configured:
         return configured
     if client.settings.free_models:
         return []  # configured but none available: do not silently switch to arbitrary models
-    discovered = sorted((m for m in models.values() if m.is_free),
+    discovered = sorted(usable.values(),
                         key=lambda m: (-(m.context_length or 0), m.id))
     return [m.id for m in discovered[:AUTO_FREE_LIMIT]]
 

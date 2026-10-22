@@ -52,6 +52,13 @@ class ModelInfo:
     prompt_price: str
     completion_price: str
     supported_parameters: tuple[str, ...]
+    input_modalities: tuple[str, ...] = ("text",)
+    output_modalities: tuple[str, ...] = ("text",)
+
+    @property
+    def is_text_chat(self) -> bool:
+        """Accepts text and produces only text (excludes e.g. audio or image generators)."""
+        return "text" in self.input_modalities and tuple(self.output_modalities) == ("text",)
 
     @property
     def is_free(self) -> bool:
@@ -127,6 +134,8 @@ class OpenRouterClient:
                 prompt_price=str(m.get("pricing", {}).get("prompt", "")),
                 completion_price=str(m.get("pricing", {}).get("completion", "")),
                 supported_parameters=tuple(m.get("supported_parameters") or ()),
+                input_modalities=tuple((m.get("architecture") or {}).get("input_modalities") or ("text",)),
+                output_modalities=tuple((m.get("architecture") or {}).get("output_modalities") or ("text",)),
             )
             for m in response.json().get("data", [])
             if isinstance(m, dict) and m.get("id")
@@ -169,8 +178,8 @@ class OpenRouterClient:
                 return attempts
 
             latency = self._elapsed(started)
-            if response.status_code in (401, 403):
-                raise AuthenticationError(f"OpenRouter rejected the API key (HTTP {response.status_code})")
+            if response.status_code == 401:
+                raise AuthenticationError("OpenRouter rejected the API key (HTTP 401)")
             if response.status_code == 402:
                 raise PaymentRequiredError("OpenRouter reports insufficient credit (HTTP 402)")
             if response.status_code in RETRY_STATUSES:
@@ -182,9 +191,10 @@ class OpenRouterClient:
                     continue
                 return attempts
             if response.status_code >= 400:
+                # 400/403/404 etc.: this model is unusable for this request or account; try the next one.
                 attempts.append(Attempt(model, number, "error", latency, response.status_code,
                                         error_kind=f"http_{response.status_code}"))
-                return attempts  # 400/404 etc.: not retryable for this model
+                return attempts
 
             attempts.append(self._parse_success(model, number, latency, response))
             return attempts
@@ -193,7 +203,8 @@ class OpenRouterClient:
     def _parse_success(self, model: str, number: int, latency: int, response: httpx.Response) -> Attempt:
         try:
             body = response.json()
-            content = body["choices"][0]["message"].get("content")
+            choice = body["choices"][0]
+            content = choice["message"].get("content")
         except (ValueError, KeyError, IndexError, TypeError, AttributeError):
             return Attempt(model, number, "error", latency, response.status_code, error_kind="invalid_response")
         usage = body.get("usage") or {}
@@ -210,6 +221,9 @@ class OpenRouterClient:
             generation_id=body.get("id"),
             content=content,
         )
+        if choice.get("finish_reason") == "length":
+            # Cut off by max_tokens (often reasoning models): the answer is incomplete.
+            attempt.status, attempt.error_kind = "invalid_output", "truncated"
         if isinstance(usage.get("cost"), (int, float)):
             attempt.cost_usd, attempt.cost_source = float(usage["cost"]), "provider_reported"
         elif attempt.generation_id:

@@ -25,6 +25,8 @@ MODELS = {"data": [
      "pricing": {"prompt": "0", "completion": "0"}, "supported_parameters": ["max_tokens"]},
     {"id": "acme/big:free", "name": "Big", "context_length": 128000,
      "pricing": {"prompt": "0", "completion": "0"}},
+    {"id": "acme/song", "name": "Song", "context_length": 1000000, "pricing": {"prompt": "0", "completion": "0"},
+     "architecture": {"input_modalities": ["text"], "output_modalities": ["text", "audio"]}},
     {"id": "acme/pro", "name": "Pro", "context_length": 200000,
      "pricing": {"prompt": "0.000003", "completion": "0.000015"}},
 ]}
@@ -309,7 +311,7 @@ def test_connectivity_report_has_requested_fields():
     assert report["status"] == "ok"
     assert {k: report[k] for k in ("model_used", "tokens_in", "tokens_out", "cost_usd", "tier")} == {
         "model_used": "acme/big:free", "tokens_in": 15, "tokens_out": 1, "cost_usd": 0.0, "tier": "free"}
-    assert report["models_listed"] == 3 and report["free_models_listed"] == 2
+    assert report["models_listed"] == 4 and report["free_models_listed"] == 3
 
 
 def test_connectivity_cli_without_key(monkeypatch, capsys, tmp_path):
@@ -351,3 +353,30 @@ def test_api_key_never_reaches_frontend(synthetic_client):
     for path in ("/", "/static/app.js", "/api/subjects", "/api/openapi.json"):
         body = synthetic_client.get(path).text
         assert "OPENROUTER" not in body and "sk-or-" not in body
+
+
+def test_non_text_output_models_are_never_candidates():
+    client, _ = make(FakeOpenRouter())
+    assert "acme/song" not in free_candidates(client)  # free but outputs audio
+    client, _ = make(FakeOpenRouter(), free_models=("acme/song",))
+    assert free_candidates(client) == []
+
+
+# ---------------------------------------------------------------- live findings (T006)
+
+def test_403_on_one_model_skips_it_instead_of_stopping():
+    fake = FakeOpenRouter({"acme/big:free": [(403, {"error": {"message": "only available to ..."}}, {})]})
+    client, _ = make(fake)
+    result = route(client, MemoryUsageStore(), MSG, "connectivity_test")
+    assert result.status == "ok" and result.final.model_requested == "acme/small:free"
+
+
+def test_truncated_reply_is_invalid_output_and_moves_on():
+    truncated = completion("acme/big:free", content="El usuario quiere...")
+    truncated["choices"][0]["finish_reason"] = "length"
+    fake = FakeOpenRouter({"acme/big:free": [(200, truncated, {})]})
+    client, _ = make(fake)
+    store = MemoryUsageStore()
+    result = route(client, store, MSG, "connectivity_test")
+    assert store.records[0]["status"] == "invalid_output" and store.records[0]["error_kind"] == "truncated"
+    assert result.status == "ok" and result.final.model_requested == "acme/small:free"
