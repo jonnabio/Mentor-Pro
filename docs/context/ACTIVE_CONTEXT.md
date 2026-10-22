@@ -8,8 +8,8 @@
 
 ## Current Objective
 
-Next task: OpenRouter integration and question generation over the approved
-curriculum catalog (tracker T005). Not started.
+T005 OpenRouter integration done (mocked; live check pending the key,
+[ADR-009](../adr/ADR-009-openrouter-integration.md)). Next: question generation.
 
 ## Handoff Summary
 
@@ -37,6 +37,8 @@ curriculum catalog (tracker T005). Not started.
   deterministic balanced allocation
   ([ADR-008](../adr/ADR-008-practice-configuration-api.md)). Product Owner
   confirmed the web interface is available.
+- T005 — OpenRouter client, free-first routing, paid gate, budgets, usage
+  records in `llm.usage_record`, CLI `python -m app.llm.connectivity`.
 
 ### Current State
 
@@ -46,21 +48,22 @@ curriculum catalog (tracker T005). Not started.
 - App: `app/main.py` (FastAPI) + `app/static/`; endpoints
   `GET /api/subjects`, `GET /api/objectives`, `POST /api/practice/configure`.
   Returns allocation slots (objective, evidencia, difficulty); no questions yet.
-- Tests: 183 passing (`tests/ace` 99, `tests/curriculum` 44, `tests/app` 40).
+- Tests: 211 passing (`tests/ace` 99, `tests/curriculum` 44, `tests/app` 68).
   ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
 1. Owner runs `.venv/Scripts/python.exe scripts/dev/setup_secrets.py`
    (Postgres password and `OPENROUTER_API_KEY` into `.env`).
-2. Owner sets budget and model policy for T005: free-only or paid fallback,
+2. Run `.venv/Scripts/python.exe -m app.llm.connectivity` and record model,
+   tokens, cost and latency.
+3. Owner sets budget and model policy for generation: free-only or paid fallback,
    daily/monthly USD and request limits (`openrouter-model-routing` skill).
-3. T005 plan (Architect): OpenRouter client with runtime model discovery and
-   free-first routing; generation from allocation slots (`mep-question-design`);
+4. T006 plan (Architect): generation from allocation slots (`mep-question-design`);
    deterministic checker + independent solve (`question-quality-review`);
    usage/cost records (`llm-cost-observability`); storage tables for items and
-   usage. Write ADR-009 before code.
-4. Implement T005 after plan approval; keep `/api/practice/configure` contract.
+   usage. Write ADR-010 before code.
+5. Implement T006 after plan approval; keep `/api/practice/configure` contract.
 
 ### Blockers/Issues
 

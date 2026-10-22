@@ -143,6 +143,36 @@
       "result_file": "docs/progress/task_T004_result.md",
       "failures": [],
       "notes": "Product Owner label T003. Web interface confirmed available by the Product Owner (2026-10-21); automated browser check not executed (Edge cannot start under automation)."
+    },
+    {
+      "id": "T005",
+      "name": "OpenRouter API integration",
+      "objective": "OpenRouter connectivity with model discovery, configurable free-first routing, explicit paid fallback, timeouts, limited retries and usage capture (model, tokens, USD cost, latency); developer-only connectivity check; no question generation.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/llm/",
+          "tests/app/test_openrouter.py",
+          "docs/adr/ADR-009-openrouter-integration.md"
+        ],
+        "modify": [
+          ".ace/schemas/question-engine/llm-usage-record.schema.json",
+          ".env.example",
+          "requirements.txt",
+          "requirements-dev.txt",
+          ".aceconfig"
+        ]
+      },
+      "depends_on": [
+        "T004"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T005_result.md",
+      "failures": [],
+      "notes": "Live connectivity test not run: OPENROUTER_API_KEY not configured (.env missing)."
     }
   ]
 }

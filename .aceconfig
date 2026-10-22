@@ -107,7 +107,7 @@ role_routing:
 verify:
   test_cmd: ".venv/Scripts/python.exe -m pytest -q -p no:warnings tests/ace tests/curriculum tests/app && .venv/Scripts/python.exe .ace/scripts/validate_skills.py"
   # Scoped to question-engine docs; framework baseline debt is tracked in docs/TODO-markdown-lint.md
-  lint_cmd: "npx markdownlint-cli2 --no-globs '.ace/skills/{mep-curriculum-grounding,mep-question-design,question-quality-review,math-answer-verification,evidence-coverage-planning,question-evaluation,openrouter-model-routing,llm-cost-observability,curriculum-data-ingestion}/SKILL.md' .ace/standards/question-engine.md .ace/knowledge/mep-pne-curriculum.md 'docs/adr/ADR-00[4-8]-*.md' docs/runbooks/practice-ui.md 'docs/requirements/2026-*.md' 'docs/planning/2026-*.md' 'docs/progress/task_T*_result.md' docs/context/ACTIVE_CONTEXT.md"
+  lint_cmd: "npx markdownlint-cli2 --no-globs '.ace/skills/{mep-curriculum-grounding,mep-question-design,question-quality-review,math-answer-verification,evidence-coverage-planning,question-evaluation,openrouter-model-routing,llm-cost-observability,curriculum-data-ingestion}/SKILL.md' .ace/standards/question-engine.md .ace/knowledge/mep-pne-curriculum.md 'docs/adr/ADR-00[4-9]-*.md' docs/runbooks/practice-ui.md 'docs/requirements/2026-*.md' 'docs/planning/2026-*.md' 'docs/progress/task_T*_result.md' docs/context/ACTIVE_CONTEXT.md"
   typecheck_cmd: ""
 
 # Validation hooks
