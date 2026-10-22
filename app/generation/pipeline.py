@@ -22,9 +22,10 @@ from app.llm.client import OpenRouterClient
 from app.llm.router import Store, route
 
 MAX_GENERATION_ATTEMPTS = 2
-GENERATION_MAX_TOKENS = 2500
-SOLVE_MAX_TOKENS = 400
-RUBRIC_MAX_TOKENS = 600
+# Generous limits: free reasoning models spend many tokens before answering.
+GENERATION_MAX_TOKENS = 4000
+SOLVE_MAX_TOKENS = 2000
+RUBRIC_MAX_TOKENS = 3000
 SUBJECT_ID = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
 
 

@@ -12,7 +12,7 @@ import json
 from app.generation.grounding import GroundingBundle
 
 GENERATION_PROMPT_ID = "item-generation"
-GENERATION_PROMPT_VERSION = "1.0.0"
+GENERATION_PROMPT_VERSION = "1.1.0"  # 1.1.0: exact subject_checks shape per subject
 SOLVE_PROMPT_VERSION = "1.0.0"
 RUBRIC_PROMPT_VERSION = "1.0.0"
 
@@ -26,7 +26,8 @@ DIFFICULTY_RULES = {
 
 SUBJECT_RULES = {
     "matematicas": (
-        "Matemáticas: las cuatro opciones deben ser números (con la misma unidad si aplica), sin expresiones. "
+        "Matemáticas: las cuatro opciones deben ser números, sin expresiones; si usa unidad, TODAS las opciones "
+        "llevan la misma unidad y esa unidad va en \"unit\". "
         "Use coma decimal (12,5) y espacio para miles (12 500); nunca punto. "
         "En subject_checks.math incluya EXACTAMENTE UNO de: "
         '"expression": operación aritmética exacta (+ - * / y paréntesis, sin separador de miles) cuyo valor es la respuesta; '
@@ -57,7 +58,13 @@ OUTPUT_SHAPE = {
     "explanation": "explicación breve de por qué la respuesta es correcta",
     "distractor_rationales": {"<cada letra incorrecta>": "error o confusión que representa"},
     "cognitive_verb": "verbo de la evidencia, p. ej. Compara",
-    "subject_checks": {"...": "según las reglas de la materia"},
+    "subject_checks": "ver EJEMPLO DE subject_checks",
+}
+SUBJECT_CHECK_EXAMPLES = {
+    "matematicas": [{"math": {"expression": "144 / 6"}}, {"math": {"select": "max", "unit": "m"}}],
+    "espanol": [{"reading": {"key_support_span": "fragmento copiado exactamente del texto"}}],
+    "ciencias": [{"facts": {"support_terms": ["<término clave 1>", "<término clave 2>"]}}],
+    "estudios_sociales": [{"facts": {"support_terms": ["<término clave 1>", "<término clave 2>"]}}],
 }
 
 SYSTEM = (
@@ -98,6 +105,8 @@ def generation_messages(bundle: GroundingBundle, difficulty: str, avoid_stems: l
     user = (
         f"<curriculo>\n{curriculum}\n</curriculo>\n\nReglas:\n- " + "\n- ".join(rules)
         + "\n\nFormato de salida (JSON):\n" + json.dumps(OUTPUT_SHAPE, ensure_ascii=False, indent=1)
+        + "\n\nEJEMPLO DE subject_checks (use esta estructura exacta):\n"
+        + " o ".join(json.dumps(e, ensure_ascii=False) for e in SUBJECT_CHECK_EXAMPLES[bundle.subject])
     )
     return [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
 

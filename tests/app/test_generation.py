@@ -268,3 +268,26 @@ def test_dev_endpoint_without_key_returns_503(synthetic_client, monkeypatch):
     response = client.post("/api/dev/questions/generate",
                            json={"subject": "matematicas", "objective_code": "M01", "difficulty": "easy"})
     assert response.status_code == 503 and response.json()["error"] == "llm_not_configured"
+
+
+def test_parsers_tolerate_leaked_reasoning():
+    reasoning = ('The user wants me to evaluate {an item}. Let me check B and C.\n'
+                 '{"alignment": 2, "clarity": 2, "distractor_quality": 1, "language": 2, "difficulty_match": 2, "notes": "ok"}')
+    assert parse_rubric(reasoning)["distractor_quality"] == 1
+    assert parse_solve("Compare A with C... the largest is option C.\nC") == "C"
+    assert parse_solve("Options A and B look wrong.\nAMBIGUA") is None
+
+
+def test_subject_checks_keep_only_known_keys():
+    from app.generation.parsing import model_fields
+
+    raw = {**READING_ITEM, "subject_checks": {"reading": {"key_support_span": "x", "difficulty": "medium"},
+                                              "difficulty": "medium", "math": "nope"}}
+    assert model_fields(raw)["subject_checks"] == {"reading": {"key_support_span": "x"}}
+
+
+@pytest.mark.parametrize(("subject", "code", "block"), [
+    ("matematicas", "M01", '"math"'), ("espanol", "EL01", '"reading"')])
+def test_prompt_shows_exact_subject_checks_shape(catalog_conn, subject, code, block):
+    user = prompts.generation_messages(bundle(catalog_conn, subject, code), "easy")[1]["content"]
+    assert "EJEMPLO DE subject_checks" in user and block in user.split("EJEMPLO DE subject_checks")[-1]
