@@ -202,18 +202,34 @@
         "math": {
           "type": "object",
           "additionalProperties": false,
-          "required": [
-            "expression"
-          ],
           "properties": {
             "expression": {
               "type": "string",
-              "description": "Exact arithmetic using + - * / ( ) and es-CR or ASCII numbers."
+              "description": "Exact arithmetic with at least one operator; its value is the key."
             },
             "unit": {
               "type": "string"
+            },
+            "select": {
+              "enum": [
+                "min",
+                "max"
+              ],
+              "description": "Comparison items: the checker picks the smallest or largest option value."
             }
-          }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "expression"
+              ]
+            },
+            {
+              "required": [
+                "select"
+              ]
+            }
+          ]
         },
         "reading": {
           "type": "object",

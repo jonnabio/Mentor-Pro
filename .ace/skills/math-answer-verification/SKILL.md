@@ -33,7 +33,8 @@ numbers, measures or money (₡).
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `subject_checks.math.expression` | Yes | Exact expression whose value is the key |
+| `subject_checks.math.expression` | One of | Exact expression (with an operator) whose value is the key |
+| `subject_checks.math.select` | One of | `min` or `max`: comparison items; the checker picks the option value |
 | `subject_checks.math.unit` | No | Expected unit shared by all options (e.g. `cm`, `kg`, `₡`) |
 | `options` | Yes | Option texts as shown to students |
 | `answer_key` | Yes | Label of the intended answer |
@@ -68,6 +69,12 @@ exactly the key equals the expression.
 | Unit conversion | `2,5 * 1000` (state unit `m` in `unit`) |
 
 Allowed syntax: integers, decimal comma, `+ - * / ( )`. No powers, names or calls.
+
+### 1b. Comparison items
+
+"¿Cuál es el menor / mayor…?" items use `select: min` or `select: max`; the
+checker computes the answer from the option values. A bare number as
+`expression` is rejected because it restates the key instead of proving it.
 
 ### 2. Format options in MEP style
 

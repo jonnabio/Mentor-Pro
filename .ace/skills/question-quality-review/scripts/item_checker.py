@@ -28,7 +28,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cr_math import AmbiguousNumberError, evaluate, parse_quantity  # noqa: E402
 
-CHECKER_VERSION = "1.1.0"
+CHECKER_VERSION = "1.2.0"
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "question-engine" / "question-item.schema.json"
 
 SUBJECT_CODES = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
@@ -44,6 +44,7 @@ NEAR_DUPLICATE_THRESHOLD = 0.85
 OPTION_SIMILARITY_THRESHOLD = 0.9
 # Grounding failures cannot be fixed by regenerating the same slot.
 GROUNDING_CHECKS = {"G01", "G02"}
+RE_OPERATOR = re.compile(r"[-+*/×÷]")
 
 Check = dict[str, str]
 
@@ -261,12 +262,13 @@ def check_duplicates(item: dict[str, Any], bank: list[dict[str, Any]]) -> list[C
 
 def check_math(item: dict[str, Any]) -> tuple[list[Check], bool]:
     spec = item.get("subject_checks", {}).get("math")
-    if not spec:
-        return [_check("M01", "fail", "matemáticas item without subject_checks.math expression")], False
-    try:
-        expected = evaluate(spec["expression"])
-    except (ValueError, ZeroDivisionError) as exc:
-        return [_check("M01", "fail", f"expression not evaluable: {exc}")], False
+    if not spec or not (spec.get("expression") or spec.get("select")):
+        return [_check("M01", "fail", "matemáticas item without subject_checks.math expression or select")], False
+    if spec.get("expression") and spec.get("select"):
+        return [_check("M01", "fail", "use either expression or select, not both")], False
+    if spec.get("expression") and not RE_OPERATOR.search(spec["expression"].strip()[1:]):
+        # A bare number restates the claimed key instead of computing it.
+        return [_check("M01", "fail", "expression must compute the answer, not restate a number")], False
     unit = spec.get("unit", "")
 
     values: dict[str, Fraction] = {}
@@ -280,6 +282,16 @@ def check_math(item: dict[str, Any]) -> tuple[list[Check], bool]:
         if opt_unit != unit:
             return [_check("M02", "fail", f"option {opt.get('label')} unit {opt_unit!r} != expected {unit!r}")], False
         values[opt["label"]] = value
+    if spec.get("select"):
+        if spec["select"] not in ("min", "max") or not values:
+            return [_check("M01", "fail", f"select must be 'min' or 'max', got {spec['select']!r}")], False
+        # The checker, not the model, decides which option is smallest or largest.
+        expected = min(values.values()) if spec["select"] == "min" else max(values.values())
+    else:
+        try:
+            expected = evaluate(spec["expression"])
+        except (ValueError, ZeroDivisionError) as exc:
+            return [_check("M01", "fail", f"expression not evaluable: {exc}")], False
     distinct = len(set(values.values())) == len(values)
     matches = [lbl for lbl, v in values.items() if v == expected]
     checks = [_check("M02", "pass" if distinct else "fail",

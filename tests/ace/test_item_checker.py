@@ -275,3 +275,39 @@ def test_item_cannot_claim_official_basis_for_baseline_record(item_by_subject, r
     assert "G01" in failing_ids(run(item, baseline_records(records_by_id), validator))
     item["grounding_basis"] = "approved_baseline"
     assert "G01" not in failing_ids(run(item, baseline_records(records_by_id), validator))
+
+
+# ---------------------------------------------------------------- comparison items and restated keys (T006)
+
+def comparison_item(item_by_subject, select="min", key="B"):
+    item = item_by_subject["matematicas"]
+    item["stem"] = "Cuatro atletas registran estos tiempos en segundos. ¿Cuál es el menor tiempo?"
+    item["options"] = [{"label": "A", "text": "12,8 s"}, {"label": "B", "text": "12,08 s"},
+                       {"label": "C", "text": "12,18 s"}, {"label": "D", "text": "12,81 s"}]
+    item["answer_key"] = key
+    item["distractor_rationales"] = {l: "Confunde el valor posicional." for l in "ABCD" if l != key}
+    item["subject_checks"] = {"math": {"select": select, "unit": "s"}}
+    return item
+
+
+def test_select_min_proves_comparison_key(item_by_subject, records_by_id, validator):
+    result = run(comparison_item(item_by_subject), records_by_id, validator)
+    assert result["deterministic_status"] == "pass", result["reasons"]
+    assert result["math_proven"] is True
+
+
+def test_select_detects_wrong_comparison_key(item_by_subject, records_by_id, validator):
+    result = run(comparison_item(item_by_subject, select="max", key="B"), records_by_id, validator)
+    assert "M03" in failing_ids(result)
+
+
+def test_bare_number_expression_is_rejected(item_by_subject, records_by_id, validator):
+    item = item_by_subject["matematicas"]
+    item["subject_checks"] = {"math": {"expression": "12"}}
+    assert "M01" in failing_ids(run(item, records_by_id, validator))
+
+
+def test_expression_and_select_together_are_rejected(item_by_subject, records_by_id, validator):
+    item = item_by_subject["matematicas"]
+    item["subject_checks"] = {"math": {"expression": "144 / 12", "select": "max"}}
+    assert "M01" in failing_ids(run(item, records_by_id, validator))

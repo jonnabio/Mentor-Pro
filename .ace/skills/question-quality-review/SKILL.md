@@ -68,7 +68,7 @@ One ValidationResult per item:
 | G02 | All | Every excerpt verbatim in a groundable record |
 | G03 | All | Cognitive verb appears in the evidencia (warning) |
 | D01 | All | No exact or near duplicate (bank and siblings) |
-| M01–M03 | Matemáticas | Exact expression; es-CR numbers and units; only the key equals the value |
+| M01–M03 | Matemáticas | Exact expression or `select: min\|max`; es-CR numbers and units; only the key matches |
 | R01–R03 | Español | Passage ≥ 40 words; quoted spans and key support verbatim |
 | F01–F02 | Ciencias, Estudios Sociales | Support terms grounded and used by key/explanation |
 
