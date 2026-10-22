@@ -1,0 +1,97 @@
+# ADR-010: Single Curriculum-Grounded Question Generation
+
+> **Status:** Accepted (Product Owner task T006)
+> **Date:** 2026-10-21
+
+---
+
+## Context
+
+T006 requires one validated multiple-choice question per request, grounded in
+baseline `PNE2026-SUM-v1.0`, generated through the ADR-009 OpenRouter router,
+with model, tokens, cost and validation recorded. Invalid questions must be
+rejected, and the key must not reach students before they answer.
+
+---
+
+## Decision
+
+### Pipeline (`app/generation/`)
+
+1. **Grounding** (`grounding.py`): objective, verbatim assertion, evidencias,
+   concepts and source from the catalog; one evidencia (explicit ordinal or
+   the first). Rubric (`EE`) and ungroundable objectives abstain.
+2. **Prompt** (`prompts.py`, `item-generation` 1.0.0): curriculum passed as
+   delimited data; *forma actual* context; difficulty as cognitive demand;
+   four options; subject-specific check blocks; JSON only.
+3. **Parsing** (`parsing.py`): only model-authored fields are kept; IDs,
+   curriculum reference, verbatim excerpt, `grounding_basis` and generation
+   metadata are set by code.
+4. **Validation**: shared deterministic checker (1.2.0) with concepts as
+   reviewed facts → blind independent solve on a different free model
+   (skipped only when the math key is proven) → rubric on a different model.
+5. **Verdict**: `question-quality-review` table. Up to two generation
+   attempts; only `accept` is a valid question.
+
+### Mathematics
+
+- New `subject_checks.math.select` (`min` \| `max`) for comparison items: the
+  checker computes the answer from the option values.
+- An `expression` must contain an operator; a bare number would restate the
+  model's key and is rejected.
+
+### Records
+
+- Usage per call: `llm.usage_record` (ADR-009), purposes `generation`,
+  `independent_solve`, `review`.
+- Per request: `generation.question_attempt` — objective code, evidencia,
+  difficulty, status, verdict, models, calls, tokens, cost, validation, item.
+
+### Exposure
+
+- `POST /api/dev/questions/generate` exists only when
+  `MENTOR_PRO_DEV_ENDPOINTS=true`; otherwise 404.
+- Accepted: `item` (with key, for developers) and `student_view` (no key,
+  explanation or rationales). Rejected: `rejected_draft` only, never `item`.
+- Student routes are unchanged and never return keys.
+
+---
+
+## Alternatives Considered
+
+### Alternative 1: Trust model-provided metadata
+
+- **Pros:** Simpler prompt handling.
+- **Cons:** Models can invent IDs or claim official provenance.
+- **Why rejected:** Fail-closed provenance rule.
+
+### Alternative 2: Skip the rubric to save calls
+
+- **Pros:** Fewer calls.
+- **Cons:** Violates the review skill's accept rule.
+- **Why rejected:** Free models make the extra calls cost-neutral.
+
+---
+
+## Consequences
+
+### Positive
+
+- No question is reported valid without deterministic checks plus either a
+  math proof or an agreeing blind solve, and a full-score rubric.
+
+### Negative
+
+- Three model calls per accepted non-math question; acceptance depends on
+  free-model quality.
+
+### Neutral
+
+- Rubric scores come from a model and are not ground truth.
+
+---
+
+## Related
+
+- [ADR-006](ADR-006-curriculum-baseline-v1.md), [ADR-009](ADR-009-openrouter-integration.md)
+- Report: `docs/progress/task_T006_result.md`
