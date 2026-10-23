@@ -1,7 +1,7 @@
 # Task T006 Result: First Curriculum-Grounded Question
 
-> **Date:** 2026-10-22
-> **Status:** Implemented; live validation partial (see Results)
+> **Date:** 2026-10-22 (completed 2026-10-23 00:03 UTC)
+> **Status:** Done — all four subjects validated
 > **Decision:** [ADR-010](../adr/ADR-010-single-question-generation.md)
 
 ---
@@ -11,9 +11,23 @@
 The pipeline generates one question per request from baseline
 `PNE2026-SUM-v1.0` through OpenRouter, validates it (deterministic checker,
 blind solve, rubric) and records objective, evidencia, models, tokens, cost
-and verdict. Live runs exposed six defects, all fixed with regression tests.
-Under the final rules, two live questions are valid (EL01, ES01); M02 and C01
-are not yet validated.
+and verdict. Under checker 1.4.0 and prompt 1.2.0, M02, C01, EL01 and ES01
+each produced an accepted question. Total API cost: **$0.00**.
+
+---
+
+## Product Owner Decisions Applied
+
+| Decision | Change |
+|----------|--------|
+| Daily request budget 1000 (local) | `.env` `OPENROUTER_MAX_REQUESTS_PER_DAY=1000`; account is not free tier (1000 free requests/day); paid models stay disabled (`ALLOW_PAID=false`, `MAX_USD_PER_DAY=0`) |
+| C09 rejects a material length cue | Checker 1.4.0: fail (`regenerate`) when the key is ≥ 1.5× **and** ≥ 12 characters longer than the longest distractor |
+| Record every rejection reason | `validation.attempts` keeps each attempt's verdict and reasons (previously only the last attempt) |
+
+The C09 heuristic compares the key with the *longest* distractor, so a key
+that is merely longer than some options passes. The 12-character gap stops
+short options failing on ratio alone (`1,405 m` vs `1,5 m`; `12,5 kg` vs
+`3 kg`). Prompt 1.2.0 tells the generator to keep options similar in length.
 
 ---
 
@@ -21,69 +35,102 @@ are not yet validated.
 
 | Item | Value |
 |------|-------|
-| `.env` | Created, git-ignored; key added by the owner |
-| Connectivity | 468 models listed, 21 free; Nemotron 3 Ultra, 26 in / 16 out tokens, $0, 852 ms |
 | Pinned free models | `nvidia/nemotron-3-ultra-550b-a55b:free`, `minimax/minimax-m3.1-flash:free`, `nvidia/nemotron-3.5-super-vl:free` |
 | Unavailable to this account | Gemma 4 (429 upstream), Nemotron 3 Super (404), Inkling (403) |
-| Calls recorded | 52 (36 ok, 9 rate-limited, 4 errors, 1 truncated, 2 budget-blocked) |
-| **Actual API cost** | **$0.00** — all provider-reported, none missing |
-| Daily request budget | 50 reached; further calls blocked as designed |
+| Calls, earlier runs (checker ≤ 1.3.0) | 52 (36 ok, 9 rate-limited, 4 errors, 1 truncated, 2 budget-blocked), $0.00 |
+| Calls, final runs (checker 1.4.0) | 30 sent (29 ok, 1 truncated) + 2 budget-blocked before the budget change |
+| Tokens, final runs | 19 747 in / 48 032 out |
+| **Actual API cost** | **$0.00** — every call `provider_reported`, none missing |
 
 ---
 
-## Results
+## Final Results
 
-| Objective / evidencia | Final status | Verdict basis | Generator → solver/reviewer |
-|-----------------------|--------------|---------------|-----------------------------|
-| **ES01** E2 (medium) | **Valid** | Checks pass; blind solve C = key; rubric 2/2/2/2/2 | Nemotron 3 Ultra → MiniMax M3.1 Flash |
-| **EL01** E8 (medium) | **Valid, with warning** | Checks pass (C09 key-length warning); blind solve A = key; rubric all 2 | Nemotron 3 Ultra → MiniMax M3.1 Flash |
-| **M02** E3 (medium) | **Not validated** | Accepted at checker 1.2.0, then withdrawn: proof `148/100` restated the key (M04 rule, 1.3.0); needs a blind solve | Nemotron 3 Ultra → MiniMax M3.1 Flash |
-| **C01** E1 (easy) | **Rejected** | Earlier: F02 term not in key; missing `support_terms`; near-identical options. Last: checks passed but solve blocked by budget (`pending`) | Nemotron 3 Ultra |
+| Objective / evidencia | Status | Validation evidence | Generator → solver/reviewer |
+|-----------------------|--------|---------------------|-----------------------------|
+| **M02** E3 *Compara decimales* (medium) | **Accepted** | All checks pass; M03 `select: max` proves 25/2 = B only; rubric all 2 | Nemotron 3 Ultra → Nemotron 3.5 Super VL (rubric) |
+| **C01** E1 *partes de la célula* (easy) | **Accepted** | All checks pass; F01/F02 terms grounded; blind solve A = key; rubric all 2 | Nemotron 3 Ultra → Nemotron 3.5 Super VL |
+| **EL01** E8 *idea fundamental* (medium) | **Accepted** | All checks pass incl. R01–R03 (86-word passage); blind solve A = key; rubric all 2 | Nemotron 3 Ultra → Nemotron 3.5 Super VL |
+| **ES01** E2 *importancia para la convivencia* (medium) | **Accepted** | All checks pass; F01/F02; blind solve B = key; rubric all 2 | Nemotron 3 Ultra → Nemotron 3.5 Super VL |
 
-Per-request usage (selected): ES01 4 calls, 2 507 / 3 498 tokens, 66 s;
-EL01 4 calls, 2 634 / 5 499 tokens, 106 s; M02 (last) 3 calls,
-2 309 / 3 960 tokens, 78 s. All $0.
+Each accepted item has valid objective/evidencia references (G01, G02), four
+distinct options (C02, C04), exactly one key (C03), an explanation and a
+rationale per distractor (C06) and no material length cue (C09).
 
-### Valid example — ES01
+### Revalidation of earlier items under C09
 
-Estudios Sociales, E2 *"Explica por qué son importantes para la convivencia"*:
+| Item | Key / longest distractor (chars) | C09 1.4.0 |
+|------|----------------------------------|-----------|
+| EL01 `req-484cadcb` | 202 / 83 (2.4×) | **Fail** — replaced by the new EL01 (balanced, 99–108 chars) |
+| ES01 `req-0b2aad40` | 161 / 111 (1.45×) | Pass (borderline); superseded by the new ES01 |
+
+### All final-run requests
+
+| Request | Objective | Calls | Outcome | Reason |
+|---------|-----------|-------|---------|--------|
+| `req-5d8bab43` | M02 | 0 | unavailable | daily budget (50) reached |
+| `req-10ca1b74` | C01 | 0 | unavailable | daily budget (50) reached |
+| `req-9004c7b5` | M02 | 2 | rejected (regenerate) | M02 two options equal value |
+| `req-29316ad5` | C01 | 4 | **accepted** | 1st attempt rejected (reason not retained — fixed since) |
+| `req-5075b12a` | EL01 | 3 | **accepted** | — |
+| `req-4d32e222` | ES01 | 4 | **accepted** | 1st attempt rejected (reason not retained — fixed since) |
+| `req-9e723546` | M02 | 5 | rejected (revise) | rubric `language` = 1 |
+| `req-6eaee573` | M02 | 2 | rejected (regenerate) | M02 option A missing unit `m` |
+| `req-be2a64fc` | M02 | 3 | rejected (revise) | rubric `difficulty_match` = 1 |
+| `req-8b426d9a` | M02 | 3 | rejected (revise) | rubric `difficulty_match` = 1 |
+| `req-f0f4ae38` | M02 | 2 | unavailable | fallback truncated at 4000 tokens |
+| `req-e19a3e0d` | M02 | 2 | **accepted** | — |
+
+M02 took 7 requests (22 calls); rejections were genuine, not bypassed.
+
+---
+
+## Accepted Examples
+
+### M02 — Matemáticas
 
 ```text
-En la escuela, los estudiantes de sexto grado organizan una feria comunitaria
-para decidir cómo mejorar el parque del barrio. Deben ponerse de acuerdo entre
-diferentes opiniones y propuestas.
-
-¿Por qué los Estudios Sociales y la Educación Cívica son importantes para la
-convivencia en esta situación?
-
-A) Porque enseñan a conocer la historia y la geografía del país, lo que ayuda a obtener buenas notas.
-B) Porque permiten memorizar fechas y nombres de personajes importantes para los exámenes.
-C) Porque fomentan la participación, el diálogo, el respeto por la diversidad y la solución pacífica de conflictos, lo que fortalece la convivencia y el bien común.   <- clave
-D) Porque solo se centran en los derechos individuales sin considerar los deberes ni la participación democrática.
+En la feria de la escuela, cuatro grupos midieron la longitud de sus cintas
+decorativas en metros y obtuvieron los siguientes resultados:
+¿Cuál de las siguientes longitudes es la mayor?
+A) 12,35   B) 12,5   C) 12,3   D) 12,05      <- clave B
 ```
 
-Generated with prompt 1.0.0, whose example terms came from ES01 concepts
-(since replaced by placeholders). The key is also the longest option.
+Independent verification: all integer parts are 12; tenths are 3, 5, 3, 0,
+so 12,5 is the maximum and is unique. The checker proves the same with exact
+fractions (`select: max` → 25/2, only B matches); no model proof is trusted.
+**Quality note:** the stimulus says "los siguientes resultados" and mentions
+metres, but the values appear only as options without units. Correct, but
+awkward wording the rubric did not catch.
 
-### Valid example — EL01
-
-Español, E8 *"Elige la idea fundamental respaldada por el texto"*.
-
-Passage on a school recycling campaign (88 words); key A summarises the
-campaign. Blind solver chose A. **Quality concern:** option A is far longer
-than the distractors (C09 warning), a cue students can exploit.
-
-### Not validated — M02
-
-Matemáticas, E3 *"Compara decimales"*:
+### C01 — Ciencias
 
 ```text
-Alturas: 1,45 m; 1,5 m; 1,405 m; 1,48 m. ¿Cuál es la altura de la planta que
-quedó en segundo lugar al ordenar las alturas de mayor a menor?
-A) 1,45 m   B) 1,5 m   C) 1,405 m   D) 1,48 m   <- clave D
+En la clase de ciencias, la maestra muestra una lámina de una célula animal.
+¿Cuál es la función principal de la membrana celular?
+A) Controlar el intercambio de sustancias y proteger la célula.   <- clave
+B) Almacenar la información genética en el núcleo.
+C) Servir de medio donde ocurren las reacciones químicas.
+D) Transmitir impulsos nerviosos a través del cuerpo.
 ```
 
-The key is correct, but the claimed proof did not compute it.
+Support terms `membrana`, `intercambio`, `protección` are in the approved
+detailed content (F01) and used by key and explanation (F02); blind solver
+chose A.
+
+### EL01 — Español
+
+An 86-word passage on a school recycling campaign. Key A ("…recolectó 120
+kilogramos de reciclables y enseñó a cuidar el ambiente") is supported by
+verbatim passage spans (R03); the three distractors are true details. Option
+lengths 99–108 characters, so there is no length cue. Blind solver chose A.
+
+### ES01 — Estudios Sociales
+
+Feria comunitaria scenario; key B ("Porque fomentan el diálogo, el respeto
+por diversidad y la solución pacífica de conflictos para alcanzar el bien
+común"). Blind solver chose B. The key is the longest option (119 vs 88
+characters, 1.35× the longest distractor), below the C09 threshold.
 
 ---
 
@@ -97,8 +144,7 @@ The key is correct, but the claimed proof did not compute it.
 | 4 | Rubric/solve parsing failed on leaked reasoning | Last JSON object with rubric keys; letter on final line |
 | 5 | Model injected keys into `subject_checks` | Only known blocks and keys kept |
 | 6 | Expression `148/100` "proved" the key | M04: operands must come from item text (or 2–10, 100, 1000); otherwise blind solve required |
-
-Prompt 1.1.0 shows the exact `subject_checks` shape with neutral placeholders.
+| 7 | Only the last attempt's reasons were stored | `validation.attempts` records every attempt |
 
 ---
 
@@ -106,17 +152,18 @@ Prompt 1.1.0 shows the exact `subject_checks` shape with neutral placeholders.
 
 | Check | Result |
 |-------|--------|
-| Full suite | 246 passed, 0 skipped |
+| Full suite | 254 passed (C09: 2 obvious-cue and 5 acceptable-variation cases; attempt history) |
 | ACE gate | `VERIFY_RESULT=pass gate=all` |
-| Mutation check | Removing the solve-agreement rule fails its test |
-| Key exposure | `.env` git-ignored; key absent from tracked files and all HTTP responses; `student_view` has no key/explanation |
+| Fixture change | Reading test fixture had a 1.55× length-cued key; distractors lengthened |
+| Key exposure | `.env` git-ignored; key absent from tracked files and HTTP responses; `student_view` has no key/explanation |
 
 ---
 
 ## Open Items
 
-1. Regenerate M02 and C01 when the daily budget resets (or raise
-   `OPENROUTER_MAX_REQUESTS_PER_DAY`).
-2. Decide whether C09 (key-length cue) should reject instead of warn.
-3. Rubric scores come from a free model and approved a length-cued key; add
-   human spot checks (`question-evaluation`).
+1. Rubric scores come from one free model; add human spot checks
+   (`question-evaluation`). It missed the M02 stimulus wording.
+2. Social-studies keys tend to be the longest option even below the C09
+   threshold; watch this in the evaluation set.
+3. M02 acceptance rate was 1 in 7 requests; prompt tuning for maths is a
+   candidate for the next task.

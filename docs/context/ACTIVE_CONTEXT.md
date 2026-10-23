@@ -8,8 +8,8 @@
 
 ## Current Objective
 
-Finish T006 live validation (M02, C01), then the next Product Owner task
-(practice sessions / batch generation) after approval.
+T006 is complete. Next: plan the next Product Owner task (practice sessions)
+after approval. Do not start T007 without it.
 
 ## Handoff Summary
 
@@ -32,33 +32,34 @@ Finish T006 live validation (M02, C01), then the next Product Owner task
   connectivity verified ($0).
 - T006 — single grounded question: grounding, prompt 1.1.0, checker 1.3.0
   (math `select`, M04 operand grounding), blind solve, rubric, dev endpoint
-  ([ADR-010](../adr/ADR-010-single-question-generation.md)). Live: ES01 and
-  EL01 valid; M02 not validated; C01 rejected; cost $0.00 over 52 calls.
-  Six live defects fixed (`docs/progress/task_T006_result.md`).
+  ([ADR-010](../adr/ADR-010-single-question-generation.md)). Final (checker
+  1.4.0, prompt 1.2.0): M02, C01, EL01, ES01 each accepted; $0.00 over 82
+  calls. C09 now rejects material key-length cues (PO decision). Seven live
+  defects fixed (`docs/progress/task_T006_result.md`).
 
 ### Current State
 
 - `main` pushed to `origin/main`; working tree clean; no task locks; no
   background servers.
-- `.env` exists (git-ignored) with `OPENROUTER_API_KEY`, pinned free models
-  and `MENTOR_PRO_DEV_ENDPOINTS=true`.
+- `.env` exists (git-ignored) with `OPENROUTER_API_KEY`, pinned free models,
+  `OPENROUTER_MAX_REQUESTS_PER_DAY=1000` (account not free tier) and
+  `MENTOR_PRO_DEV_ENDPOINTS=true`.
 - Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`.
-- Tests: 246 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tests: 254 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. After the UTC daily budget reset, regenerate M02 then C01:
-   `scripts/dev/generate_examples.py --out <file> --only M02`; update the
-   T006 report.
-2. PO decisions: C09 key-length cue warn vs reject; daily request budget.
-3. Plan the next PO task (practice session generation) with an ADR first.
+1. Plan the next PO task (practice session generation) with an ADR first.
+2. Human spot checks of rubric scores (`question-evaluation`); M02 accepted
+   1 in 7 requests, so maths prompt tuning is a candidate.
+3. `scripts/pubs/check_lane.py` (session start prompt) does not exist here.
 
 ### Blockers/Issues
 
 - Free models: Gemma 429 (upstream), Nemotron Super 404, Inkling 403 for this
   account; only Nemotron 3 Ultra, MiniMax M3.1 Flash, Nemotron 3.5 Super VL
   pinned.
-- Rubric is model-scored and approved length-cued keys (EL01, ES01).
+- Rubric is model-scored by one free model; it missed awkward M02 wording.
 - Local `pg_hba.conf` uses `trust`; `mentor_pro_admin` has no password.
 - Automated browser checks fail on this machine (Edge under automation).
 - Docker not installed; `docker-compose.yml` untested.
