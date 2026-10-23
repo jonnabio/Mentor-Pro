@@ -1,0 +1,8 @@
+PASS [live] generation finished after 366 s
+PASS [live] complete set (notice: '')
+PASS [live] explanation not in the page before answering
+PASS [live] answered 5: 3 correct, 2 incorrect
+PASS [live] result 60 %
+PASS [live] session 75b0d01273840a29d2cf38c3742c7593
+PASS [live] no key or explanation before submission ([])
+PASS [live] no JavaScript errors []

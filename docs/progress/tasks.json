@@ -299,6 +299,41 @@
       "result_file": "docs/progress/task_T009_result.md",
       "failures": [],
       "notes": "Checker 1.6.0. Of 18 accepted maths items, only the T008 slot 3 item newly loses its proof; no valid proof lost."
+    },
+    {
+      "id": "T010",
+      "name": "Student practice integration and real testing (PO T010)",
+      "objective": "Server-managed generation jobs with polling, one-question-at-a-time practice, server-side evaluation, feedback and summary in the Spanish page; keys never sent before submission.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/",
+          "tests/app/test_practice_api.py",
+          "scripts/dev/practice_e2e.py",
+          "docs/adr/ADR-013-student-practice-sessions.md",
+          "docs/progress/task_T010_result.md",
+          "docs/progress/screenshots/T010/"
+        ],
+        "modify": [
+          "app/main.py",
+          "app/static/",
+          "app/generation/practice_set.py",
+          "docs/runbooks/practice-ui.md"
+        ],
+        "delete": [
+          "scripts/dev/ui_smoke.py"
+        ]
+      },
+      "depends_on": [
+        "T009"
+      ],
+      "complexity": "L",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T010_result.md",
+      "failures": [],
+      "notes": "Browser mocked 71/71; live run 1 partial 4/5 (truncation), run 2 complete 5/5 in 366 s, 22 calls, $0.00."
     }
   ]
 }

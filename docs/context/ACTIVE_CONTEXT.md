@@ -8,7 +8,7 @@
 
 ## Current Objective
 
-T009 (maths proof correctness, checker 1.6.0) is complete. Next: the next Product
+T010 (student practice in the web page) is complete. Next: the next Product
 Owner task after approval (not 10–30 question sets, answering or frontend
 without it).
 
@@ -51,6 +51,11 @@ without it).
   stem asks (number properties or extra conditions → blind solve required);
   [RCA-002](../rca/RCA-002-math-proof-not-establishing-question.md) and guard
   (`docs/progress/task_T009_result.md`).
+- T010 — student practice ([ADR-013](../adr/ADR-013-student-practice-sessions.md)):
+  schema `practice` (session, item, answer), in-process job queue with
+  polling, server-side evaluation, one question at a time, feedback, summary;
+  `scripts/dev/practice_e2e.py` (Playwright + Chrome). Live: 5/5 in 366 s,
+  $0.00 (`docs/progress/task_T010_result.md`).
 
 ### Current State
 
@@ -61,11 +66,12 @@ without it).
   `MENTOR_PRO_DEV_ENDPOINTS=true`.
 - Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`,
   `generation.practice_set`, `generation.practice_set_item`.
-- Tests: 298 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tests: 312 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Plan the next PO task with an ADR first.
+1. Plan the next PO task with an ADR first. Generation truncation at 4 000
+   tokens causes partial sets; raising it needs approval.
 2. Property cues are keyword heuristics (T009 limitations); a typed
    property check (divisibility, parity) would make such keys provable.
 3. Human spot checks of rubric scores (`question-evaluation`).
@@ -78,7 +84,7 @@ without it).
   pinned.
 - Rubric is model-scored by one free model; it missed awkward M02 wording.
 - Local `pg_hba.conf` uses `trust`; `mentor_pro_admin` has no password.
-- Automated browser checks fail on this machine (Edge under automation).
+- Edge cannot start under automation; browser tests use installed Chrome.
 - Docker not installed; `docker-compose.yml` untested.
 - Student first name in pushed commit `42adbe7`; rewrite needs approval.
 - Remote branch `origin/copilot/clean-repository` (merged PR #1) remains.
@@ -101,4 +107,4 @@ without it).
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-012](../adr/ADR-012-controlled-parallel-generation.md)
+  [ADR-013](../adr/ADR-013-student-practice-sessions.md)

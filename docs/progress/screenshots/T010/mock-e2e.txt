@@ -1,0 +1,71 @@
+PASS [desktop-matematicas] explanation not in the page before answering
+PASS [desktop-matematicas] Q1 answered A: shown 'Incorrecto. La respuesta correcta es la opción B.'
+PASS [desktop-matematicas] Q2 answered C: shown '¡Correcto!'
+PASS [desktop-matematicas] Q3 answered D: shown '¡Correcto!'
+PASS [desktop-matematicas] Q4 answered A: shown '¡Correcto!'
+PASS [desktop-matematicas] Q5 answered B: shown '¡Correcto!'
+PASS [desktop-matematicas] 4 correct, 1 incorrect
+PASS [desktop-matematicas] summary 4 / 1 / 80 %
+PASS [desktop-matematicas] practiced objectives listed: ['M02', 'M04', 'M05']
+PASS [desktop-matematicas] no key or explanation before submission ([])
+PASS [desktop-matematicas] no horizontal overflow
+PASS [desktop-espanol] explanation not in the page before answering
+PASS [desktop-espanol] Q1 answered A: shown 'Incorrecto. La respuesta correcta es la opción B.'
+PASS [desktop-espanol] Q2 answered C: shown '¡Correcto!'
+PASS [desktop-espanol] Q3 answered D: shown '¡Correcto!'
+PASS [desktop-espanol] Q4 answered A: shown '¡Correcto!'
+PASS [desktop-espanol] Q5 answered B: shown '¡Correcto!'
+PASS [desktop-espanol] 4 correct, 1 incorrect
+PASS [desktop-espanol] summary 4 / 1 / 80 %
+PASS [desktop-espanol] practiced objectives listed: ['EL01', 'EL02']
+PASS [desktop-espanol] no key or explanation before submission ([])
+PASS [desktop-espanol] no horizontal overflow
+PASS [desktop-ciencias] explanation not in the page before answering
+PASS [desktop-ciencias] Q1 answered A: shown 'Incorrecto. La respuesta correcta es la opción B.'
+PASS [desktop-ciencias] Q2 answered C: shown '¡Correcto!'
+PASS [desktop-ciencias] Q3 answered D: shown '¡Correcto!'
+PASS [desktop-ciencias] Q4 answered A: shown '¡Correcto!'
+PASS [desktop-ciencias] Q5 answered B: shown '¡Correcto!'
+PASS [desktop-ciencias] 4 correct, 1 incorrect
+PASS [desktop-ciencias] summary 4 / 1 / 80 %
+PASS [desktop-ciencias] practiced objectives listed: ['C01', 'C02']
+PASS [desktop-ciencias] no key or explanation before submission ([])
+PASS [desktop-ciencias] no horizontal overflow
+PASS [desktop-estudios_sociales] explanation not in the page before answering
+PASS [desktop-estudios_sociales] Q1 answered A: shown 'Incorrecto. La respuesta correcta es la opción B.'
+PASS [desktop-estudios_sociales] Q2 answered C: shown '¡Correcto!'
+PASS [desktop-estudios_sociales] Q3 answered D: shown '¡Correcto!'
+PASS [desktop-estudios_sociales] Q4 answered A: shown '¡Correcto!'
+PASS [desktop-estudios_sociales] Q5 answered B: shown '¡Correcto!'
+PASS [desktop-estudios_sociales] 4 correct, 1 incorrect
+PASS [desktop-estudios_sociales] summary 4 / 1 / 80 %
+PASS [desktop-estudios_sociales] practiced objectives listed: ['ES01', 'ES02']
+PASS [desktop-estudios_sociales] no key or explanation before submission ([])
+PASS [desktop-estudios_sociales] no horizontal overflow
+PASS [dup] second tab with the same configuration reuses the running session
+PASS [dup] 5 clicks + second tab started 1 job(s)
+PASS [refresh] progress view restored after reload during generation
+PASS [refresh] reload did not start a second job
+PASS [resubmit] second answer to Q1 ignored; first (A, incorrect) kept
+PASS [resubmit] answer button hidden after answering
+PASS [resubmit] reload resumes at the first unanswered question
+PASS [llm-down] failure shown: 'El servicio de generación de preguntas no respondió. No se pudo preparar ninguna pregunta. Intente de nuevo más tarde.'
+PASS [budget] partial notice: 'Se alcanzó el límite diario de generación de preguntas. Se prepararon 2 de 5 preguntas; puede practicar con ellas.'
+PASS [budget] 2 questions to practise
+PASS [budget] explanation not in the page before answering
+PASS [budget] Q1 answered B: shown '¡Correcto!'
+PASS [budget] Q2 answered B: shown 'Incorrecto. La respuesta correcta es la opción C.'
+PASS [budget] summary 50 %
+PASS [desktop] no JavaScript errors []
+PASS [mobile-matematicas] explanation not in the page before answering
+PASS [mobile-matematicas] Q1 answered A: shown 'Incorrecto. La respuesta correcta es la opción B.'
+PASS [mobile-matematicas] Q2 answered C: shown '¡Correcto!'
+PASS [mobile-matematicas] Q3 answered D: shown '¡Correcto!'
+PASS [mobile-matematicas] Q4 answered A: shown '¡Correcto!'
+PASS [mobile-matematicas] Q5 answered B: shown '¡Correcto!'
+PASS [mobile-matematicas] 4 correct, 1 incorrect
+PASS [mobile-matematicas] summary 4 / 1 / 80 %
+PASS [mobile-matematicas] practiced objectives listed: ['M02', 'M04', 'M05']
+PASS [mobile-matematicas] no key or explanation before submission ([])
+PASS [mobile-matematicas] no horizontal overflow
+PASS [mobile] no JavaScript errors []

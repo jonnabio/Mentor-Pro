@@ -1,7 +1,8 @@
-# Runbook: Practice Configuration UI (local)
+# Runbook: Práctica PNE UI (local)
 
 > **Date:** 2026-10-21
-> **Decision:** [ADR-008](../adr/ADR-008-practice-configuration-api.md)
+> **Decision:** [ADR-008](../adr/ADR-008-practice-configuration-api.md),
+> [ADR-013](../adr/ADR-013-student-practice-sessions.md) (practice sessions, T010)
 
 ---
 
@@ -33,10 +34,22 @@ curl -s -X POST http://127.0.0.1:8000/api/practice/configure \
   -d '{"subject":"ciencias","scope":"subject_simulation","objective_codes":[],"difficulty":"mixed","question_count":5}'
 ```
 
-Browser smoke test (desktop 1280 px, mobile 390 px; uses installed Edge):
+Practice flow: choose subject, objectives, difficulty and 5 questions, then
+"Generar práctica". Generation runs as a server job (about 10 minutes on free
+models); the page polls every 3 s and resumes after a reload. Requires
+`OPENROUTER_API_KEY` in `.env`.
 
 ```bash
-.venv/Scripts/python.exe scripts/dev/ui_smoke.py --out <folder>
+curl -s -X POST http://127.0.0.1:8000/api/practice/sessions -H "Content-Type: application/json"   -d '{"subject":"matematicas","scope":"selected_objectives","objective_codes":["M02","M04","M05"],
+       "difficulty":"medium","question_count":5,"client_request_id":"manual-0001"}'
+curl -s http://127.0.0.1:8000/api/practice/sessions/<session_id>
+```
+
+Browser end-to-end test (installed Chrome, desktop 1280 px and mobile 390 px):
+
+```bash
+.venv/Scripts/python.exe scripts/dev/practice_e2e.py --out <folder>          # mocked generator
+.venv/Scripts/python.exe scripts/dev/practice_e2e.py --out <folder> --live   # OpenRouter, ~10 min
 ```
 
 ---
@@ -47,4 +60,5 @@ Browser smoke test (desktop 1280 px, mobile 390 px; uses installed Edge):
 |---------|-------|
 | Subjects do not load | `DATABASE_URL` missing or PostgreSQL stopped |
 | All counts are 0 | Catalog not imported, or `CURRICULUM_BASELINE` mismatch |
-| `ui_smoke.py` fails at browser launch | Edge cannot start in automation on this machine (see T004 report) |
+| Browser test fails at launch | Use Chrome (`channel="chrome"`); Edge cannot start in automation on this machine |
+| Practice shows "se interrumpió" | The server restarted during generation; configure it again |
