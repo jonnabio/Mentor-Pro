@@ -49,6 +49,12 @@ rejected, and the key must not reach students before they answer.
   numeric or one-word options from failing. Prompt 1.2.0 asks for options of
   similar length.
 - `validation.attempts` keeps every generation attempt's verdict and reasons.
+- Checker 1.6.0 (T009): a deterministic proof counts only if it establishes
+  what the stem asks. A number property (múltiplo, par, primo, divisible,
+  "de modo que"…) in the stimulus or stem leaves any proof unproven;
+  `select: min|max` proves a key only when the stem asks for that extreme
+  without further conditions (entre, pero, segundo, mayor que…). Unproven
+  items need an agreeing blind solve; without one they are not accepted.
 
 ### Live hardening (2026-10-22)
 

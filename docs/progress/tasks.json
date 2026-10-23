@@ -271,6 +271,34 @@
       "result_file": "docs/progress/task_T008_result.md",
       "failures": [],
       "notes": "Live set-5b7eb9ee (M02, M04, M05): 5/5, 628 s vs 1342 s in T007 (-53%), 18 calls, 14172/40587 tokens, $0.00. Finding: select-based proof does not check property conditions (follow-up)."
+    },
+    {
+      "id": "T009",
+      "name": "Mathematical validation correctness (PO T009)",
+      "objective": "Deterministic math proofs count only when they establish what the question asks; property-based questions need an agreeing blind solve or are rejected.",
+      "status": "verified",
+      "role": "Incident Responder",
+      "files": {
+        "create": [
+          "docs/progress/task_T009_result.md"
+        ],
+        "modify": [
+          ".ace/skills/question-quality-review/scripts/item_checker.py",
+          ".ace/skills/question-quality-review/SKILL.md",
+          "tests/ace/test_item_checker.py",
+          "tests/app/test_generation.py",
+          "docs/adr/ADR-010-single-question-generation.md"
+        ]
+      },
+      "depends_on": [
+        "T008"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T009_result.md",
+      "failures": [],
+      "notes": "Checker 1.6.0. Of 18 accepted maths items, only the T008 slot 3 item newly loses its proof; no valid proof lost."
     }
   ]
 }

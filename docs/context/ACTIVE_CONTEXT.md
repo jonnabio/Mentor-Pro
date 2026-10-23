@@ -8,7 +8,7 @@
 
 ## Current Objective
 
-T008 (controlled parallel set generation) is complete. Next: the next Product
+T009 (maths proof correctness, checker 1.6.0) is complete. Next: the next Product
 Owner task after approval (not 10–30 question sets, answering or frontend
 without it).
 
@@ -47,6 +47,10 @@ without it).
   `QUESTION_GENERATION_CONCURRENCY` (default 2), `BudgetGate` reserves budget
   before every HTTP attempt, commit-time D01, slot-ordered results. Live 5/5
   in 628 s (T007: 1 342 s), $0.00 (`docs/progress/task_T008_result.md`).
+- T009 — checker 1.6.0: a maths proof counts only if it establishes what the
+  stem asks (number properties or extra conditions → blind solve required);
+  [RCA-002](../rca/RCA-002-math-proof-not-establishing-question.md) and guard
+  (`docs/progress/task_T009_result.md`).
 
 ### Current State
 
@@ -57,13 +61,13 @@ without it).
   `MENTOR_PRO_DEV_ENDPOINTS=true`.
 - Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`,
   `generation.practice_set`, `generation.practice_set_item`.
-- Tests: 282 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tests: 298 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
 1. Plan the next PO task with an ADR first.
-2. Proofs by `select: min|max` do not check property conditions in the stem
-   (T008 finding); proposed rule change needs PO approval.
+2. Property cues are keyword heuristics (T009 limitations); a typed
+   property check (divisibility, parity) would make such keys provable.
 3. Human spot checks of rubric scores (`question-evaluation`).
 4. `scripts/pubs/check_lane.py` (session start prompt) does not exist here.
 

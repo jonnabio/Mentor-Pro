@@ -76,3 +76,29 @@ guards:
 
 # Active Guards (add new guards below)
 # ------------------------------------
+
+  - id: RCA-002
+    title: "Math proof accepted without establishing what the question asks"
+    severity: high
+    created: 2026-10-23
+    rca_file: docs/rca/RCA-002-math-proof-not-establishing-question.md
+
+    # A proof may only skip the blind solve if it establishes what is asked.
+    guarded_files:
+      - .ace/skills/question-quality-review/scripts/item_checker.py
+      - app/generation/pipeline.py
+
+    invariants:
+      - "math_proven is false when the stimulus or stem states a number property"
+      - "select: min|max proves a key only for a stem asking that extreme without further conditions"
+      - "An unproven maths item is accepted only with an agreeing independent blind solve"
+
+    tests:
+      - tests/ace/test_item_checker.py
+      - tests/app/test_generation.py
+
+    standard_rule: ".ace/skills/question-quality-review/SKILL.md M04"
+
+    review_triggers:
+      - "Changes to check_math, _unproven_reason or the cue lists"
+      - "New proof types in subject_checks.math"
