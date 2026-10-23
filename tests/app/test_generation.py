@@ -305,3 +305,47 @@ def test_subject_checks_keep_only_known_keys():
 def test_prompt_shows_exact_subject_checks_shape(catalog_conn, subject, code, block):
     user = prompts.generation_messages(bundle(catalog_conn, subject, code), "easy")[1]["content"]
     assert "EJEMPLO DE subject_checks" in user and block in user.split("EJEMPLO DE subject_checks")[-1]
+
+
+# ---------------------------------------------------------------- unproven property questions (checker 1.6.0, T009)
+
+PROPERTY_ITEM = {
+    **MATH_ITEM,
+    "stimulus": {"type": "text", "text": "En la escuela hay 72 alumnos inscritos en un torneo de fútbol."},
+    "stem": "¿Cuál es la mayor cantidad de equipos iguales que se pueden formar de modo que el número de equipos "
+            "sea múltiplo de 3 y par?",
+    "options": [{"label": "A", "text": "6"}, {"label": "B", "text": "12"},
+                {"label": "C", "text": "18"}, {"label": "D", "text": "24"}],
+    "answer_key": "D",
+    "explanation": "24 divide a 72, es par y es múltiplo de 3; es la mayor de las opciones que cumple.",
+    "distractor_rationales": {"A": "No es la mayor.", "B": "No es la mayor.", "C": "No es la mayor."},
+    "subject_checks": {"math": {"select": "max"}},
+}
+
+
+def test_property_question_needs_agreeing_blind_solve(catalog_conn):
+    fake = FakeLlm([PROPERTY_ITEM], solve="D")
+    outcome = generate_one(client_for(fake), MemoryUsageStore(), bundle(catalog_conn), "medium")
+    assert outcome.status == "accepted"
+    assert outcome.validation["math_proven"] is False
+    assert outcome.validation["independent_solve"]["agrees_with_key"] is True
+    assert "solve" in [p for p, _ in fake.calls]
+
+
+def test_property_question_rejected_when_blind_solve_disagrees(catalog_conn):
+    fake = FakeLlm([PROPERTY_ITEM], solve="C")
+    outcome = generate_one(client_for(fake), MemoryUsageStore(), bundle(catalog_conn), "medium")
+    assert outcome.status == "rejected"
+    assert any("independent solve chose C" in r for r in outcome.reasons)
+
+
+def test_property_question_rejected_when_blind_solve_unavailable(catalog_conn):
+    class NoSolve(FakeLlm):
+        def _respond(self, request):
+            if request.content and json.loads(request.content)["messages"][0]["content"].startswith("Usted resuelve"):
+                return httpx.Response(404, json={"error": {"message": "unavailable"}})
+            return super()._respond(request)
+
+    outcome = generate_one(client_for(NoSolve([PROPERTY_ITEM])), MemoryUsageStore(), bundle(catalog_conn), "medium")
+    assert outcome.status == "rejected" and outcome.validation["verdict"] == "pending"
+    assert "independent solve unavailable" in outcome.reasons

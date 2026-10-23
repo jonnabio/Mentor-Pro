@@ -72,7 +72,7 @@ One ValidationResult per item:
 | G03 | All | Cognitive verb appears in the evidencia (warning) |
 | D01 | All | No exact or near duplicate (bank and siblings) |
 | M01–M03 | Matemáticas | Exact expression or `select: min\|max`; es-CR numbers and units; only the key matches |
-| M04 | Matemáticas | Expression operands from the item text; property-selection stems ("¿Cuál de los siguientes…?") need a blind solve |
+| M04 | Matemáticas | Proven only if the proof establishes what is asked: expression operands from the item text; no number property (múltiplo, par, primo, divisible, "de modo que"…) in stimulus or stem; `select` only when the stem asks that extreme with no extra condition. Otherwise warn → blind solve required |
 | R01–R03 | Español | Passage ≥ 40 words; quoted spans and key support verbatim |
 | F01–F02 | Ciencias, Estudios Sociales | Support terms grounded and used by key/explanation |
 

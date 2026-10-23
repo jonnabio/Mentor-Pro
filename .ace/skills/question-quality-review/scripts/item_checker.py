@@ -28,7 +28,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cr_math import AmbiguousNumberError, evaluate, parse_quantity  # noqa: E402
 
-CHECKER_VERSION = "1.5.0"  # 1.5.0: L01-L03 linguistic clarity checks
+CHECKER_VERSION = "1.6.0"  # 1.6.0: a proof must establish what the stem asks (M04 property and select rules)
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "question-engine" / "question-item.schema.json"
 
 SUBJECT_CODES = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
@@ -61,6 +61,18 @@ ALLOWED_CONSTANTS = {Fraction(n) for n in (*range(2, 11), 100, 1000)}
 # M04: a stem that picks the option satisfying a property ("¿Cuál de los siguientes es múltiplo de 3?")
 # is not proven by an expression that merely evaluates to the key; the blind solve must decide.
 PROPERTY_SELECTION_CUES = ("cual de los siguientes", "cual de las siguientes", "podria")
+# M04: number properties or conditions in the stimulus or stem (regexes on normalized text). Neither an
+# expression nor a min/max selection checks them, so their presence leaves the key unproven.
+PROPERTY_CUES = (r"multiplos?", r"divisor(es)?", r"divisib\w*", r"pares?", r"impares?", r"primos?", r"compuestos?",
+                 r"factor(es)?", r"de modo que", r"que cumpl\w*", r"cumple\w*", r"a la vez", r"podria", r"posibles?")
+# M04 for `select`: comparison conditions in the stem that make the answer something other than the extreme.
+SELECT_CONDITION_CUES = (r"entre", r"pero", r"si fue", r"mayor que", r"menor que", r"excepto", r"sin contar",
+                         r"segund[oa]", r"tercer[oa]?", r"penultim[oa]", r"ordenar")
+# `select` proves a key only when the stem asks for that extreme.
+EXTREME_CUES = {
+    "max": (r"(el|la|los|las) mayor(es)?", r"mas grandes?", r"maxim[oa]s?", r"mas alt[oa]s?", r"mas larg[oa]s?"),
+    "min": (r"(el|la|los|las) menor(es)?", r"mas pequen[oa]s?", r"minim[oa]s?", r"mas baj[oa]s?", r"mas cort[oa]s?"),
+}
 
 Check = dict[str, str]
 
@@ -325,6 +337,7 @@ def check_math(item: dict[str, Any]) -> tuple[list[Check], bool]:
         foreign = [o for o in operands if o not in text_values and o not in ALLOWED_CONSTANTS]
         grounded_proof = bool(operands) and not foreign and any(o in text_values for o in operands)
         selects_by_property = any(c in normalize(item.get("stem", "")) for c in PROPERTY_SELECTION_CUES)
+    unproven_reason = _unproven_reason(item, spec)
     checks = [_check("M02", "pass" if distinct else "fail",
                      "option values are distinct" if distinct else "two options have the same value")]
     if matches == [item.get("answer_key")] and distinct:
@@ -337,10 +350,35 @@ def check_math(item: dict[str, Any]) -> tuple[list[Check], bool]:
             checks.append(_check("M04", "warn", "stem selects an option by a property; the expression does not "
                                                 "prove it, independent solve required"))
             return checks, False
-        checks.append(_check("M04", "pass", "expression operands come from the item text"))
+        if unproven_reason:
+            checks.append(_check("M04", "warn", f"{unproven_reason}; independent solve required"))
+            return checks, False
+        checks.append(_check("M04", "pass", "proof establishes what the stem asks"))
         return checks, True
     checks.append(_check("M03", "fail", f"expression = {expected}; matching options {matches}, key {item.get('answer_key')}"))
     return checks, False
+
+
+def _cue_hits(cues: tuple[str, ...], text: str) -> list[str]:
+    return [m.group(0) for c in cues if (m := re.search(rf"\b(?:{c})\b", text))]
+
+
+def _unproven_reason(item: dict[str, Any], spec: dict[str, Any]) -> str | None:
+    """Why a consistent proof still does not establish the key, or None when it does."""
+    stem = normalize(item.get("stem", ""))
+    text = normalize(f"{item.get('stimulus', {}).get('text', '')} {item.get('stem', '')}")
+    properties = _cue_hits(PROPERTY_CUES, text)
+    if properties:
+        return f"the item states properties {properties} that the proof does not check"
+    if spec.get("select"):
+        direction = spec["select"]
+        opposite = "min" if direction == "max" else "max"
+        if not _cue_hits(EXTREME_CUES[direction], stem):
+            return f"the stem does not ask for the {'largest' if direction == 'max' else 'smallest'} option"
+        conditions = _cue_hits(SELECT_CONDITION_CUES, stem) + _cue_hits(EXTREME_CUES[opposite], stem)
+        if conditions:
+            return f"the stem adds conditions {conditions} that select: {direction} does not check"
+    return None
 
 
 def check_reading(item: dict[str, Any]) -> list[Check]:

@@ -430,3 +430,98 @@ def test_property_selection_is_not_proven_by_an_expression(item_by_subject, reco
     result = run(item, records_by_id, validator)
     assert result["math_proven"] is False and result["requires_independent_solve"] is True
     assert any(c["id"] == "M04" and c["status"] == "warn" for c in result["checks"])
+
+
+# ---------------------------------------------------------------- proof must establish the question (checker 1.6.0)
+
+def math_variant(item_by_subject, stimulus, stem, options, key, spec):
+    item = copy.deepcopy(item_by_subject["matematicas"])
+    item["stimulus"] = {"type": "text", "text": stimulus} if stimulus else {"type": "none"}
+    item["stem"] = stem
+    for option, text in zip(item["options"], options):
+        option["text"] = text
+    item["answer_key"] = key
+    item["distractor_rationales"] = {l: "Confunde la condición pedida." for l in "ABCD" if l != key}
+    item["subject_checks"] = {"math": spec}
+    return item
+
+
+T008_SLOT3 = ("En la escuela se organizará un torneo de fútbol. Hay 72 alumnos inscritos y se formarán equipos con "
+              "la misma cantidad de alumnos en cada uno.",
+              "¿Cuál es la mayor cantidad de equipos que se pueden formar de modo que cada equipo tenga la misma "
+              "cantidad de alumnos y el número de equipos sea múltiplo de 3 y par?",
+              ["6", "12", "18", "24"], "D")
+
+
+def test_t008_select_max_does_not_prove_a_property_question(item_by_subject, records_by_id, validator):
+    """T008 slot 3: select: max found the largest option, not the one that is a multiple of 3 and even."""
+    result = run(math_variant(item_by_subject, *T008_SLOT3, {"select": "max"}), records_by_id, validator)
+    assert result["deterministic_status"] == "pass"
+    assert result["math_proven"] is False and result["requires_independent_solve"] is True
+    m04 = next(c for c in result["checks"] if c["id"] == "M04")
+    assert m04["status"] == "warn" and "multiplo" in m04["message"]
+
+
+def test_t008_property_select_cannot_accept_when_the_largest_option_violates_it(item_by_subject, records_by_id,
+                                                                                validator):
+    """30 is the largest option but 72 cannot be split into 30 equal teams; the correct key is 18."""
+    stimulus, stem, _, _ = T008_SLOT3
+    item = math_variant(item_by_subject, stimulus, stem, ["6", "12", "18", "30"], "C", {"select": "max"})
+    result = run(item, records_by_id, validator)
+    assert "M03" in failing_ids(result) and result["math_proven"] is False
+
+
+def test_t007_expression_3_times_6_is_not_proof_of_a_property(item_by_subject, records_by_id, validator):
+    item = math_variant(item_by_subject, "En la feria de la escuela, cada puesto tiene un número.",
+                        "¿Qué número de puesto es múltiplo de 3 y a la vez es par?",  # no "cuál de los siguientes"
+                        ["14", "15", "16", "18"], "D", {"expression": "3 * 6"})
+    result = run(item, records_by_id, validator)
+    assert result["math_proven"] is False and result["requires_independent_solve"] is True
+
+
+def test_property_in_stimulus_only_is_not_proven(item_by_subject, records_by_id, validator):
+    item = math_variant(item_by_subject, "El total de tapitas es un número par que termina en 0.",
+                        "¿Cuál es el mayor total de tapitas?", ["140", "160", "180", "210"], "C", {"select": "max"})
+    assert run(item, records_by_id, validator)["math_proven"] is False
+
+
+@pytest.mark.parametrize("stem,select", [
+    ("¿Cuál es la altura de la planta que quedó en segundo lugar?", "max"),       # T006: not the extreme
+    ("¿Cuál altura es mayor que 1,45 m pero menor que 1,5 m?", "max"),            # range condition
+    ("¿Cuál de las alturas es la menor?", "max"),                                 # direction mismatch
+    ("¿Cuánto mide la planta?", "min"),                                           # no extreme asked
+])
+def test_select_without_matching_extreme_question_is_not_proven(stem, select, item_by_subject, records_by_id,
+                                                                 validator):
+    options = ["1,45 m", "1,5 m", "1,405 m", "1,48 m"]
+    key = "B" if select == "max" else "C"
+    item = math_variant(item_by_subject, "Cuatro plantas crecieron durante un mes.", stem, options, key,
+                        {"select": select, "unit": "m"})
+    result = run(item, records_by_id, validator)
+    assert result["math_proven"] is False, stem
+
+
+@pytest.mark.parametrize("stimulus,stem,options,key,spec", [
+    (None, "¿Cuál de las siguientes fracciones representa la mayor parte?", ["3/5", "4/7", "5/8", "2/3"], "D",
+     {"select": "max"}),                                                          # T007 slot 2
+    ("En la feria se midió el jugo que quedó: 1/2, 3/5, 5/8 y 7/10.",
+     "¿Cuál de esas fracciones representa la menor cantidad de jugo?", ["1/2", "3/5", "5/8", "7/10"], "A",
+     {"select": "min"}),                                                          # T008 slot 2
+    ("En la feria de la escuela se vendieron 1 236 boletos. Los boletos se reparten por igual entre 12 grupos.",
+     "¿Cuántos boletos recibe cada grupo?", ["103", "102", "104", "105"], "A",
+     {"expression": "1236 / 12"}),                                                # T007/T008 slot 5
+    ("Una escuela reúne 144 cuadernos y los reparte en 6 aulas.", "¿Cuántos cuadernos recibe cada aula?",
+     ["18", "24", "26", "138"], "B", {"expression": "144 / 6"}),
+])
+def test_valid_arithmetic_and_comparison_proofs_are_preserved(stimulus, stem, options, key, spec, item_by_subject,
+                                                               records_by_id, validator):
+    result = run(math_variant(item_by_subject, stimulus, stem, options, key, spec), records_by_id, validator)
+    assert result["deterministic_status"] == "pass", result["reasons"]
+    assert result["math_proven"] is True, result["checks"]
+
+
+def test_para_and_comparar_are_not_property_cues(item_by_subject, records_by_id, validator):
+    item = math_variant(item_by_subject, "Para la feria se compran 144 globos para repartir en 6 aulas.",
+                        "¿Cuántos globos son para cada aula?", ["18", "24", "26", "138"], "B",
+                        {"expression": "144 / 6"})
+    assert run(item, records_by_id, validator)["math_proven"] is True
