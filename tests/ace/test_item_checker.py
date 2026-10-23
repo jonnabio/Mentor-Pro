@@ -364,3 +364,69 @@ def test_obvious_key_length_cue_fails(key_text, distractors, item_by_subject, re
 def test_acceptable_length_variation_passes(key_text, distractors, item_by_subject, records_by_id, validator):
     status, _ = c09_status(item_by_subject, records_by_id, validator, key_text, distractors)
     assert status == "pass"
+
+
+# ---------------------------------------------------------------- L01-L03 linguistic clarity (checker 1.5.0)
+
+def awkward_decimal_item(item_by_subject):
+    """The T006 M02 item: announces results it never shows and drops the metre unit."""
+    item = copy.deepcopy(item_by_subject["matematicas"])
+    item["stimulus"] = {"type": "text", "text": "En la feria de la escuela, cuatro grupos midieron la longitud de "
+                                                "sus cintas en metros y obtuvieron los siguientes resultados:"}
+    item["stem"] = "¿Cuál de las siguientes longitudes es la mayor?"
+    for option, text in zip(item["options"], ["12,35", "12,5", "12,3", "12,05"]):
+        option["text"] = text
+    item["answer_key"] = "B"
+    item["subject_checks"] = {"math": {"select": "max"}}
+    return item
+
+
+def test_t006_awkward_math_item_fails_language_checks(item_by_subject, records_by_id, validator):
+    failed = failing_ids(run(awkward_decimal_item(item_by_subject), records_by_id, validator))
+    assert {"L01", "L02"} <= failed
+
+
+def test_announced_data_without_numbers_fails(item_by_subject, records_by_id, validator):
+    item = awkward_decimal_item(item_by_subject)
+    item["stimulus"]["text"] = "Cuatro grupos midieron sus cintas y anotaron los siguientes resultados."
+    item["stem"] = "¿Cuál longitud es la mayor?"
+    assert "L01" in failing_ids(run(item, records_by_id, validator))
+
+
+def test_shown_data_with_units_passes_language_checks(item_by_subject, records_by_id, validator):
+    item = awkward_decimal_item(item_by_subject)
+    item["stimulus"]["text"] = ("Cuatro grupos midieron sus cintas en metros y obtuvieron los siguientes "
+                                "resultados: 12,35 m; 12,5 m; 12,3 m y 12,05 m.")
+    for option in item["options"]:
+        option["text"] += " m"
+    item["subject_checks"]["math"]["unit"] = "m"
+    result = run(item, records_by_id, validator)
+    assert not {"L01", "L02", "L03"} & failing_ids(result), result["reasons"]
+
+
+@pytest.mark.parametrize("stem", ["Cuál es la mayor?", "¿Cuál es la mayor", "¿Cuál es la mayor? Explique"])
+def test_unpaired_or_incomplete_question_fails(stem, item_by_subject, records_by_id, validator):
+    item = copy.deepcopy(item_by_subject["estudios_sociales"])
+    item["stem"] = stem
+    assert "L03" in failing_ids(run(item, records_by_id, validator))
+
+
+def test_stem_referring_to_displayed_options_passes_l01(item_by_subject, records_by_id, validator):
+    item = awkward_decimal_item(item_by_subject)
+    item["stimulus"] = {"type": "none"}
+    item["stem"] = "¿Cuál de los siguientes números es el mayor?"
+    assert "L01" not in failing_ids(run(item, records_by_id, validator))
+
+
+def test_property_selection_is_not_proven_by_an_expression(item_by_subject, records_by_id, validator):
+    """T007 live item: "3 * 6" evaluates to the key but does not prove "múltiplo de 3 y par"."""
+    item = copy.deepcopy(item_by_subject["matematicas"])
+    item["stimulus"] = {"type": "text", "text": "En la feria de la escuela, cada puesto tiene un número."}
+    item["stem"] = "¿Cuál de los siguientes números de puesto es múltiplo de 3 y a la vez es par?"
+    for option, text in zip(item["options"], ["14", "15", "16", "18"]):
+        option["text"] = text
+    item["answer_key"] = "D"
+    item["subject_checks"] = {"math": {"expression": "3 * 6"}}
+    result = run(item, records_by_id, validator)
+    assert result["math_proven"] is False and result["requires_independent_solve"] is True
+    assert any(c["id"] == "M04" and c["status"] == "warn" for c in result["checks"])

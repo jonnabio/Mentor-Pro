@@ -64,11 +64,15 @@ One ValidationResult per item:
 | C07 | All | Stem ≤ 120 words, options ≤ 30 words |
 | C08 | All | Stimulus present when the stem refers to one |
 | C09 | All | Key length cue: fails if key ≥ 1.5× and ≥ 12 chars longer than the longest distractor |
+| L01 | All | No announced content left unshown (stimulus ending in `:`; math data cue without numbers) |
+| L02 | Matemáticas | Unit named in the text → every option carries a unit |
+| L03 | All | Stem question marks paired (`¿…?`) and the question is complete |
 | G01 | All | Chain, subject, application; record official or approved baseline (ADR-006) |
 | G02 | All | Every excerpt verbatim in a groundable record |
 | G03 | All | Cognitive verb appears in the evidencia (warning) |
 | D01 | All | No exact or near duplicate (bank and siblings) |
 | M01–M03 | Matemáticas | Exact expression or `select: min\|max`; es-CR numbers and units; only the key matches |
+| M04 | Matemáticas | Expression operands from the item text; property-selection stems ("¿Cuál de los siguientes…?") need a blind solve |
 | R01–R03 | Español | Passage ≥ 40 words; quoted spans and key support verbatim |
 | F01–F02 | Ciencias, Estudios Sociales | Support terms grounded and used by key/explanation |
 

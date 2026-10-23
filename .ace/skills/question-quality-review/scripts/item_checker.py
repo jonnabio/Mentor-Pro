@@ -28,7 +28,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cr_math import AmbiguousNumberError, evaluate, parse_quantity  # noqa: E402
 
-CHECKER_VERSION = "1.4.0"  # 1.4.0: C09 material key-length cue fails
+CHECKER_VERSION = "1.5.0"  # 1.5.0: L01-L03 linguistic clarity checks
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "question-engine" / "question-item.schema.json"
 
 SUBJECT_CODES = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
@@ -43,6 +43,10 @@ MAX_STEM_WORDS = 120
 # short options (numbers, single words) from failing on small absolute differences.
 KEY_CUE_RATIO = 1.5
 KEY_CUE_MIN_GAP = 12
+# L01/L02: wording that announces data, and unit words whose options must carry a unit.
+ANNOUNCE_CUES = ("los siguientes", "las siguientes", "a continuacion", "estos datos", "estos resultados")
+UNIT_WORDS = ("metro", "centimetro", "milimetro", "kilometro", "gramo", "kilogramo", "litro", "mililitro",
+              "colon", "colones")
 MAX_OPTION_WORDS = 30
 MIN_PASSAGE_WORDS = 40
 NEAR_DUPLICATE_THRESHOLD = 0.85
@@ -54,6 +58,9 @@ RE_EXPR_NUMBER = re.compile(r"\d+(?:,\d+)?")
 RE_TEXT_NUMBER = re.compile(r"\d{1,3}(?: \d{3})+(?:,\d+)?|\d+(?:,\d+)?")
 # Constants an expression may use without them appearing in the item text.
 ALLOWED_CONSTANTS = {Fraction(n) for n in (*range(2, 11), 100, 1000)}
+# M04: a stem that picks the option satisfying a property ("¿Cuál de los siguientes es múltiplo de 3?")
+# is not proven by an expression that merely evaluates to the key; the blind solve must decide.
+PROPERTY_SELECTION_CUES = ("cual de los siguientes", "cual de las siguientes", "podria")
 
 Check = dict[str, str]
 
@@ -317,6 +324,7 @@ def check_math(item: dict[str, Any]) -> tuple[list[Check], bool]:
         operands = [Fraction(t.replace(",", ".")) for t in RE_EXPR_NUMBER.findall(spec["expression"])]
         foreign = [o for o in operands if o not in text_values and o not in ALLOWED_CONSTANTS]
         grounded_proof = bool(operands) and not foreign and any(o in text_values for o in operands)
+        selects_by_property = any(c in normalize(item.get("stem", "")) for c in PROPERTY_SELECTION_CUES)
     checks = [_check("M02", "pass" if distinct else "fail",
                      "option values are distinct" if distinct else "two options have the same value")]
     if matches == [item.get("answer_key")] and distinct:
@@ -324,6 +332,10 @@ def check_math(item: dict[str, Any]) -> tuple[list[Check], bool]:
         if not grounded_proof:
             # e.g. "148/100" restates the key: consistent, but not a proof; require an independent solve.
             checks.append(_check("M04", "warn", "expression operands not taken from the item text; key not proven"))
+            return checks, False
+        if spec.get("expression") and selects_by_property:
+            checks.append(_check("M04", "warn", "stem selects an option by a property; the expression does not "
+                                                "prove it, independent solve required"))
             return checks, False
         checks.append(_check("M04", "pass", "expression operands come from the item text"))
         return checks, True
@@ -370,6 +382,47 @@ def check_facts(item: dict[str, Any], records: dict[str, dict[str, Any]], facts:
     return checks
 
 
+# --------------------------------------------------------------------------- linguistic clarity
+
+def check_language(item: dict[str, Any]) -> list[Check]:
+    """L01-L03: content announced but not shown, missing units, unpaired question marks."""
+    checks: list[Check] = []
+    stimulus = (item.get("stimulus", {}).get("text") or "").strip()
+    stem = (item.get("stem") or "").strip()
+    is_math = item.get("subject") == "matematicas"
+    text = normalize(f"{stimulus} {stem}")
+
+    # Only the stimulus is searched: in the stem, "¿Cuál de los siguientes…?" refers to the options.
+    announced = [c for c in ANNOUNCE_CUES if c in normalize(stimulus)]
+    if stimulus.endswith(":"):
+        checks.append(_check("L01", "fail", "stimulus ends with ':' but the announced content is not shown"))
+    elif is_math and announced and not re.search(r"\d", stimulus):
+        checks.append(_check("L01", "fail", f"stimulus announces data ({announced}) but shows no numbers"))
+    else:
+        checks.append(_check("L01", "pass", "no reference to content that is not shown"))
+
+    if is_math:
+        words = set(text.split())
+        named = sorted(u for u in UNIT_WORDS if u in words or f"{u}s" in words)
+        unitless = []
+        for opt in item.get("options", []):
+            try:
+                if not parse_quantity(opt.get("text", ""))[1]:
+                    unitless.append(opt.get("label"))
+            except ValueError:
+                pass
+        if named and unitless:
+            checks.append(_check("L02", "fail", f"text names units {named} but options {unitless} have none"))
+        else:
+            checks.append(_check("L02", "pass", "units consistent between text and options"))
+
+    if stem.count("¿") != stem.count("?") or ("?" in stem and not stem.endswith("?")):
+        checks.append(_check("L03", "fail", "stem question marks are unpaired or the question is incomplete"))
+    else:
+        checks.append(_check("L03", "pass", "stem is a complete question or statement"))
+    return checks
+
+
 # --------------------------------------------------------------------------- orchestration
 
 def check_item(item: dict[str, Any], records: dict[str, dict[str, Any]], bank: list[dict[str, Any]] | None = None,
@@ -381,6 +434,7 @@ def check_item(item: dict[str, Any], records: dict[str, dict[str, Any]], bank: l
     checks += check_lengths_and_stimulus(item)
     checks += check_grounding(item, records)
     checks += check_duplicates(item, bank or [])
+    checks += check_language(item)
 
     subject = item.get("subject")
     math_proven = False
