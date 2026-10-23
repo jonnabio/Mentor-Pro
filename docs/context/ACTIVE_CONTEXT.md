@@ -1,15 +1,16 @@
-# Active Context: Session Handoff 2026-10-22
+# Active Context: Session Handoff 2026-10-23
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-22
+- **Last Updated:** 2026-10-23
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
 
 ## Current Objective
 
-T006 is complete. Next: plan the next Product Owner task (practice sessions)
-after approval. Do not start T007 without it.
+T007 (validated 5-question practice sets) is complete. Next: the next Product
+Owner task after approval (not 10–30 question sets, answering or frontend
+without it).
 
 ## Handoff Summary
 
@@ -36,6 +37,12 @@ after approval. Do not start T007 without it.
   1.4.0, prompt 1.2.0): M02, C01, EL01, ES01 each accepted; $0.00 over 82
   calls. C09 now rejects material key-length cues (PO decision). Seven live
   defects fixed (`docs/progress/task_T006_result.md`).
+- T007 — practice sets ([ADR-011](../adr/ADR-011-validated-practice-sets.md)):
+  `generate_set`, limits 5 questions / 3 requests per slot / 80 calls per set,
+  checker 1.5.0 (L01–L03, M04 property selection), prompts generation 1.3.0
+  and rubric 1.1.0, tables `generation.practice_set` and `practice_set_item`,
+  `POST /api/dev/practice-sets/generate`. Live: complete 5/5, 31 calls, $0.00,
+  22 min (`docs/progress/task_T007_result.md`).
 
 ### Current State
 
@@ -44,15 +51,17 @@ after approval. Do not start T007 without it.
 - `.env` exists (git-ignored) with `OPENROUTER_API_KEY`, pinned free models,
   `OPENROUTER_MAX_REQUESTS_PER_DAY=1000` (account not free tier) and
   `MENTOR_PRO_DEV_ENDPOINTS=true`.
-- Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`.
-- Tests: 254 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`,
+  `generation.practice_set`, `generation.practice_set_item`.
+- Tests: 276 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Plan the next PO task (practice session generation) with an ADR first.
-2. Human spot checks of rubric scores (`question-evaluation`); M02 accepted
-   1 in 7 requests, so maths prompt tuning is a candidate.
-3. `scripts/pubs/check_lane.py` (session start prompt) does not exist here.
+1. Plan the next PO task with an ADR first.
+2. Set generation takes about 4–5 min per question (sequential, free models);
+   larger sets need parallel slots or faster models.
+3. Human spot checks of rubric scores (`question-evaluation`).
+4. `scripts/pubs/check_lane.py` (session start prompt) does not exist here.
 
 ### Blockers/Issues
 
@@ -84,4 +93,4 @@ after approval. Do not start T007 without it.
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-010](../adr/ADR-010-single-question-generation.md)
+  [ADR-011](../adr/ADR-011-validated-practice-sets.md)

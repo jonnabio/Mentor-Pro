@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-10-21T21:00:00Z",
+  "updated": "2026-10-23",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -204,7 +204,40 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T006_result.md",
       "failures": [],
-      "notes": "Live: ES01 and EL01 valid; M02 not validated (hollow proof withdrawn by M04); C01 rejected. Cost $0.00 over 52 calls. Daily request budget reached."
+      "notes": "Final: M02, C01, EL01, ES01 each accepted (checker 1.4.0, prompt 1.2.0); C09 rejects material key-length cues. $0.00 over 82 calls."
+    },
+    {
+      "id": "T007",
+      "name": "Validated practice set generation (PO T007, max 5 questions)",
+      "objective": "Generate a practice set from a practice configuration with the existing allocation and single-question engine; linguistic clarity checks; in-set duplicate rejection; bounded retries; partial results on budget limits; sets, items and attempts persisted.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/generation/practice_set.py",
+          "tests/app/test_practice_set.py",
+          "scripts/dev/generate_practice_set.py",
+          "docs/adr/ADR-011-validated-practice-sets.md",
+          "docs/progress/task_T007_result.md"
+        ],
+        "modify": [
+          "app/generation/pipeline.py",
+          "app/generation/store.py",
+          "app/generation/prompts.py",
+          "app/dev_routes.py",
+          "app/llm/router.py",
+          ".ace/skills/question-quality-review/"
+        ]
+      },
+      "depends_on": [
+        "T006"
+      ],
+      "complexity": "L",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T007_result.md",
+      "failures": [],
+      "notes": "Live set-d5c125f2 (M02, M04, M05; medium): complete 5/5, 8 requests, 31 calls, 15669/46124 tokens, $0.00, 1342 s. Checker 1.5.0 (L01-L03, M04 property selection)."
     }
   ]
 }
