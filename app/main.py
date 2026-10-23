@@ -1,4 +1,4 @@
-"""Mentor Pro practice-configuration API and static UI (T003).
+"""Mentor Pro practice API and static UI (T003 configuration, T010 student practice).
 
 Reads the PostgreSQL curriculum catalog through `curriculum.catalog`
 (read-only). Only multiple-choice objectives are offered; the Español `EE`
@@ -24,6 +24,8 @@ from pydantic import BaseModel, Field
 
 from app.allocation import allocate
 from app.dev_routes import LlmFactory, build_dev_router
+from app.practice.jobs import SetRunner, live_set_runner
+from app.practice.routes import PracticeService, build_practice_router
 from curriculum import db
 from curriculum.catalog import PracticeScope, SelectionError, list_objectives, open_catalog, select_objectives
 
@@ -60,8 +62,8 @@ class PracticeConfig(BaseModel):
 
 def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
                baseline: str = BASELINE_VERSION, dev_endpoints: bool | None = None,
-               llm_factory: LlmFactory | None = None) -> FastAPI:
-    app = FastAPI(title="Mentor Pro", version="0.3.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
+               llm_factory: LlmFactory | None = None, practice_runner: SetRunner | None = None) -> FastAPI:
+    app = FastAPI(title="Mentor Pro", version="0.4.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.state.catalog_target = (database_url, schema)
 
     def catalog() -> Iterator[psycopg.Connection]:
@@ -133,6 +135,15 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
             "notice_es": GROUNDING_NOTICE_ES,
             **result,
         }
+
+    def runner_factory() -> SetRunner:
+        if practice_runner is not None:
+            return practice_runner
+        return live_set_runner(llm_factory or _default_llm_factory(database_url),
+                               lambda: open_catalog(database_url or db.database_url(), schema))
+
+    app.state.practice = PracticeService(lambda: database_url or db.database_url(), runner_factory)
+    app.include_router(build_practice_router(catalog, baseline, app.state.practice, ApiError, _selection_message))
 
     if dev_endpoints is None:
         dev_endpoints = os.environ.get("MENTOR_PRO_DEV_ENDPOINTS", "").lower() in ("1", "true", "yes")

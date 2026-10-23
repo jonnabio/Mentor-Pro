@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Mentor Pro · Configurar práctica</title>
+  <title>Mentor Pro · Práctica PNE</title>
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/app.js" defer></script>
 </head>
@@ -11,7 +11,7 @@
   <header class="site-header">
     <div class="wrap">
       <p class="brand">Mentor Pro</p>
-      <h1>Configurar práctica</h1>
+      <h1>Práctica PNE</h1>
       <p class="lead">Prueba Nacional Estandarizada · Sexto grado</p>
     </div>
   </header>
@@ -53,11 +53,12 @@
           <div>
             <p class="field-label" id="count-label">Cantidad de preguntas</p>
             <div class="segmented" role="radiogroup" aria-labelledby="count-label">
-              <label><input type="radio" name="question_count" value="5"> 5</label>
-              <label><input type="radio" name="question_count" value="10" checked> 10</label>
-              <label><input type="radio" name="question_count" value="20"> 20</label>
-              <label><input type="radio" name="question_count" value="30"> 30</label>
+              <label><input type="radio" name="question_count" value="5" checked> 5</label>
+              <label class="soon"><input type="radio" name="question_count" value="10" disabled> 10</label>
+              <label class="soon"><input type="radio" name="question_count" value="20" disabled> 20</label>
+              <label class="soon"><input type="radio" name="question_count" value="30" disabled> 30</label>
             </div>
+            <p class="muted small">Por ahora las prácticas tienen 5 preguntas.</p>
           </div>
         </div>
       </fieldset>
@@ -66,15 +67,52 @@
       <button type="submit" id="submit" class="primary" disabled>Generar práctica</button>
     </form>
 
-    <section id="summary" class="card summary" aria-live="polite" hidden>
-      <h2>Resumen de la práctica</h2>
-      <dl id="summary-meta" class="meta"></dl>
-      <p id="summary-coverage" class="muted"></p>
-      <table class="allocation">
-        <thead><tr><th scope="col">Objetivo</th><th scope="col">Preguntas</th><th scope="col">Evidencias</th></tr></thead>
-        <tbody id="summary-rows"></tbody>
-      </table>
-      <p class="note">Esta versión muestra solo la distribución de preguntas. Las preguntas se generarán en una próxima etapa.</p>
+    <section id="progress-view" class="card" aria-live="polite" hidden>
+      <h2>Preparando su práctica</h2>
+      <p id="progress-message"></p>
+      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="5" aria-valuenow="0"
+           aria-label="Preguntas preparadas">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <p id="progress-count" class="muted"></p>
+      <p class="muted small">Puede dejar esta página abierta. Si la recarga, la generación continúa.</p>
+      <ul id="progress-objectives" class="plain-list"></ul>
+      <p id="progress-error" class="alert" role="alert" hidden></p>
+      <button type="button" id="progress-new" class="secondary" hidden>Configurar otra práctica</button>
+    </section>
+
+    <section id="quiz-view" class="card" hidden>
+      <p id="quiz-notice" class="warning" role="status" hidden></p>
+      <div class="quiz-head">
+        <p id="quiz-position" class="field-label"></p>
+        <span id="quiz-objective" class="code"></span>
+      </div>
+      <p id="quiz-stimulus" class="stimulus" hidden></p>
+      <form id="answer-form" novalidate>
+        <fieldset>
+          <legend id="quiz-stem" class="stem"></legend>
+          <div id="quiz-options" class="options"></div>
+        </fieldset>
+        <p id="answer-error" class="alert" role="alert" hidden></p>
+        <button type="submit" id="answer-submit" class="primary" disabled>Responder</button>
+      </form>
+      <div id="feedback" class="feedback" aria-live="polite" hidden>
+        <p id="feedback-result" class="feedback-result"></p>
+        <p id="feedback-explanation"></p>
+        <button type="button" id="next" class="primary"></button>
+      </div>
+    </section>
+
+    <section id="result-view" class="card" hidden>
+      <h2>Resultado de la práctica</h2>
+      <dl class="meta">
+        <div><dt>Correctas</dt><dd id="result-correct"></dd></div>
+        <div><dt>Incorrectas</dt><dd id="result-incorrect"></dd></div>
+        <div><dt>Porcentaje</dt><dd id="result-percentage"></dd></div>
+      </dl>
+      <h3>Objetivos y evidencias practicados</h3>
+      <ul id="result-objectives" class="plain-list"></ul>
+      <button type="button" id="result-new" class="primary">Nueva práctica</button>
     </section>
 
     <p id="notice" class="notice"></p>

@@ -1,0 +1,158 @@
+"""Practice sessions, items and answers in PostgreSQL (schema `practice`), ADR-013.
+
+A session is identified only by a random token; no student identity is stored.
+Items keep their answer keys here, server side; the API decides what a student
+may see.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import secrets
+from typing import Any
+
+import psycopg
+from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
+
+ACTIVE = ("queued", "running")
+
+SCHEMA_SQL = """
+CREATE SCHEMA IF NOT EXISTS practice;
+CREATE TABLE IF NOT EXISTS practice.session (
+    session_id         TEXT PRIMARY KEY,
+    client_request_id  TEXT NOT NULL UNIQUE,
+    fingerprint        TEXT NOT NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    started_at         TIMESTAMPTZ,
+    finished_at        TIMESTAMPTZ,
+    baseline_version   TEXT NOT NULL,
+    subject            TEXT NOT NULL,
+    config             JSONB NOT NULL,
+    allocation         JSONB NOT NULL,
+    status             TEXT NOT NULL CHECK (status IN ('queued', 'running', 'complete', 'partial', 'failed')),
+    stop_reason        TEXT,
+    slots_total        INTEGER NOT NULL,
+    slots_done         INTEGER NOT NULL DEFAULT 0,
+    practice_set_id    TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_session_active_config ON practice.session (fingerprint)
+    WHERE status IN ('queued', 'running');
+CREATE TABLE IF NOT EXISTS practice.item (
+    session_id      TEXT NOT NULL REFERENCES practice.session (session_id),
+    slot            INTEGER NOT NULL,
+    objective_code  TEXT NOT NULL,
+    evidence_id     TEXT NOT NULL,
+    item            JSONB NOT NULL,
+    PRIMARY KEY (session_id, slot)
+);
+CREATE TABLE IF NOT EXISTS practice.answer (
+    session_id    TEXT NOT NULL,
+    slot          INTEGER NOT NULL,
+    chosen_label  TEXT NOT NULL CHECK (chosen_label IN ('A', 'B', 'C', 'D')),
+    is_correct    BOOLEAN NOT NULL,
+    answered_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (session_id, slot),
+    FOREIGN KEY (session_id, slot) REFERENCES practice.item (session_id, slot)
+);
+"""
+
+
+def fingerprint(baseline: str, config: dict[str, Any]) -> str:
+    canonical = json.dumps({"baseline": baseline, **config, "objective_codes": sorted(config["objective_codes"])},
+                           sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+class PracticeStore:
+    def __init__(self, url: str):
+        self.url = url
+        with self._connect() as conn:
+            conn.execute(SCHEMA_SQL)
+
+    def _connect(self) -> psycopg.Connection:
+        return psycopg.connect(self.url, row_factory=dict_row, autocommit=True)
+
+    def create_or_get(self, client_request_id: str, baseline: str, config: dict[str, Any],
+                      allocation: list[dict[str, Any]]) -> tuple[dict[str, Any], bool]:
+        """Insert a queued session, or return the existing one for the same request or active configuration."""
+        fp = fingerprint(baseline, config)
+        slots_total = sum(len(row["slots"]) for row in allocation)
+        with self._connect() as conn:
+            existing = conn.execute("SELECT * FROM practice.session WHERE client_request_id = %s",
+                                    (client_request_id,)).fetchone()
+            if existing:
+                return existing, False
+            row = conn.execute(
+                """INSERT INTO practice.session (session_id, client_request_id, fingerprint, baseline_version,
+                       subject, config, allocation, status, slots_total)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, 'queued', %s)
+                   ON CONFLICT DO NOTHING RETURNING *""",
+                (secrets.token_hex(16), client_request_id, fp, baseline, config["subject"], Jsonb(config),
+                 Jsonb(allocation), slots_total)).fetchone()
+            if row:
+                return row, True
+            # Lost a race: same request id, or an active session for the same configuration.
+            existing = conn.execute(
+                """SELECT * FROM practice.session WHERE client_request_id = %s
+                   OR (fingerprint = %s AND status IN ('queued', 'running'))
+                   ORDER BY created_at LIMIT 1""", (client_request_id, fp)).fetchone()
+            return existing, False
+
+    def get(self, session_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM practice.session WHERE session_id = %s", (session_id,)).fetchone()
+
+    def mark_running(self, session_id: str) -> None:
+        self._update(session_id, "status = 'running', started_at = now()")
+
+    def progress(self, session_id: str, slots_done: int) -> None:
+        self._update(session_id, "slots_done = GREATEST(slots_done, %s)", slots_done)
+
+    def finish(self, session_id: str, status: str, stop_reason: str | None, practice_set_id: str | None,
+               items: list[dict[str, Any]]) -> None:
+        """Store accepted items and the final status in one transaction."""
+        with psycopg.connect(self.url) as conn, conn.transaction():
+            for row in items:
+                conn.execute(
+                    """INSERT INTO practice.item (session_id, slot, objective_code, evidence_id, item)
+                       VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING""",
+                    (session_id, row["slot"], row["objective_code"], row["evidence_id"], Jsonb(row["item"])))
+            conn.execute(
+                """UPDATE practice.session SET status = %s, stop_reason = %s, practice_set_id = %s,
+                       slots_done = slots_total, finished_at = now(), updated_at = now() WHERE session_id = %s""",
+                (status, stop_reason, practice_set_id, session_id))
+
+    def fail_interrupted(self) -> int:
+        """Sessions left active by a previous server process can no longer finish."""
+        with self._connect() as conn:
+            cur = conn.execute(
+                """UPDATE practice.session SET status = 'failed', stop_reason = 'interrupted',
+                       finished_at = now(), updated_at = now() WHERE status IN ('queued', 'running')""")
+            return cur.rowcount
+
+    def items(self, session_id: str) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            return conn.execute(
+                """SELECT i.slot, i.objective_code, i.evidence_id, i.item, a.chosen_label, a.is_correct
+                   FROM practice.item i LEFT JOIN practice.answer a USING (session_id, slot)
+                   WHERE i.session_id = %s ORDER BY i.slot""", (session_id,)).fetchall()
+
+    def answer(self, session_id: str, slot: int, label: str, is_correct: bool) -> tuple[dict[str, Any], bool]:
+        """Record the first answer for a slot; later submissions return the stored one."""
+        with self._connect() as conn:
+            row = conn.execute(
+                """INSERT INTO practice.answer (session_id, slot, chosen_label, is_correct)
+                   VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING RETURNING chosen_label, is_correct""",
+                (session_id, slot, label, is_correct)).fetchone()
+            if row:
+                return row, True
+            return conn.execute("SELECT chosen_label, is_correct FROM practice.answer "
+                                "WHERE session_id = %s AND slot = %s", (session_id, slot)).fetchone(), False
+
+    def _update(self, session_id: str, assignment: str, *params: Any) -> None:
+        with self._connect() as conn:
+            conn.execute(f"UPDATE practice.session SET {assignment}, updated_at = now() WHERE session_id = %s",
+                         (*params, session_id))

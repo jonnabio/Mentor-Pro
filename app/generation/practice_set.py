@@ -133,8 +133,12 @@ def _reject_as_duplicate(outcome: GenerationOutcome, reason: str) -> None:
 def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store: Store, generation_store: Any,
                  baseline: str, subject: str, allocation: list[dict[str, Any]], limits: SetLimits,
                  practice_set_id: str | None = None,
-                 clock: Callable[[], float] = time.monotonic) -> PracticeSetResult:
-    """Generate every slot of `allocation` (the `allocation` list returned by `allocate`)."""
+                 clock: Callable[[], float] = time.monotonic,
+                 on_slot_done: Callable[[SlotResult], None] | None = None) -> PracticeSetResult:
+    """Generate every slot of `allocation` (the `allocation` list returned by `allocate`).
+
+    `on_slot_done` (progress reporting) is called from a worker thread when a slot finishes.
+    """
     set_id = practice_set_id or f"set-{uuid.uuid4().hex[:16]}"
     slots = [SlotResult(s["slot"], row["workbook_code"], s["evidence_id"], s["evidence_ordinal"], s["difficulty"])
              for row in allocation for s in row["slots"]]
@@ -151,6 +155,13 @@ def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store
     started = clock()
 
     def run_slot(slot: SlotResult) -> None:
+        try:
+            generate_slot(slot)
+        finally:
+            if on_slot_done is not None:
+                on_slot_done(slot)
+
+    def generate_slot(slot: SlotResult) -> None:
         for _ in range(limits.max_requests_per_slot):
             with lock:
                 if stop[0]:
