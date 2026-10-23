@@ -238,6 +238,39 @@
       "result_file": "docs/progress/task_T007_result.md",
       "failures": [],
       "notes": "Live set-d5c125f2 (M02, M04, M05; medium): complete 5/5, 8 requests, 31 calls, 15669/46124 tokens, $0.00, 1342 s. Checker 1.5.0 (L01-L03, M04 property selection)."
+    },
+    {
+      "id": "T008",
+      "name": "Controlled parallel question generation (PO T008)",
+      "objective": "Run practice-set slots with bounded concurrency (QUESTION_GENERATION_CONCURRENCY, default 2) with atomic budgets, set-wide duplicate detection, isolated slot histories and deterministic ordering; no validation changes.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/llm/budget.py",
+          "docs/adr/ADR-012-controlled-parallel-generation.md",
+          "docs/progress/task_T008_result.md"
+        ],
+        "modify": [
+          "app/llm/client.py",
+          "app/llm/router.py",
+          "app/generation/pipeline.py",
+          "app/generation/practice_set.py",
+          "app/generation/validation.py",
+          "tests/app/test_practice_set.py",
+          "tests/app/test_generation.py",
+          ".env.example"
+        ]
+      },
+      "depends_on": [
+        "T007"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T008_result.md",
+      "failures": [],
+      "notes": "Live set-5b7eb9ee (M02, M04, M05): 5/5, 628 s vs 1342 s in T007 (-53%), 18 calls, 14172/40587 tokens, $0.00. Finding: select-based proof does not check property conditions (follow-up)."
     }
   ]
 }

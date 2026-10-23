@@ -8,7 +8,7 @@
 
 ## Current Objective
 
-T007 (validated 5-question practice sets) is complete. Next: the next Product
+T008 (controlled parallel set generation) is complete. Next: the next Product
 Owner task after approval (not 10–30 question sets, answering or frontend
 without it).
 
@@ -43,6 +43,10 @@ without it).
   and rubric 1.1.0, tables `generation.practice_set` and `practice_set_item`,
   `POST /api/dev/practice-sets/generate`. Live: complete 5/5, 31 calls, $0.00,
   22 min (`docs/progress/task_T007_result.md`).
+- T008 — parallel slots ([ADR-012](../adr/ADR-012-controlled-parallel-generation.md)):
+  `QUESTION_GENERATION_CONCURRENCY` (default 2), `BudgetGate` reserves budget
+  before every HTTP attempt, commit-time D01, slot-ordered results. Live 5/5
+  in 628 s (T007: 1 342 s), $0.00 (`docs/progress/task_T008_result.md`).
 
 ### Current State
 
@@ -53,13 +57,13 @@ without it).
   `MENTOR_PRO_DEV_ENDPOINTS=true`.
 - Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`,
   `generation.practice_set`, `generation.practice_set_item`.
-- Tests: 276 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tests: 282 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
 1. Plan the next PO task with an ADR first.
-2. Set generation takes about 4–5 min per question (sequential, free models);
-   larger sets need parallel slots or faster models.
+2. Proofs by `select: min|max` do not check property conditions in the stem
+   (T008 finding); proposed rule change needs PO approval.
 3. Human spot checks of rubric scores (`question-evaluation`).
 4. `scripts/pubs/check_lane.py` (session start prompt) does not exist here.
 
@@ -93,4 +97,4 @@ without it).
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-011](../adr/ADR-011-validated-practice-sets.md)
+  [ADR-012](../adr/ADR-012-controlled-parallel-generation.md)
