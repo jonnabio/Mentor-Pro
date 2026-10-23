@@ -49,9 +49,10 @@ def free_candidates(client: OpenRouterClient) -> list[str]:
 
 def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]], purpose: str,
           max_tokens: int | None = None, request_id: str | None = None,
-          avoid: frozenset[str] = frozenset()) -> RouteResult:
+          avoid: frozenset[str] = frozenset(), practice_set_id: str | None = None) -> RouteResult:
     """Route one request. Models in `avoid` are tried last (e.g. the generator, for a blind solve)."""
-    ctx = UsageContext(request_id=request_id or f"req-{uuid.uuid4().hex[:16]}", purpose=purpose)
+    ctx = UsageContext(request_id=request_id or f"req-{uuid.uuid4().hex[:16]}", purpose=purpose,
+                       practice_set_id=practice_set_id)
     result = RouteResult(status="exhausted")
     settings = client.settings
 

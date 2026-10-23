@@ -12,9 +12,9 @@ import json
 from app.generation.grounding import GroundingBundle
 
 GENERATION_PROMPT_ID = "item-generation"
-GENERATION_PROMPT_VERSION = "1.2.0"  # 1.2.0: options of similar length (C09 rejects length cues)
+GENERATION_PROMPT_VERSION = "1.3.0"  # 1.3.0: show announced data, units in options (L01-L03)
 SOLVE_PROMPT_VERSION = "1.0.0"
-RUBRIC_PROMPT_VERSION = "1.0.0"
+RUBRIC_PROMPT_VERSION = "1.1.0"  # 1.1.0: clarity covers missing data/units and inconsistency
 
 SUBJECT_ES = {"espanol": "Español", "matematicas": "Matemáticas", "ciencias": "Ciencias",
               "estudios_sociales": "Estudios Sociales"}
@@ -95,6 +95,9 @@ def generation_messages(bundle: GroundingBundle, difficulty: str, avoid_stems: l
         "Exactamente cuatro opciones A, B, C y D; una sola correcta; distractores plausibles basados en errores comunes.",
         "Las cuatro opciones deben tener longitud y nivel de detalle similares; la correcta no puede ser notablemente más larga.",
         "Prohibido: 'todas las anteriores', 'ninguna de las anteriores', 'a y b'.",
+        "Si el texto anuncia datos ('los siguientes', 'a continuación'), muéstrelos completos; el estímulo no termina en dos puntos.",
+        "Si el texto menciona una unidad (metros, kilogramos, colones…), todas las opciones llevan esa unidad.",
+        "La pregunta usa signos de interrogación completos (¿…?).",
         "Si la pregunta menciona un texto, tabla o imagen, inclúyalo en stimulus; no use imágenes.",
         "La explicación no debe agregar datos que no estén en el contenido curricular.",
         SUBJECT_RULES[bundle.subject],
@@ -137,7 +140,7 @@ def rubric_messages(bundle: GroundingBundle, item: dict, difficulty: str) -> lis
         {"role": "user", "content": (
             f"EVIDENCIA: {bundle.evidence['text_es']}\nDIFICULTAD SOLICITADA: {DIFFICULTY_RULES[difficulty]}\n"
             f"ÍTEM:\n{json.dumps(view, ensure_ascii=False)}\n\n"
-            "Criterios: alignment (evalúa la evidencia), clarity (una sola lectura posible), "
+            "Criterios: alignment (evalúa la evidencia), clarity (una sola lectura posible; 0 si la redacción es incompleta o torpe, si menciona información que no se muestra, si faltan unidades o si el estímulo, la pregunta y las opciones no son coherentes), "
             "distractor_quality (distractores plausibles y claramente incorrectos), "
             "language (español de Costa Rica apropiado para la edad), difficulty_match.")},
     ]

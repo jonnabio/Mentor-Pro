@@ -65,8 +65,10 @@ def student_view(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _item_id(bundle: GroundingBundle, fields: dict[str, Any]) -> str:
-    digest = hashlib.sha256(repr(sorted(fields.items())).encode("utf-8")).hexdigest()[:8]
+def _item_id(bundle: GroundingBundle, fields: dict[str, Any], request_id: str) -> str:
+    # The request ID is part of the digest: D01 skips bank items with the same item_id, so identical
+    # content from another request must get a different ID to be caught as a duplicate.
+    digest = hashlib.sha256((request_id + repr(sorted(fields.items()))).encode("utf-8")).hexdigest()[:8]
     return f"Q-{bundle.evidence['id']}-{digest}"
 
 
@@ -76,7 +78,7 @@ def assemble_item(bundle: GroundingBundle, fields: dict[str, Any], difficulty: s
     objective = bundle.objective
     return {
         "schema_version": "1.0",
-        "item_id": _item_id(bundle, fields),
+        "item_id": _item_id(bundle, fields, request_id),
         "subject": bundle.subject,
         "curriculum_ref": {
             "spec_version": "PNE2026",
@@ -124,16 +126,18 @@ def verdict(det: dict[str, Any], solve: dict[str, Any], rubric: dict[str, int] |
 
 
 def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle, difficulty: str,
-                 bank: list[dict[str, Any]] | None = None) -> GenerationOutcome:
+                 bank: list[dict[str, Any]] | None = None, practice_set_id: str | None = None) -> GenerationOutcome:
     request_id = f"req-{uuid.uuid4().hex[:16]}"
     outcome = GenerationOutcome("rejected", request_id, bundle.objective_code, bundle.evidence["id"])
     notes: list[str] = []
     facts = bundle.concept_lines
+    avoid_stems = [i["stem"] for i in bank or [] if i and i.get("stem")]
     attempts: list[dict[str, Any]] = []  # every attempt's verdict and reasons, kept in validation
 
     for number in range(1, MAX_GENERATION_ATTEMPTS + 1):
-        gen = route(client, store, prompts.generation_messages(bundle, difficulty, revision_notes=notes),
-                    purpose="generation", max_tokens=GENERATION_MAX_TOKENS, request_id=request_id)
+        messages = prompts.generation_messages(bundle, difficulty, revision_notes=notes, avoid_stems=avoid_stems)
+        gen = route(client, store, messages, purpose="generation", max_tokens=GENERATION_MAX_TOKENS,
+                    request_id=request_id, practice_set_id=practice_set_id)
         outcome.usage += gen.records
         if gen.status != "ok":
             outcome.status = "unavailable"
@@ -156,7 +160,7 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
         if det["deterministic_status"] == "pass":
             if det["requires_independent_solve"]:
                 solved = route(client, store, prompts.solve_messages(item), purpose="independent_solve",
-                               max_tokens=SOLVE_MAX_TOKENS, request_id=request_id,
+                               max_tokens=SOLVE_MAX_TOKENS, request_id=request_id, practice_set_id=practice_set_id,
                                avoid=frozenset({gen.final.model_requested}))
                 outcome.usage += solved.records
                 if solved.status == "ok":
@@ -164,7 +168,7 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
                     solve = {"performed": True, "model_used": solved.final.model_used or solved.final.model_requested,
                              "chosen_label": chosen, "agrees_with_key": chosen == item["answer_key"]}
             reviewed = route(client, store, prompts.rubric_messages(bundle, item, difficulty), purpose="review",
-                             max_tokens=RUBRIC_MAX_TOKENS, request_id=request_id,
+                             max_tokens=RUBRIC_MAX_TOKENS, request_id=request_id, practice_set_id=practice_set_id,
                              avoid=frozenset({gen.final.model_requested}))
             outcome.usage += reviewed.records
             if reviewed.status == "ok":
