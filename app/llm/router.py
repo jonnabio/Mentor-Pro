@@ -2,7 +2,8 @@
 
 Order: configured free models (if available), else discovered free models;
 the paid model only when OPENROUTER_ALLOW_PAID=true and the daily USD budget
-allows. Every attempt — including budget-blocked ones — is recorded.
+allows. Every HTTP attempt reserves budget through a `BudgetGate` before it is
+sent (ADR-012). Every attempt — including budget-blocked ones — is recorded.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from app.llm.budget import BudgetGate
 from app.llm.client import Attempt, AuthenticationError, OpenRouterClient, PaymentRequiredError, TransientError
 from app.llm.usage import UsageContext, blocked_record, to_record
 
@@ -49,8 +51,12 @@ def free_candidates(client: OpenRouterClient) -> list[str]:
 
 def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]], purpose: str,
           max_tokens: int | None = None, request_id: str | None = None,
-          avoid: frozenset[str] = frozenset(), practice_set_id: str | None = None) -> RouteResult:
-    """Route one request. Models in `avoid` are tried last (e.g. the generator, for a blind solve)."""
+          avoid: frozenset[str] = frozenset(), practice_set_id: str | None = None,
+          gate: BudgetGate | None = None) -> RouteResult:
+    """Route one request. Models in `avoid` are tried last (e.g. the generator, for a blind solve).
+
+    Pass one shared `gate` to every concurrent caller; without it a private gate is used.
+    """
     ctx = UsageContext(request_id=request_id or f"req-{uuid.uuid4().hex[:16]}", purpose=purpose,
                        practice_set_id=practice_set_id)
     result = RouteResult(status="exhausted")
@@ -71,38 +77,39 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
         result.message = "no qualified free model available and paid fallback disabled"
         return result
 
+    gate = gate or BudgetGate(store, settings)
     for index, (model, tier) in enumerate(plan):
         is_fallback = index > 0
-        usage = store.today()
-        if usage["requests"] >= settings.max_requests_per_day:
-            record = blocked_record(model, ctx, tier, is_fallback)
-            store.add(record)
-            result.records.append(record)
-            return RouteResult(status="budget_blocked", candidates=result.candidates, records=result.records,
-                               message="daily request budget reached")
-        if tier == "paid" and (usage["paid_unknown"] > 0 or usage["paid_usd"] >= settings.max_usd_per_day):
-            record = blocked_record(model, ctx, tier, is_fallback)
-            store.add(record)
-            result.records.append(record)
-            result.status, result.message = "budget_blocked", "paid fallback blocked by the daily USD budget"
-            return result
+        reserved = [0]
+
+        def reserve(tier: str = tier) -> bool:
+            if gate.acquire(tier):
+                reserved[0] += 1
+                return True
+            return False
 
         try:
-            attempts = client.chat(model, messages, max_tokens=max_tokens)
+            attempts = client.chat(model, messages, max_tokens=max_tokens, before_attempt=reserve)
         except AuthenticationError as exc:
+            gate.settle(reserved[0], reserved[0] if tier == "paid" else 0)
             return RouteResult(status="auth_error", candidates=result.candidates, records=result.records,
                                message=str(exc))
         except PaymentRequiredError:
             record = blocked_record(model, ctx, tier, is_fallback)
             store.add(record)
             result.records.append(record)
+            gate.settle(reserved[0], reserved[0] if tier == "paid" else 0)
             continue
 
         for attempt in attempts:
             record = to_record(attempt, ctx, tier, is_fallback)
             store.add(record)
             result.records.append(record)
+        gate.settle(reserved[0], reserved[0] if tier == "paid" else 0)
         final = attempts[-1]
+        if final.status == "budget_blocked":
+            return RouteResult(status="budget_blocked", candidates=result.candidates, records=result.records,
+                               message=gate.refusal or "budget reached")
         if final.status == "ok" and final.content:
             result.status, result.content, result.final, result.tier = "ok", final.content, final, tier
             return result

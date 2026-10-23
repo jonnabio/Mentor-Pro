@@ -1,19 +1,26 @@
-"""Validated practice set generation (T007, ADR-011).
+"""Validated practice set generation (T007 ADR-011; concurrency T008 ADR-012).
 
 Each allocation slot (objective, evidencia, difficulty from `app.allocation`)
 is generated with `generate_one` and the same validation as a single question.
 A slot gets at most `max_requests_per_slot` requests; a slot that never yields
 an accepted item stays failed. The set is never padded and validation is
-never bypassed. The set's accepted items form the duplicate bank, so in-set
-near duplicates are rejected (D01).
+never bypassed.
+
+Slots run on a bounded thread pool (`QUESTION_GENERATION_CONCURRENCY`). All
+workers share one `BudgetGate`, so request budgets hold under concurrency.
+An accepted item is committed only after a D01 check, under a lock, against
+every item already committed, so simultaneous near duplicates are rejected.
+Results keep allocation order whatever the completion order.
 """
 
 from __future__ import annotations
 
 import os
+import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -22,8 +29,12 @@ import psycopg
 from app.generation import prompts
 from app.generation.grounding import build_grounding
 from app.generation.pipeline import GenerationOutcome, generate_one
+from app.generation.validation import duplicate_reason
+from app.llm.budget import BudgetGate
 from app.llm.client import OpenRouterClient
 from app.llm.router import Store
+
+MAX_CONCURRENCY = 8
 
 
 @dataclass(frozen=True)
@@ -31,6 +42,7 @@ class SetLimits:
     max_questions: int = 5
     max_requests_per_slot: int = 3
     max_calls_per_set: int = 80
+    concurrency: int = 2
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> SetLimits:
@@ -38,35 +50,13 @@ class SetLimits:
             max_questions=int(env.get("MENTOR_PRO_SET_MAX_QUESTIONS", cls.max_questions)),
             max_requests_per_slot=int(env.get("MENTOR_PRO_SET_MAX_REQUESTS_PER_SLOT", cls.max_requests_per_slot)),
             max_calls_per_set=int(env.get("MENTOR_PRO_SET_MAX_CALLS", cls.max_calls_per_set)),
+            concurrency=int(env.get("QUESTION_GENERATION_CONCURRENCY", cls.concurrency)),
         )
         if min(limits.max_questions, limits.max_requests_per_slot, limits.max_calls_per_set) < 1:
             raise ValueError("practice set limits must be positive")
+        if not 1 <= limits.concurrency <= MAX_CONCURRENCY:
+            raise ValueError(f"QUESTION_GENERATION_CONCURRENCY must be 1..{MAX_CONCURRENCY}")
         return limits
-
-
-class SetBudgetStore:
-    """Usage store wrapper that makes the router budget-block once the set's call limit is reached.
-
-    The router already refuses to send a call when `today()["requests"]` reaches the daily budget,
-    so reporting an exhausted budget here enforces the per-set limit before any call is sent.
-    """
-
-    def __init__(self, inner: Store, max_calls: int):
-        self.inner, self.max_calls = inner, max_calls
-        self.sent = 0
-        self.limit_hit = False
-
-    def add(self, record: dict[str, Any]) -> None:
-        self.inner.add(record)
-        if record["status"] != "budget_blocked":
-            self.sent += 1
-
-    def today(self) -> dict[str, Any]:
-        usage = self.inner.today()
-        if self.sent >= self.max_calls:
-            self.limit_hit = True
-            return {**usage, "requests": float("inf")}
-        return usage
 
 
 @dataclass
@@ -130,6 +120,16 @@ def _request_entry(outcome: GenerationOutcome) -> dict[str, Any]:
             "usage": outcome.summary()}
 
 
+def _reject_as_duplicate(outcome: GenerationOutcome, reason: str) -> None:
+    """An item that passed validation but duplicates an item committed meanwhile by another slot."""
+    outcome.status = "rejected"
+    outcome.reasons = [reason]
+    validation = outcome.validation
+    validation["verdict"], validation["reasons"] = "regenerate", [reason]
+    validation["attempts"][-1] = {**validation["attempts"][-1], "verdict": "regenerate", "reasons": [reason],
+                                  "stage": "set_commit"}
+
+
 def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store: Store, generation_store: Any,
                  baseline: str, subject: str, allocation: list[dict[str, Any]], limits: SetLimits,
                  practice_set_id: str | None = None,
@@ -140,41 +140,59 @@ def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store
              for row in allocation for s in row["slots"]]
     if len(slots) > limits.max_questions:
         raise ValueError(f"{len(slots)} questions requested; the limit is {limits.max_questions}")
+    # The catalog connection is not shared with worker threads: ground every slot first.
+    bundles = {s.slot: build_grounding(conn, baseline, subject, s.objective_code, s.evidence_ordinal) for s in slots}
 
-    budget = SetBudgetStore(usage_store, limits.max_calls_per_set)
+    gate = BudgetGate(usage_store, client.settings, max_calls=limits.max_calls_per_set)
+    lock = threading.Lock()
+    committed: list[dict[str, Any]] = []
+    outcomes: dict[int, list[GenerationOutcome]] = {s.slot: [] for s in slots}
+    stop: list[str | None] = [None]
     started = clock()
-    outcomes: list[GenerationOutcome] = []
-    accepted_items: list[dict[str, Any]] = []
-    stop_reason: str | None = None
 
-    for slot in slots:
-        if stop_reason in ("set_call_limit", "daily_budget"):
-            break
-        bundle = build_grounding(conn, baseline, subject, slot.objective_code, slot.evidence_ordinal)
+    def run_slot(slot: SlotResult) -> None:
         for _ in range(limits.max_requests_per_slot):
-            bank = accepted_items + generation_store.recent_stems(slot.evidence_id)
-            outcome = generate_one(client, budget, bundle, slot.difficulty, bank=bank, practice_set_id=set_id)
+            with lock:
+                if stop[0]:
+                    return
+                bank = list(committed)
+            bank += generation_store.recent_stems(slot.evidence_id)
+            outcome = generate_one(client, usage_store, bundles[slot.slot], slot.difficulty, bank=bank,
+                                   practice_set_id=set_id, gate=gate)
+            if outcome.status == "accepted":
+                with lock:
+                    duplicate = duplicate_reason(outcome.item, committed)
+                    if duplicate is None:
+                        committed.append(outcome.item)
+                if duplicate:
+                    _reject_as_duplicate(outcome, duplicate)
             generation_store.add(outcome, baseline, slot.difficulty, prompts.GENERATION_PROMPT_VERSION,
                                  practice_set_id=set_id, slot=slot.slot)
-            outcomes.append(outcome)
+            outcomes[slot.slot].append(outcome)
             slot.requests.append(_request_entry(outcome))
             if outcome.status == "accepted":
                 slot.status, slot.item, slot.request_id = "accepted", outcome.item, outcome.request_id
-                accepted_items.append(outcome.item)
-                break
+                return
             if outcome.status == "unavailable" and any("budget_blocked" in r for r in outcome.reasons):
-                stop_reason = "set_call_limit" if budget.limit_hit else "daily_budget"
-                break
+                with lock:
+                    stop[0] = stop[0] or ("set_call_limit" if gate.set_limit_hit else "daily_budget")
+                return
             # Other unavailable outcomes (model errors, truncation) count as a failed request and are retried.
-        if slot.status != "accepted":
+
+    with ThreadPoolExecutor(max_workers=limits.concurrency, thread_name_prefix="slot") as pool:
+        list(pool.map(run_slot, slots))  # re-raises any worker exception
+
+    stop_reason = stop[0]
+    for slot in slots:
+        if slot.status != "accepted" and slot.requests:
             slot.status = "failed"
             if stop_reason is None:
                 unavailable = all(r["status"] == "unavailable" for r in slot.requests)
                 stop_reason = "llm_unavailable" if unavailable else "slot_retries_exhausted"
-
     complete = all(s.status == "accepted" for s in slots)
+    ordered = [o for s in slots for o in outcomes[s.slot]]
     return PracticeSetResult(set_id, subject, "complete" if complete else "partial",
-                             None if complete else stop_reason, slots, outcomes, int((clock() - started) * 1000))
+                             None if complete else stop_reason, slots, ordered, int((clock() - started) * 1000))
 
 
 def coverage(allocation: list[dict[str, Any]], result: PracticeSetResult) -> list[dict[str, Any]]:

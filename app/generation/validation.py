@@ -28,3 +28,9 @@ def deterministic_check(item: dict[str, Any], records: list[dict[str, Any]], fac
                         bank: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return item_checker.check_item(item, {r["record_id"]: r for r in records}, bank or [], facts,
                                    option_count=4, validator=_validator)
+
+
+def duplicate_reason(item: dict[str, Any], bank: list[dict[str, Any]]) -> str | None:
+    """D01 against `bank` alone; the reason if `item` duplicates a bank item, else None."""
+    check = item_checker.check_duplicates(item, bank)[0]
+    return f"D01: {check['message']}" if check["status"] == "fail" else None

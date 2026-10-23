@@ -71,7 +71,7 @@ class Attempt:
 
     model_requested: str
     attempt: int
-    status: str                      # ok | error | rate_limited | timeout
+    status: str                      # ok | error | rate_limited | timeout | invalid_output | budget_blocked
     latency_ms: int
     http_status: int | None = None
     model_used: str | None = None
@@ -146,8 +146,11 @@ class OpenRouterClient:
     # ------------------------------------------------------------------ chat
 
     def chat(self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None,
-             temperature: float = 0.0) -> list[Attempt]:
+             temperature: float = 0.0, before_attempt: Callable[[], bool] | None = None) -> list[Attempt]:
         """Call one model, retrying transient failures. Returns all attempts; the last is final.
+
+        `before_attempt` is asked before every HTTP attempt (budget reservation); if it returns False
+        no request is sent and a final `budget_blocked` attempt is returned.
 
         @throws AuthenticationError on 401/403 (stop everything)
         @throws PaymentRequiredError on 402
@@ -161,6 +164,9 @@ class OpenRouterClient:
         }
         attempts: list[Attempt] = []
         for number in range(1, self.settings.max_retries + 2):
+            if before_attempt is not None and not before_attempt():
+                attempts.append(Attempt(model, number, "budget_blocked", 0, error_kind="budget"))
+                return attempts
             started = self._clock()
             try:
                 response = self._http.post("/chat/completions", json=payload)

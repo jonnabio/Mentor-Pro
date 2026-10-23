@@ -18,6 +18,7 @@ from app.generation import prompts
 from app.generation.grounding import GroundingBundle
 from app.generation.parsing import OutputError, extract_json, model_fields, parse_rubric, parse_solve
 from app.generation.validation import CHECKER_VERSION, deterministic_check
+from app.llm.budget import BudgetGate
 from app.llm.client import OpenRouterClient
 from app.llm.router import Store, route
 
@@ -126,7 +127,8 @@ def verdict(det: dict[str, Any], solve: dict[str, Any], rubric: dict[str, int] |
 
 
 def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle, difficulty: str,
-                 bank: list[dict[str, Any]] | None = None, practice_set_id: str | None = None) -> GenerationOutcome:
+                 bank: list[dict[str, Any]] | None = None, practice_set_id: str | None = None,
+                 gate: BudgetGate | None = None) -> GenerationOutcome:
     request_id = f"req-{uuid.uuid4().hex[:16]}"
     outcome = GenerationOutcome("rejected", request_id, bundle.objective_code, bundle.evidence["id"])
     notes: list[str] = []
@@ -137,7 +139,7 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
     for number in range(1, MAX_GENERATION_ATTEMPTS + 1):
         messages = prompts.generation_messages(bundle, difficulty, revision_notes=notes, avoid_stems=avoid_stems)
         gen = route(client, store, messages, purpose="generation", max_tokens=GENERATION_MAX_TOKENS,
-                    request_id=request_id, practice_set_id=practice_set_id)
+                    request_id=request_id, practice_set_id=practice_set_id, gate=gate)
         outcome.usage += gen.records
         if gen.status != "ok":
             outcome.status = "unavailable"
@@ -160,7 +162,8 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
         if det["deterministic_status"] == "pass":
             if det["requires_independent_solve"]:
                 solved = route(client, store, prompts.solve_messages(item), purpose="independent_solve",
-                               max_tokens=SOLVE_MAX_TOKENS, request_id=request_id, practice_set_id=practice_set_id,
+                               max_tokens=SOLVE_MAX_TOKENS, request_id=request_id,
+                               practice_set_id=practice_set_id, gate=gate,
                                avoid=frozenset({gen.final.model_requested}))
                 outcome.usage += solved.records
                 if solved.status == "ok":
@@ -168,7 +171,8 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
                     solve = {"performed": True, "model_used": solved.final.model_used or solved.final.model_requested,
                              "chosen_label": chosen, "agrees_with_key": chosen == item["answer_key"]}
             reviewed = route(client, store, prompts.rubric_messages(bundle, item, difficulty), purpose="review",
-                             max_tokens=RUBRIC_MAX_TOKENS, request_id=request_id, practice_set_id=practice_set_id,
+                             max_tokens=RUBRIC_MAX_TOKENS, request_id=request_id,
+                             practice_set_id=practice_set_id, gate=gate,
                              avoid=frozenset({gen.final.model_requested}))
             outcome.usage += reviewed.records
             if reviewed.status == "ok":

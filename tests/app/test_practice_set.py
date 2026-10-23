@@ -70,7 +70,7 @@ def test_complete_set_follows_allocation(catalog_conn):
     assert summary["accepted"] == 5 and summary["rejected_attempts"] == 0
     assert summary["calls"] == len(usage.records) == 10  # generation + rubric per math item (proof, no solve)
     assert all(r["practice_set_id"] == result.practice_set_id for r in usage.records)
-    assert [(r["practice_set_id"], r["slot"]) for r in store.rows] == [(result.practice_set_id, n) for n in range(1, 6)]
+    assert sorted((r["practice_set_id"], r["slot"]) for r in store.rows) == [(result.practice_set_id, n) for n in range(1, 6)]
 
 
 def test_duplicate_within_set_is_rejected_and_regenerated(catalog_conn):
@@ -96,7 +96,7 @@ def test_invalid_questions_never_fill_the_set(catalog_conn):
 
 def test_set_call_limit_is_never_exceeded(catalog_conn):
     result, _, usage, _ = run_set(catalog_conn, FakeLlm([math_item(i) for i in range(5)]),
-                                  SetLimits(max_calls_per_set=3))
+                                  SetLimits(max_calls_per_set=3, concurrency=1))
     sent = [r for r in usage.records if r["status"] != "budget_blocked"]
     assert len(sent) == 3
     assert result.status == "partial" and result.stop_reason == "set_call_limit"
@@ -106,7 +106,8 @@ def test_set_call_limit_is_never_exceeded(catalog_conn):
 
 def test_daily_budget_stops_the_set(catalog_conn):
     settings = LlmSettings(api_key=KEY, max_requests_per_day=4)
-    result, _, usage, _ = run_set(catalog_conn, FakeLlm([math_item(i) for i in range(5)]), settings=settings)
+    result, _, usage, _ = run_set(catalog_conn, FakeLlm([math_item(i) for i in range(5)]), SetLimits(concurrency=1),
+                                  settings=settings)
     assert len([r for r in usage.records if r["status"] != "budget_blocked"]) == 4
     assert result.status == "partial" and result.stop_reason == "daily_budget"
     assert result.summary()["accepted"] == 2
@@ -121,6 +122,11 @@ def test_more_questions_than_the_limit_is_refused(catalog_conn):
 def test_limits_from_env():
     assert SetLimits.from_env({}) == SetLimits()
     assert SetLimits.from_env({"MENTOR_PRO_SET_MAX_CALLS": "12"}).max_calls_per_set == 12
+    assert SetLimits.from_env({}).concurrency == 2
+    assert SetLimits.from_env({"QUESTION_GENERATION_CONCURRENCY": "4"}).concurrency == 4
+    for bad in ("0", "9"):
+        with pytest.raises(ValueError):
+            SetLimits.from_env({"QUESTION_GENERATION_CONCURRENCY": bad})
     with pytest.raises(ValueError):
         SetLimits.from_env({"MENTOR_PRO_SET_MAX_REQUESTS_PER_SLOT": "0"})
 
@@ -195,14 +201,14 @@ class FlakyLlm(FakeLlm):
         super().__init__(generations)
         self.failures = failures
 
-    def __call__(self, request):
+    def _respond(self, request):  # called with the FakeLlm lock held
         import json
 
         if not request.url.path.endswith("/models") and self.failures:
             if json.loads(request.content)["messages"][0]["content"] == prompts.SYSTEM:
                 self.failures -= 1
                 return httpx.Response(502, json={"error": {"message": "upstream"}})
-        return super().__call__(request)
+        return super()._respond(request)
 
 
 def test_model_failure_is_retried_not_fatal(catalog_conn):
@@ -219,3 +225,117 @@ def test_transient_failure_then_success_completes(catalog_conn):
     result, *_ = run_set(catalog_conn, fake)
     assert result.status == "complete"
     assert result.slots[0].requests[0]["status"] == "unavailable"
+
+
+# ---------------------------------------------------------------- concurrency (T008, ADR-012)
+
+import threading  # noqa: E402
+import time  # noqa: E402
+
+from app.llm.budget import BudgetGate  # noqa: E402
+
+
+class SlowLlm(FakeLlm):
+    """Adds latency outside the lock so calls from different workers overlap."""
+
+    def __init__(self, generations, delay=0.02, delay_for=None):
+        super().__init__(generations)
+        self.delay, self.delay_for = delay, delay_for or {}
+
+    def __call__(self, request):
+        body = request.content.decode("utf-8") if request.content else ""
+        extra = next((d for text, d in self.delay_for.items() if text in body), 0.0)
+        time.sleep(self.delay + extra)
+        return super().__call__(request)
+
+
+def test_budget_gate_is_atomic_under_threads():
+    gate = BudgetGate(MemoryUsageStore(), LlmSettings(api_key=KEY, max_requests_per_day=10))
+    start = threading.Barrier(40)
+    granted = []
+
+    def worker():
+        start.wait()
+        granted.append(gate.acquire("free"))
+
+    threads = [threading.Thread(target=worker) for _ in range(40)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert granted.count(True) == 10 and gate.refusal == "daily request budget reached"
+
+
+@pytest.mark.parametrize("daily,set_cap", [(7, 1000), (10_000, 7)])
+def test_concurrent_set_never_exceeds_budgets(catalog_conn, daily, set_cap):
+    settings = LlmSettings(api_key=KEY, max_requests_per_day=daily, max_retries=0)
+    result, _, usage, _ = run_set(catalog_conn, SlowLlm([math_item(i) for i in range(5)]),
+                                  SetLimits(max_calls_per_set=set_cap, concurrency=5), settings=settings)
+    assert len([r for r in usage.records if r["status"] != "budget_blocked"]) == 7
+    assert result.status == "partial"
+    assert result.stop_reason == ("daily_budget" if daily == 7 else "set_call_limit")
+
+
+class BarrierLlm(FakeLlm):
+    """Every generation waits until all workers have generated, so no slot sees another's item in its bank."""
+
+    def __init__(self, generations, parties):
+        super().__init__(generations)
+        self.barrier = threading.Barrier(parties, timeout=5)
+
+    def __call__(self, request):
+        body = request.content.decode("utf-8") if request.content else ""
+        response = super().__call__(request)
+        if "Formato de salida" in body:  # generation requests only
+            try:
+                self.barrier.wait()
+            except threading.BrokenBarrierError:
+                pass
+        return response
+
+
+def test_simultaneous_duplicates_are_rejected_at_commit(catalog_conn):
+    same = math_item(0)
+    result, *_ = run_set(catalog_conn, BarrierLlm([same], parties=5), SetLimits(concurrency=5,
+                                                                                  max_requests_per_slot=1))
+    accepted = [s for s in result.slots if s.status == "accepted"]
+    assert len(accepted) == 1
+    commit_rejections = [r for r in result.rejection_reasons() if r.get("stage") == "set_commit"]
+    assert len(commit_rejections) == 4
+    assert all(r["reasons"][0].startswith("D01: exact duplicate") for r in commit_rejections)
+
+
+def test_retries_are_isolated_per_slot(catalog_conn):
+    class FailM02(FakeLlm):
+        def _respond(self, request):
+            body = request.content.decode("utf-8") if request.content else ""
+            if "Usa los símbolos" in body and "Formato de salida" in body:
+                return httpx.Response(502, json={"error": {"message": "upstream"}})
+            return super()._respond(request)
+
+    settings = LlmSettings(api_key=KEY, max_requests_per_day=10_000, max_retries=0)
+    result, _, usage, _ = run_set(catalog_conn, FailM02([math_item(i) for i in range(5)]),
+                                  SetLimits(concurrency=3), settings=settings)
+    by_code = {code: [s for s in result.slots if s.objective_code == code] for code in ("M01", "M02")}
+    assert all(s.status == "accepted" and len(s.requests) == 1 for s in by_code["M01"])
+    assert all(s.status == "failed" and len(s.requests) == 3 for s in by_code["M02"])
+    ids = [r["request_id"] for s in result.slots for r in s.requests]
+    assert len(ids) == len(set(ids))  # no request is shared between slots
+    for slot in result.slots:
+        own = {r["request_id"] for r in slot.requests}
+        assert all(rec["request_id"] in own for rec in usage.records
+                   if rec["request_id"] in own)  # each usage record belongs to exactly one slot
+    assert {rec["request_id"] for rec in usage.records} == set(ids)
+
+
+def test_output_keeps_allocation_order_when_completion_order_differs(catalog_conn):
+    # Slot 1 (first M01 evidencia) is slowest, so later slots finish first.
+    fake = SlowLlm([math_item(i) for i in range(5)], delay=0.0, delay_for={"Lee números": 0.3})
+    result, allocation, _, store = run_set(catalog_conn, fake, SetLimits(concurrency=5))
+    planned = [(row["workbook_code"], s["evidence_id"]) for row in allocation for s in row["slots"]]
+    assert [(s.objective_code, s.evidence_id) for s in result.slots] == planned
+    assert [s.slot for s in result.slots] == [1, 2, 3, 4, 5]
+    assert [o.evidence_id for o in result.outcomes] == [e for _, e in planned]
+    completion = [r["slot"] for r in store.rows]
+    assert completion != sorted(completion)  # completion order really differed
+    assert all(s.item["curriculum_ref"]["evidencia_id"] == s.evidence_id for s in result.slots)

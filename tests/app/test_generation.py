@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 
 import httpx
 import pytest
@@ -63,8 +64,13 @@ class FakeLlm:
         self.generations = list(generations)
         self.solve, self.rubric, self.cost = solve, rubric or RUBRIC_OK, cost
         self.calls: list[tuple[str, str]] = []
+        self.lock = threading.Lock()  # practice-set workers call concurrently
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        with self.lock:
+            return self._respond(request)
+
+    def _respond(self, request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("/models"):
             return httpx.Response(200, json=MODELS)
         body = json.loads(request.content)
