@@ -43,10 +43,10 @@ PASSAGE = ("Las tortugas baula llegan cada año a las playas de Guanacaste para 
 READING_ITEM = {
     "stimulus": {"type": "text", "text": PASSAGE},
     "stem": "¿Cuál es la idea fundamental del texto?",
-    "options": [{"label": "A", "text": "Los guardaparques usan luces fuertes."},
+    "options": [{"label": "A", "text": "Los guardaparques usan luces fuertes en la playa."},
                 {"label": "B", "text": "Proteger las playas permite que las tortugas baula sobrevivan."},
-                {"label": "C", "text": "Las tortugas cavan nidos durante el día."},
-                {"label": "D", "text": "Guanacaste es una provincia grande."}],
+                {"label": "C", "text": "Las tortugas cavan sus nidos durante el día."},
+                {"label": "D", "text": "Guanacaste es una provincia grande y muy seca."}],
     "answer_key": "B",
     "explanation": "El texto concluye que proteger las playas es necesario para que la especie sobreviva.",
     "distractor_rationales": {"A": "Contradice el texto.", "C": "Contradice el texto.", "D": "No aparece en el texto."},
@@ -184,6 +184,14 @@ def test_solve_disagreement_rejects(catalog_conn):
     outcome = generate_one(client_for(fake), MemoryUsageStore(), bundle(catalog_conn, "espanol", "EL01"), "medium")
     assert outcome.status == "rejected"
     assert any("independent solve chose C" in r for r in outcome.reasons)
+
+
+def test_every_attempt_reason_is_recorded(catalog_conn):
+    fake = FakeLlm([READING_ITEM], solve="C")
+    outcome = generate_one(client_for(fake), MemoryUsageStore(), bundle(catalog_conn, "espanol", "EL01"), "medium")
+    attempts = outcome.validation["attempts"]
+    assert [a["attempt"] for a in attempts] == [1, 2]
+    assert all(a["verdict"] == "regenerate" and a["reasons"] for a in attempts)
 
 
 def test_rubric_zero_rejects_and_rubric_one_revises(catalog_conn):

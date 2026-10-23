@@ -28,7 +28,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cr_math import AmbiguousNumberError, evaluate, parse_quantity  # noqa: E402
 
-CHECKER_VERSION = "1.3.0"
+CHECKER_VERSION = "1.4.0"  # 1.4.0: C09 material key-length cue fails
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "question-engine" / "question-item.schema.json"
 
 SUBJECT_CODES = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
@@ -38,6 +38,11 @@ BANNED_OPTIONS = (
 )
 STIMULUS_CUES = ("observe", "observá", "la imagen", "la figura", "el gráfico", "la tabla", "el mapa", "el texto", "la lectura", "el fragmento")
 MAX_STEM_WORDS = 120
+# C09: a key is a material length cue only when it is the strictly longest option, at least
+# KEY_CUE_RATIO x the longest distractor AND KEY_CUE_MIN_GAP characters longer. The gap keeps
+# short options (numbers, single words) from failing on small absolute differences.
+KEY_CUE_RATIO = 1.5
+KEY_CUE_MIN_GAP = 12
 MAX_OPTION_WORDS = 30
 MIN_PASSAGE_WORDS = 40
 NEAR_DUPLICATE_THRESHOLD = 0.85
@@ -175,9 +180,11 @@ def check_lengths_and_stimulus(item: dict[str, Any]) -> list[Check]:
     key = item.get("answer_key")
     texts = {o["label"]: o.get("text", "") for o in item.get("options", []) if "label" in o}
     if key in texts and len(texts) > 1:
-        others = [len(t) for lbl, t in texts.items() if lbl != key]
-        if len(texts[key]) > 1.75 * max(others) and len(texts[key]) > 25:
-            checks.append(_check("C09", "warn", "key is much longer than every distractor (cueing risk)"))
+        key_len = len(texts[key].strip())
+        longest = max(len(t.strip()) for lbl, t in texts.items() if lbl != key)
+        if key_len >= KEY_CUE_RATIO * longest and key_len - longest >= KEY_CUE_MIN_GAP:
+            checks.append(_check("C09", "fail", f"key is a length cue: {key_len} chars vs longest distractor "
+                                                f"{longest} (limit {KEY_CUE_RATIO}x and +{KEY_CUE_MIN_GAP})"))
         else:
             checks.append(_check("C09", "pass", "no length cue on the key"))
     return checks

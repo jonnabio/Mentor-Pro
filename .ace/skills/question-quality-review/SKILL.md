@@ -63,7 +63,7 @@ One ValidationResult per item:
 | C06 | All | Rationale for every distractor |
 | C07 | All | Stem ≤ 120 words, options ≤ 30 words |
 | C08 | All | Stimulus present when the stem refers to one |
-| C09 | All | Key length cue (warning) |
+| C09 | All | Key length cue: fails if key ≥ 1.5× and ≥ 12 chars longer than the longest distractor |
 | G01 | All | Chain, subject, application; record official or approved baseline (ADR-006) |
 | G02 | All | Every excerpt verbatim in a groundable record |
 | G03 | All | Cognitive verb appears in the evidencia (warning) |

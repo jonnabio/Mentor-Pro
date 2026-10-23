@@ -12,7 +12,7 @@ import json
 from app.generation.grounding import GroundingBundle
 
 GENERATION_PROMPT_ID = "item-generation"
-GENERATION_PROMPT_VERSION = "1.1.0"  # 1.1.0: exact subject_checks shape per subject
+GENERATION_PROMPT_VERSION = "1.2.0"  # 1.2.0: options of similar length (C09 rejects length cues)
 SOLVE_PROMPT_VERSION = "1.0.0"
 RUBRIC_PROMPT_VERSION = "1.0.0"
 
@@ -93,6 +93,7 @@ def generation_messages(bundle: GroundingBundle, difficulty: str, avoid_stems: l
         "(escuela, comunidad, feria, naturaleza) cuando sea apropiado.",
         f"Dificultad: {DIFFICULTY_RULES[difficulty]}",
         "Exactamente cuatro opciones A, B, C y D; una sola correcta; distractores plausibles basados en errores comunes.",
+        "Las cuatro opciones deben tener longitud y nivel de detalle similares; la correcta no puede ser notablemente más larga.",
         "Prohibido: 'todas las anteriores', 'ninguna de las anteriores', 'a y b'.",
         "Si la pregunta menciona un texto, tabla o imagen, inclúyalo en stimulus; no use imágenes.",
         "La explicación no debe agregar datos que no estén en el contenido curricular.",

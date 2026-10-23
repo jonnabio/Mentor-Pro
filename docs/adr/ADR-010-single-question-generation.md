@@ -43,6 +43,13 @@ rejected, and the key must not reach students before they answer.
   2–10, 100 or 1000; otherwise the key is not proven and a blind solve is
   required (e.g. `148/100` for a key of 1,48).
 
+- Checker 1.4.0 (C09, PO decision 2026-10-22): a material key-length cue
+  fails (`regenerate`). Material means the key is at least 1.5× and at least
+  12 characters longer than the longest distractor; the gap keeps short
+  numeric or one-word options from failing. Prompt 1.2.0 asks for options of
+  similar length.
+- `validation.attempts` keeps every generation attempt's verdict and reasons.
+
 ### Live hardening (2026-10-22)
 
 - Candidates: free, text-input, text-only-output models; pin with

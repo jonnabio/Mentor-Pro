@@ -129,8 +129,9 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
     outcome = GenerationOutcome("rejected", request_id, bundle.objective_code, bundle.evidence["id"])
     notes: list[str] = []
     facts = bundle.concept_lines
+    attempts: list[dict[str, Any]] = []  # every attempt's verdict and reasons, kept in validation
 
-    for _ in range(MAX_GENERATION_ATTEMPTS):
+    for number in range(1, MAX_GENERATION_ATTEMPTS + 1):
         gen = route(client, store, prompts.generation_messages(bundle, difficulty, revision_notes=notes),
                     purpose="generation", max_tokens=GENERATION_MAX_TOKENS, request_id=request_id)
         outcome.usage += gen.records
@@ -143,6 +144,7 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
         except OutputError as exc:
             notes = [str(exc)]
             outcome.reasons = [f"invalid output: {exc}"]
+            attempts.append({"attempt": number, "verdict": "invalid_output", "reasons": outcome.reasons})
             continue
 
         item = assemble_item(bundle, fields, difficulty, gen.final.model_requested, gen.final.model_used,
@@ -172,8 +174,9 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
                     rubric = None
 
         decision, reasons = verdict(det, solve, rubric)
+        attempts.append({"attempt": number, "item_id": item["item_id"], "verdict": decision, "reasons": reasons})
         validation = {**det, "independent_solve": solve, "verdict": decision, "reasons": reasons,
-                      "checker_version": CHECKER_VERSION}
+                      "checker_version": CHECKER_VERSION, "attempts": attempts}
         if rubric is not None:
             validation["rubric"] = rubric
         outcome.item, outcome.validation, outcome.reasons = item, validation, reasons

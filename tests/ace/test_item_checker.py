@@ -326,3 +326,41 @@ def test_expression_from_item_numbers_is_a_proof(item_by_subject, records_by_id,
     result = run(item_by_subject["matematicas"], records_by_id, validator)  # "144 / 12"
     assert result["math_proven"] is True
     assert any(c["id"] == "M04" and c["status"] == "pass" for c in result["checks"])
+
+
+
+# ---------------------------------------------------------------- C09 key-length cue (checker 1.4.0)
+
+def c09_status(item_by_subject, records_by_id, validator, key_text, distractors):
+    """Set the key's text and the three distractors' texts; return C09's status and the full result."""
+    item = copy.deepcopy(item_by_subject["espanol"])
+    others = iter(distractors)
+    for option in item["options"]:
+        option["text"] = key_text if option["label"] == item["answer_key"] else next(others)
+    result = run(item, records_by_id, validator)
+    return next(c["status"] for c in result["checks"] if c["id"] == "C09"), result
+
+
+@pytest.mark.parametrize("key_text,distractors", [
+    ("Una campaña escolar que promueve el reciclaje en toda la comunidad",
+     ["Un paseo al río", "Una feria de ciencias", "Un torneo de fútbol"]),
+    ("Porque el agua se evapora con el calor del sol y luego se condensa en nubes",
+     ["Porque llueve", "Porque hace frío", "Porque el río crece"]),
+])
+def test_obvious_key_length_cue_fails(key_text, distractors, item_by_subject, records_by_id, validator):
+    status, result = c09_status(item_by_subject, records_by_id, validator, key_text, distractors)
+    assert status == "fail"
+    assert result["verdict"] == "regenerate"
+
+
+@pytest.mark.parametrize("key_text,distractors", [
+    ("1,405 m", ["1,5 m", "1,45 m", "1,48 m"]),              # ratio 1.4x, gap 1 char
+    ("12,5 kg", ["3 kg", "4 kg", "5 kg"]),                    # ratio 3.5x but only 3 chars longer
+    ("La campaña de reciclaje escolar", ["El paseo anual de la escuela", "La feria de ciencias", "El torneo"]),
+    ("Una campaña de reciclaje en la escuela y el barrio",   # much longer than two distractors, not the longest one
+     ["Una feria de ciencias organizada por estudiantes", "Un paseo", "Un torneo"]),
+    ("Respuesta", ["Una opción bastante más larga que la clave", "Otra opción larga de relleno", "Una tercera"]),
+])
+def test_acceptable_length_variation_passes(key_text, distractors, item_by_subject, records_by_id, validator):
+    status, _ = c09_status(item_by_subject, records_by_id, validator, key_text, distractors)
+    assert status == "pass"
