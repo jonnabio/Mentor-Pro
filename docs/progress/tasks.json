@@ -462,6 +462,36 @@
       "result_file": "docs/progress/task_T014_result.md",
       "failures": [],
       "notes": "No base T014 document existed; implemented the two amendments. 275 of 343 stored answers are from mocked browser tests (decision pending)."
+    },
+    {
+      "id": "T015",
+      "name": "Practice cancellation (PO small task)",
+      "objective": "'Salir de la práctica' with Spanish confirmation; cancelled_at on the session; answers kept and counted; no resume, no generation.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T015_result.md"
+        ],
+        "modify": [
+          "app/practice/store.py",
+          "app/practice/routes.py",
+          "app/static/",
+          "scripts/dev/practice_e2e.py",
+          "tests/app/test_practice_api.py",
+          "tests/app/test_mastery.py",
+          "docs/adr/ADR-013-student-practice-sessions.md"
+        ]
+      },
+      "depends_on": [
+        "T014"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T015_result.md",
+      "failures": [],
+      "notes": "Browser 182/182; suite 365."
     }
   ]
 }

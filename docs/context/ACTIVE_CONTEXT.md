@@ -8,7 +8,7 @@
 
 ## Current Objective
 
-T014 (learning dashboard, repeat-aware mastery) is complete. Next: the next Product
+T015 (practice cancellation) is complete. Next: the next Product
 Owner task after approval (not 10–30 question sets, answering or frontend
 without it).
 
@@ -72,6 +72,8 @@ without it).
   six configurable statuses from first attempts on distinct questions,
   `GET /api/dashboard`, "Ver mi progreso"; bank freshness from global history
   (`docs/progress/task_T014_result.md`).
+- T015 — "Salir de la práctica" with confirmation; `practice.session.cancelled_at`;
+  answers kept and counted (`docs/progress/task_T015_result.md`).
 
 ### Current State
 
@@ -84,7 +86,7 @@ without it).
   `generation.practice_set`, `generation.practice_set_item`,
   `generation.bank_revalidation`, `practice.session`, `practice.item`,
   `practice.answer`.
-- Tests: 359 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tests: 365 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 

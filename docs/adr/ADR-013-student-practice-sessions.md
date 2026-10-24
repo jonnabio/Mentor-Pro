@@ -57,6 +57,16 @@ server. There are no accounts.
 - Summary (correct, incorrect, percentage, objectives and evidencias) when
   every available question is answered.
 
+### Cancellation (T015)
+
+`POST /api/practice/sessions/{id}/cancel` sets `practice.session.cancelled_at`
+on a ready practice with unanswered questions; the generation status
+(`complete`/`partial`) is kept, so cancelled, completed and failed practices
+stay distinct. Idempotent (`already_cancelled`); after the final answer it
+returns `finished` without cancelling; refused while generating. Answers are
+kept and still count for learning progress; unanswered questions are not
+answers; later answers are refused; a cancelled practice is never resumed.
+
 ### Status shown to the student
 
 Partial sets can be practised with a notice; failed sets show the reason
