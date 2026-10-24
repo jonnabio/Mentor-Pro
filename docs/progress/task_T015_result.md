@@ -2,7 +2,8 @@
 
 > **Date:** 2026-10-23
 > **Status:** Done
-> **Decision:** [ADR-013](../adr/ADR-013-student-practice-sessions.md) (cancellation section)
+> **Decision:** [ADR-013](../adr/ADR-013-student-practice-sessions.md)
+> (cancellation section)
 
 ---
 
