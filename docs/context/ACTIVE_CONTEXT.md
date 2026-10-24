@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T015)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T016)
 
 ## Current Objective
 
@@ -52,6 +52,11 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   ([ADR-015](../adr/ADR-015-repeat-aware-learning-status.md)).
 - **T015** — "Salir de la práctica" with confirmation;
   `practice.session.cancelled_at`; answers kept and counted.
+- **T016** (PO T014.1) — automated tests and browser runs use only
+  `TEST_DATABASE_URL` (`mentor_pro_test`); `require_test_database` refuses
+  the student database (pytest exit 4, `practice_e2e.py` exit 2); read-only
+  report of historical test records, nothing deleted
+  ([ADR-016](../adr/ADR-016-test-database-isolation.md)).
 
 ### Current State
 
@@ -67,14 +72,15 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 365 passing; browser (mocked) 182/182; ACE gate
+- Tests: 375 passing; browser (mocked) 182/182 and live 14/14 on
+  `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Decide on mocked browser test data (see Blockers): isolate
-   `practice_e2e.py` mock mode in a separate database or schema, and
-   optionally remove existing `Q-mock-…` practices.
+1. Product Owner decision on cleanup of historical test records
+   (`docs/progress/T016_test_data_report.md`): 103 confirmed and 14 probable
+   test sessions. No cleanup without explicit approval.
 2. Restore a generation model fallback: only Nemotron 3 Ultra generates
    (MiniMax M3.1 Flash unlisted, Super VL excluded). Add another free text
    model to `OPENROUTER_FREE_MODELS` or evaluate the reasoning-effort setting
@@ -85,9 +91,9 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 
 ### Blockers/Issues
 
-- **Test data in the student history:** mocked browser runs write to the
-  same database; 275 of 343 stored answers are `Q-mock-…` items and appear
-  in the dashboard. Decision pending.
+- **Historical test data in the student history:** 308 confirmed and 68
+  probable test answers of 381 still appear in the dashboard until cleanup
+  is approved. New automated runs can no longer add any.
 - **No generation fallback model** (see Next Steps 2); free models also
   truncate or return 502 often.
 - Rubric and blind solve come from free models; bank quality inherits them.
@@ -107,8 +113,9 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   (reads `.env`). Restart after code changes. A server start marks
   `queued`/`running` practices of the shared database as interrupted.
 - Browser tests: `.venv/Scripts/python.exe scripts/dev/practice_e2e.py --out DIR`
-  (mocked; uses M10–M12 and "Difícil", where the bank is empty) and
-  `--live` (real OpenRouter; bank-only and mixed practices).
+  (mocked; seeds `e2e-bank-…` items) and `--live` (real OpenRouter; generate,
+  repeat from the test bank, mixed). Both run only on `TEST_DATABASE_URL`;
+  live OpenRouter usage is recorded in the test database.
 - Live helpers: `scripts/dev/generate_examples.py`,
   `scripts/dev/generate_practice_set.py`; connectivity
   `.venv/Scripts/python.exe -m app.llm.connectivity`.
@@ -127,5 +134,5 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-015](../adr/ADR-015-repeat-aware-learning-status.md)
+  [ADR-016](../adr/ADR-016-test-database-isolation.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001, RCA-002)

@@ -5,6 +5,11 @@ real API, PostgreSQL sessions, server-side evaluation and UI are exercised for a
 four subjects and the failure paths without OpenRouter calls. Live mode runs the
 Matemáticas acceptance practice with the real validated generator.
 
+Both modes use only TEST_DATABASE_URL (ADR-016): the run refuses to start, without
+connecting, unless that database ends in "_test" and is not the student database.
+The baseline catalog is imported there if missing; mock mode seeds labelled
+synthetic bank items (`e2e-bank-…`).
+
 Usage:
     .venv/Scripts/python.exe scripts/dev/practice_e2e.py --out DIR            # mocked scenarios
     .venv/Scripts/python.exe scripts/dev/practice_e2e.py --out DIR --live     # live acceptance
@@ -13,7 +18,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import sys
 import threading
 import time
@@ -22,10 +29,16 @@ from pathlib import Path
 
 import uvicorn
 from playwright.sync_api import Page, expect, sync_playwright
+from psycopg.types.json import Jsonb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from app.generation.practice_set import PracticeSetResult, SlotResult  # noqa: E402
-from app.main import create_app  # noqa: E402
+from app.generation.store import GenerationStore  # noqa: E402
+from app.generation.validation import CHECKER_VERSION  # noqa: E402
+from app.main import BASELINE_VERSION, create_app  # noqa: E402
+from app.practice.bank import QuestionBank  # noqa: E402
+from curriculum import db, importer  # noqa: E402
+from curriculum.catalog import list_objectives  # noqa: E402
 
 PORT = 8766
 BASE = f"http://127.0.0.1:{PORT}/"
@@ -40,6 +53,65 @@ SUBJECTS = {  # label, objective codes
     "ciencias": ("Ciencias", ["C01", "C02"]),
     "estudios_sociales": ("Estudios Sociales", ["ES01", "ES02"]),
 }
+
+
+BANK_OBJECTIVES = ("M02", "M04", "M05")  # scenario_bank_only, "Intermedia"
+WORDS = ("río", "mesa", "nube", "faro", "trigo", "lápiz", "volcán", "puente", "cacao", "brújula", "ciprés",
+         "tambor", "arena", "colmena", "linterna", "marea", "piedra", "sendero", "tucán", "vasija", "yuca",
+         "zafiro", "bosque", "carreta", "delfín", "espiga", "flauta", "girasol", "hamaca", "iglesia")
+
+
+def test_database() -> str:
+    """TEST_DATABASE_URL after the safety gate; DATABASE_URL is redirected to it for this process."""
+    url = db.require_test_database(db.test_database_url())
+    os.environ["DATABASE_URL"] = url
+    return url
+
+
+def prepare_database(url: str, seed_bank: bool) -> None:
+    """Import the baseline catalog if missing; optionally seed synthetic bank items for the mock run."""
+    manifest = importer.DEFAULT_MANIFEST
+    registered = {line.split()[0] for line in manifest.read_text(encoding="utf-8").splitlines()
+                  if line.strip() and not line.startswith("#")}
+    workbooks = [w for w in sorted((db.REPO_ROOT / "references" / "original").glob("[!~]*.xlsx"))
+                 if hashlib.sha256(w.read_bytes()).hexdigest() in registered]
+    if not workbooks:
+        raise SystemExit("baseline workbook not found in references/original (see references/MANIFEST.sha256)")
+    importer.import_workbook(workbooks[0], url, BASELINE_VERSION, manifest)
+    if not seed_bank:  # live mode: only real validated questions may be served from the test bank
+        GenerationStore(url), QuestionBank(url)  # create the generation tables if missing
+        with db.connect(url) as conn:
+            conn.execute("DELETE FROM generation.bank_revalidation WHERE request_id LIKE 'e2e-bank-%'")
+            conn.execute("DELETE FROM generation.question_attempt WHERE request_id LIKE 'e2e-bank-%'")
+            conn.commit()
+        return
+    with db.connect(url, read_only=True) as catalog:
+        evidences = [(o["workbook_code"], e["id"])
+                     for o in list_objectives(catalog, BASELINE_VERSION, "matematicas")
+                     if o["workbook_code"] in BANK_OBJECTIVES for e in o["evidences"]]
+    GenerationStore(url)  # creates the generation schema
+    with db.connect(url) as conn:
+        for index, (code, evidence_id) in enumerate(evidences):
+            words = [WORDS[(index * 7 + k) % len(WORDS)] for k in range(5)]
+            item = {
+                "item_id": f"Q-e2e-bank-{index:02d}", "subject": "matematicas",
+                "stimulus": {"type": "text", "text": f"Banco de prueba {index}: {' '.join(words)}."},
+                "stem": f"¿Qué palabra aparece primero en la lista {' '.join(words[:3])} número {index}?",
+                "options": [{"label": lbl, "text": f"{words[k]} {index}"} for k, lbl in enumerate("ABCD")],
+                "answer_key": "A",
+                "explanation": f"EXPLICACION-OCULTA-banco-{index}: la primera palabra es {words[0]}.",
+                "source_refs": [{"record_id": evidence_id, "excerpt": f"Evidencia {evidence_id}"}],
+            }
+            conn.execute(
+                """INSERT INTO generation.question_attempt (request_id, baseline_version, objective_code,
+                       evidence_id, difficulty, status, verdict, item_id, models_used, calls, tokens_in, tokens_out,
+                       cost_usd, cost_complete, checker_version, prompt_version, validation, item, reasons)
+                   VALUES (%s, %s, %s, %s, 'medium', 'accepted', 'accept', %s, %s, 0, 0, 0, 0, true, %s, 'e2e-seed',
+                           %s, %s, %s) ON CONFLICT (request_id) DO NOTHING""",
+                (f"e2e-bank-{index:02d}", BASELINE_VERSION, code, evidence_id, item["item_id"], ["e2e-seed"],
+                 CHECKER_VERSION, Jsonb({"verdict": "accept", "checker_version": CHECKER_VERSION}), Jsonb(item),
+                 Jsonb([])))
+        conn.commit()
 
 
 class ScriptedRunner:
@@ -385,10 +457,11 @@ def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None
     report.check(True, f"[{name}] dashboard returns to the main menu")
 
 
-def run_mock(out: Path) -> Report:
+def run_mock(out: Path, url: str) -> Report:
     runner = ScriptedRunner()
     report = Report()
-    with serve(create_app(practice_runner=runner)), sync_playwright() as p:
+    prepare_database(url, seed_bank=True)
+    with serve(create_app(url, practice_runner=runner)), sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome", headless=True)
         for viewport, size in (("desktop", DESKTOP), ("mobile", MOBILE)):
             context = browser.new_context(viewport=size, locale="es-CR", is_mobile=viewport == "mobile",
@@ -435,10 +508,12 @@ def run_practice(page: Page, report: Report, name: str, out: Path) -> dict:
     return {"elapsed": elapsed, "info": info, "session_id": sid}
 
 
-def run_live(out: Path) -> Report:
-    """T013 acceptance: a bank-only practice (no OpenRouter), then one where only missing slots are generated."""
+def run_live(out: Path, url: str) -> Report:
+    """T013 acceptance on the test database's own bank: a generated practice, the same configuration again
+    from the bank (no OpenRouter), then one where only missing slots are generated."""
     report = Report()
-    with serve(create_app()), sync_playwright() as p:
+    prepare_database(url, seed_bank=False)
+    with serve(create_app(url)), sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome", headless=True)
         page = browser.new_context(viewport=DESKTOP, locale="es-CR").new_page()
         errors: list[str] = []
@@ -447,10 +522,18 @@ def run_live(out: Path) -> Report:
         watch_disclosure(page, leaks)
 
         configure(page, "matematicas", ["M02", "M04", "M05"], difficulty="Intermedia")
+        first = run_practice(page, report, "live-generated", out)
+        stocked = first["info"]["composition"]["bank"] + first["info"]["composition"]["generated"]
+        print(f"LIVE_GENERATED_SESSION={first.get('session_id')}", flush=True)
+        page.get_by_role("button", name="Volver al menú principal").click()
+
+        configure(page, "matematicas", ["M02", "M04", "M05"], difficulty="Intermedia")
         bank = run_practice(page, report, "live-bank", out)
-        report.check(bank["info"]["status"] == "complete" and bank["info"]["composition"]["bank"] == 5,
-                     "[live-bank] all 5 questions from the bank")
-        report.check(bank["elapsed"] < 10, f"[live-bank] practice started immediately ({bank['elapsed']:.1f} s)")
+        report.check(bank["info"]["composition"]["bank"] >= stocked,
+                     f"[live-bank] repeat served from the test bank ({bank['info']['composition']}, "
+                     f"{stocked} stocked)")
+        if stocked == 5:
+            report.check(bank["elapsed"] < 10, f"[live-bank] practice started immediately ({bank['elapsed']:.1f} s)")
         print(f"LIVE_BANK_SESSION={bank.get('session_id')}", flush=True)
         page.get_by_role("button", name="Volver al menú principal").click()
 
@@ -509,7 +592,13 @@ def main() -> int:
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     sys.stdout.reconfigure(encoding="utf-8")
-    report = run_live(args.out) if args.live else run_mock(args.out)
+    try:
+        url = test_database()
+    except (db.ConfigurationError, db.UnsafeDatabaseError) as exc:
+        print(f"E2E=refused: {exc}; set TEST_DATABASE_URL to a dedicated *_test database", flush=True)
+        return 2
+    print(f"E2E_DATABASE={db.database_name(url)}", flush=True)
+    report = run_live(args.out, url) if args.live else run_mock(args.out, url)
     (args.out / ("live.txt" if args.live else "mock.txt")).write_text("\n".join(report.lines) + "\n",
                                                                       encoding="utf-8")
     print(f"E2E={'pass' if not report.failures else 'fail'} ({len(report.lines)} checks, "

@@ -52,6 +52,18 @@ Browser end-to-end test (installed Chrome, desktop 1280 px and mobile 390 px):
 .venv/Scripts/python.exe scripts/dev/practice_e2e.py --out <folder> --live   # OpenRouter, ~10 min
 ```
 
+Both modes use only `TEST_DATABASE_URL` (ADR-016). They refuse to start (exit
+code 2, `E2E=refused`) unless its database name ends in `_test` and is not the
+student database. They import the baseline there if missing; the mocked run
+seeds labelled synthetic bank items (`e2e-bank-…`). pytest applies the same
+check and redirects `DATABASE_URL` to the test database for the whole run.
+
+Test records already in the student database (read-only report, no cleanup):
+
+```bash
+.venv/Scripts/python.exe scripts/dev/test_data_report.py --out <file.md>
+```
+
 ---
 
 ## Troubleshooting
@@ -59,6 +71,7 @@ Browser end-to-end test (installed Chrome, desktop 1280 px and mobile 390 px):
 | Symptom | Cause |
 |---------|-------|
 | Subjects do not load | `DATABASE_URL` missing or PostgreSQL stopped |
+| `E2E=refused` or pytest usage error | `TEST_DATABASE_URL` missing, not `*_test`, or the student database |
 | All counts are 0 | Catalog not imported, or `CURRICULUM_BASELINE` mismatch |
 | Browser test fails at launch | Use Chrome (`channel="chrome"`); Edge cannot start in automation on this machine |
 | Practice shows "se interrumpió" | The server restarted during generation; configure it again |

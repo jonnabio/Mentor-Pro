@@ -21,20 +21,65 @@ _SCHEMA_NAME = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 
 
 class ConfigurationError(RuntimeError):
-    """Raised when DATABASE_URL is missing."""
+    """Raised when DATABASE_URL (or TEST_DATABASE_URL) is missing."""
+
+
+class UnsafeDatabaseError(RuntimeError):
+    """Raised when automation is pointed at a database that may hold student data (ADR-016)."""
+
+
+def _file_setting(name: str, env_file: Path) -> str | None:
+    if env_file.is_file():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            key, sep, value = line.partition("=")
+            if sep and key.strip() == name and value.strip():
+                return value.strip()
+    return None
+
+
+def _setting(name: str, env_file: Path) -> str | None:
+    return os.environ.get(name) or _file_setting(name, env_file)
 
 
 def database_url(env_file: Path = REPO_ROOT / ".env") -> str:
     """Return DATABASE_URL from the environment, else from `.env`."""
-    url = os.environ.get("DATABASE_URL")
+    url = _setting("DATABASE_URL", env_file)
     if url:
         return url
-    if env_file.is_file():
-        for line in env_file.read_text(encoding="utf-8").splitlines():
-            key, sep, value = line.partition("=")
-            if sep and key.strip() == "DATABASE_URL" and value.strip():
-                return value.strip()
     raise ConfigurationError("DATABASE_URL is not set (environment or .env); see .env.example")
+
+
+def test_database_url(env_file: Path = REPO_ROOT / ".env") -> str:
+    """Return TEST_DATABASE_URL from the environment, else from `.env` (automated runs only)."""
+    url = _setting("TEST_DATABASE_URL", env_file)
+    if url:
+        return url
+    raise ConfigurationError("TEST_DATABASE_URL is not set (environment or .env); see .env.example")
+
+
+def database_name(url: str) -> str:
+    """The database a URL connects to, parsed with libpq rules (so `?dbname=` overrides count)."""
+    from psycopg.conninfo import conninfo_to_dict
+
+    return str(conninfo_to_dict(url).get("dbname") or "")
+
+
+def require_test_database(url: str, env_file: Path = REPO_ROOT / ".env") -> str:
+    """Return `url` if automation may use it; never connects.
+
+    The database name must end in `_test` and must not be the student database named by
+    DATABASE_URL in `.env` or in the environment. An environment DATABASE_URL equal to `url`
+    is the redirect made by the test harness itself and is not a student database.
+    Credentials are never included in the error.
+    """
+    name = database_name(url)
+    if not name.endswith("_test"):
+        raise UnsafeDatabaseError(f"refusing to run automation against non-test database {name!r}")
+    environment = os.environ.get("DATABASE_URL")
+    students = [_file_setting("DATABASE_URL", env_file), environment if environment != url else None]
+    if any(s and database_name(s) == name for s in students):
+        raise UnsafeDatabaseError(f"refusing to run automation: {name!r} is also the student database")
+    return url
 
 
 def _check_schema(schema: str) -> str:

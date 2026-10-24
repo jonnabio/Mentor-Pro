@@ -168,3 +168,13 @@ def test_answers_from_cancelled_practices_count_and_unanswered_do_not(history):
     _, m02 = objective()
     assert (m02["total_answers"], m02["distinct_questions"], m02["first_attempt_correct"]) == (2, 2, 1)
     assert m02["status"] == "insufficient_evidence"
+
+
+def test_generated_questions_without_answers_do_not_affect_progress(history):
+    """T014.1: served-but-unanswered practices and bank inventory never count as attempts."""
+    record, objective, _ = history
+    for _ in range(3):
+        record([("M02", f"Q-gen-{uuid.uuid4().hex[:6]}", "A") for _ in range(5)], {})
+    subject, m02 = objective()
+    assert (m02["total_answers"], m02["distinct_questions"], m02["status"]) == (0, 0, "unpracticed")
+    assert subject["status_counts"]["unpracticed"] == subject["objective_count"]

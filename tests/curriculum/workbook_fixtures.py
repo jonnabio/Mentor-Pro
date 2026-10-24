@@ -78,7 +78,7 @@ def register(manifest: Path, workbook: Path, name: str = "synthetic-workbook.xls
 
 
 # PostgreSQL test database. Each test gets its own schema, dropped afterwards.
-# The database name must end in "_test" so tests can never touch the real catalog.
+# require_test_database (ADR-016): name ends in "_test" and is never the student database.
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql://mentor_pro_admin@127.0.0.1:5432/mentor_pro_test")
 
@@ -90,10 +90,9 @@ class PgTarget:
 
 
 def new_target() -> PgTarget:
-    database = TEST_DATABASE_URL.rsplit("/", 1)[-1].split("?", 1)[0]
-    if not database.endswith("_test"):
-        raise RuntimeError(f"refusing to run tests against non-test database {database!r}")
-    return PgTarget(TEST_DATABASE_URL, f"t_{uuid.uuid4().hex[:12]}")
+    from curriculum import db
+
+    return PgTarget(db.require_test_database(TEST_DATABASE_URL), f"t_{uuid.uuid4().hex[:12]}")
 
 
 def drop_target(target: PgTarget) -> None:

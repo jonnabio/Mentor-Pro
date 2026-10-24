@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-10-23",
+  "updated": "2026-10-24",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -492,6 +492,41 @@
       "result_file": "docs/progress/task_T015_result.md",
       "failures": [],
       "notes": "Browser 182/182; suite 365."
+    },
+    {
+      "id": "T016",
+      "name": "T014.1 Isolate student learning data from automated tests (PO corrective task)",
+      "objective": "Automated tests and browser runs use only a *_test database and refuse the student database; read-only report of historical test records; no cleanup without approval.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-016-test-database-isolation.md",
+          "tests/conftest.py",
+          "tests/curriculum/test_database_safety.py",
+          "scripts/dev/test_data_report.py",
+          "docs/progress/T016_test_data_report.md",
+          "docs/progress/task_T016_result.md"
+        ],
+        "modify": [
+          "curriculum/db.py",
+          "tests/curriculum/workbook_fixtures.py",
+          "scripts/dev/practice_e2e.py",
+          "tests/app/test_mastery.py",
+          "docs/runbooks/practice-ui.md",
+          ".env.example"
+        ]
+      },
+      "depends_on": [
+        "T014",
+        "T015"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T016_result.md",
+      "failures": [],
+      "notes": "Suite 375; browser mock 182/182 on mentor_pro_test; student database unchanged."
     }
   ]
 }
