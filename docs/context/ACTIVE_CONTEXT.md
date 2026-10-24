@@ -8,7 +8,7 @@
 
 ## Current Objective
 
-T012 (navigation, generation routing) is complete. Next: the next Product
+T013 (validated question bank) is complete. Next: the next Product
 Owner task after approval (not 10–30 question sets, answering or frontend
 without it).
 
@@ -63,6 +63,11 @@ without it).
   principal" (no new job). Generation default 4000; Super VL excluded from
   generation only; optional `OPENROUTER_GENERATION_REASONING_EFFORT` (off)
   (`docs/progress/task_T012_result.md`).
+- T013 — question bank ([ADR-014](../adr/ADR-014-validated-question-bank.md)):
+  practices reuse eligible accepted questions by slot (current checker or
+  recorded revalidation in `generation.bank_revalidation`); only missing slots
+  are generated. Live: bank-only practice in 1.9 s with 0 calls
+  (`docs/progress/task_T013_result.md`).
 
 ### Current State
 
@@ -72,8 +77,10 @@ without it).
   `OPENROUTER_MAX_REQUESTS_PER_DAY=1000` (account not free tier) and
   `MENTOR_PRO_DEV_ENDPOINTS=true`.
 - Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`,
-  `generation.practice_set`, `generation.practice_set_item`.
-- Tests: 332 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+  `generation.practice_set`, `generation.practice_set_item`,
+  `generation.bank_revalidation`, `practice.session`, `practice.item`,
+  `practice.answer`.
+- Tests: 337 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
@@ -115,4 +122,4 @@ without it).
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-013](../adr/ADR-013-student-practice-sessions.md)
+  [ADR-014](../adr/ADR-014-validated-question-bank.md)

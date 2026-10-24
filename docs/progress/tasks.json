@@ -396,6 +396,39 @@
       "result_file": "docs/progress/task_T012_result.md",
       "failures": [],
       "notes": "Browser 114/114. Only Nemotron 3 Ultra remains for generation (MiniMax unlisted, VL excluded): no model fallback."
+    },
+    {
+      "id": "T013",
+      "name": "Validated question bank (PO T013)",
+      "objective": "Compose practices from eligible accepted questions (current checker or recorded revalidation) by slot; generate only missing slots; persist composition; prefer unseen per browser tab.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/bank.py",
+          "tests/app/test_question_bank.py",
+          "docs/adr/ADR-014-validated-question-bank.md",
+          "docs/progress/task_T013_result.md",
+          "docs/progress/screenshots/T013/"
+        ],
+        "modify": [
+          "app/practice/routes.py",
+          "app/practice/jobs.py",
+          "app/practice/store.py",
+          "app/generation/practice_set.py",
+          "app/static/",
+          "scripts/dev/practice_e2e.py"
+        ]
+      },
+      "depends_on": [
+        "T012"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T013_result.md",
+      "failures": [],
+      "notes": "Live: bank-only 5/5 in 1.9 s with 0 calls; mixed 2 bank + 3 generated in 315 s, 16 calls, $0.00. 13 of 18 older items revalidated eligible."
     }
   ]
 }

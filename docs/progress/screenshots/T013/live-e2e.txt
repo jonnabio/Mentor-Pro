@@ -1,0 +1,11 @@
+PASS [live-bank] ready after 1.9 s; status complete; composition {'bank': 5, 'generated': 0}
+PASS [live-bank] explanation not in the page before answering
+PASS [live-bank] answered 5: 2 correct, 3 incorrect, result 40 %
+PASS [live-bank] all 5 questions from the bank
+PASS [live-bank] practice started immediately (1.9 s)
+PASS [live-mixed] progress: 'Generando preguntas adicionales. 2 de 5 preguntas ya están listas del banco de preguntas.'
+PASS [live-mixed] complete; composition {'bank': 2, 'generated': 3}
+PASS [live-mixed] explanation not in the page before answering
+PASS [live-mixed] answered 5
+PASS [live] no key or explanation before submission ([])
+PASS [live] no JavaScript errors []
