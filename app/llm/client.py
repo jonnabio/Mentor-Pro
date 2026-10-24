@@ -163,11 +163,13 @@ class OpenRouterClient:
     # ------------------------------------------------------------------ chat
 
     def chat(self, model: str, messages: list[dict[str, str]], max_tokens: int | None = None,
-             temperature: float = 0.0, before_attempt: Callable[[], bool] | None = None) -> list[Attempt]:
+             temperature: float = 0.0, before_attempt: Callable[[], bool] | None = None,
+             extra_body: dict[str, Any] | None = None) -> list[Attempt]:
         """Call one model, retrying transient failures. Returns all attempts; the last is final.
 
         `before_attempt` is asked before every HTTP attempt (budget reservation); if it returns False
-        no request is sent and a final `budget_blocked` attempt is returned.
+        no request is sent and a final `budget_blocked` attempt is returned. `extra_body` adds optional
+        request fields (e.g. `reasoning`) that the caller has checked the model supports.
 
         @throws AuthenticationError on 401/403 (stop everything)
         @throws PaymentRequiredError on 402
@@ -178,6 +180,7 @@ class OpenRouterClient:
             "max_tokens": max_tokens or self.settings.max_tokens,
             "temperature": temperature,
             "usage": {"include": True},  # ask OpenRouter to report tokens and cost
+            **(extra_body or {}),
         }
         attempts: list[Attempt] = []
         for number in range(1, self.settings.max_retries + 2):

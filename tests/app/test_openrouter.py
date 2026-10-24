@@ -390,12 +390,12 @@ def clean_env(monkeypatch):
             monkeypatch.delenv(name)
 
 
-def test_generation_limit_defaults_to_6000_and_is_configurable(tmp_path, monkeypatch):
+def test_generation_limit_defaults_to_4000_and_is_configurable(tmp_path, monkeypatch):
     clean_env(monkeypatch)
     env = tmp_path / ".env"
     env.write_text(f"OPENROUTER_API_KEY={KEY}\n", encoding="utf-8")
     settings = LlmSettings.load(env)
-    assert settings.generation_max_tokens == 6000 and settings.max_tokens == 1024
+    assert settings.generation_max_tokens == 4000 and settings.max_tokens == 1024  # restored in T012
     monkeypatch.setenv("OPENROUTER_GENERATION_MAX_TOKENS", "8000")
     assert LlmSettings.load(env).generation_max_tokens == 8000
 
@@ -447,3 +447,68 @@ def test_truncated_generation_falls_back_and_is_recorded():
     assert (first["status"], first["error_kind"], first["tokens_out"]) == ("invalid_output", "truncated", 6000)
     assert [json.loads(r.content)["max_tokens"] for r in fake.requests
             if r.url.path.endswith("/chat/completions")] == [6000, 6000]
+
+
+# ---------------------------------------------------------------- routing by purpose and reasoning control (T012)
+
+REASONING_MODELS = {"data": [
+    {"id": "acme/think:free", "name": "Think", "context_length": 200000, "pricing": {"prompt": "0", "completion": "0"},
+     "supported_parameters": ["max_tokens", "reasoning", "include_reasoning"]},
+    {"id": "acme/vision:free", "name": "Vision", "context_length": 100000,
+     "pricing": {"prompt": "0", "completion": "0"}, "supported_parameters": ["max_tokens", "reasoning"]},
+    {"id": "acme/plain:free", "name": "Plain", "context_length": 50000, "pricing": {"prompt": "0", "completion": "0"},
+     "supported_parameters": ["max_tokens"]},
+]}
+
+
+def sent(fake):
+    return [(json.loads(r.content)["model"], json.loads(r.content).get("reasoning"))
+            for r in fake.requests if r.url.path.endswith("/chat/completions")]
+
+
+def test_settings_defaults_for_generation_routing(tmp_path, monkeypatch):
+    clean_env(monkeypatch)
+    env = tmp_path / ".env"
+    env.write_text(f"OPENROUTER_API_KEY={KEY}\n", encoding="utf-8")
+    settings = LlmSettings.load(env)
+    assert settings.generation_excluded_models == ("nvidia/nemotron-3.5-super-vl:free",)
+    assert settings.generation_reasoning_effort == ""
+    monkeypatch.setenv("OPENROUTER_GENERATION_REASONING_EFFORT", "LOW")
+    assert LlmSettings.load(env).generation_reasoning_effort == "low"
+    monkeypatch.setenv("OPENROUTER_GENERATION_REASONING_EFFORT", "none")
+    with pytest.raises(LlmConfigurationError):
+        LlmSettings.load(env)
+
+
+def test_excluded_model_never_generates_but_still_solves_and_reviews(monkeypatch):
+    monkeypatch.setattr(sys.modules[__name__], "MODELS", REASONING_MODELS)
+    fake = FakeOpenRouter({"acme/think:free": [(502, {}, {})]})
+    client, _ = make(fake, free_models=("acme/think:free", "acme/vision:free", "acme/plain:free"),
+                     generation_excluded_models=("acme/vision:free",), max_retries=0)
+    gen = route(client, MemoryUsageStore(), MSG, "generation")
+    assert gen.candidates == ["acme/think:free", "acme/plain:free"]
+    assert gen.final.model_requested == "acme/plain:free"   # fallback skips the excluded model
+    for purpose in ("independent_solve", "review"):
+        assert "acme/vision:free" in route(client, MemoryUsageStore(), MSG, purpose).candidates
+
+
+def test_reasoning_sent_only_for_generation_and_only_when_supported(monkeypatch):
+    monkeypatch.setattr(sys.modules[__name__], "MODELS", REASONING_MODELS)
+    fake = FakeOpenRouter({"acme/think:free": [(502, {}, {})]})
+    client, _ = make(fake, free_models=("acme/think:free", "acme/plain:free"), max_retries=0,
+                     generation_reasoning_effort="low")
+    route(client, MemoryUsageStore(), MSG, "generation")
+    assert sent(fake) == [("acme/think:free", {"effort": "low"}), ("acme/plain:free", None)]
+    fake.requests.clear()
+    route(client, MemoryUsageStore(), MSG, "independent_solve")
+    route(client, MemoryUsageStore(), MSG, "review")
+    assert sent(fake) and all(reasoning is None for _, reasoning in sent(fake))
+
+
+def test_no_reasoning_field_when_setting_is_empty(monkeypatch):
+    monkeypatch.setattr(sys.modules[__name__], "MODELS", REASONING_MODELS)
+    fake = FakeOpenRouter()
+    client, _ = make(fake, free_models=("acme/think:free",))
+    route(client, MemoryUsageStore(), MSG, "generation")
+    body = json.loads(next(r for r in fake.requests if r.url.path.endswith("/chat/completions")).content)
+    assert "reasoning" not in body and body["usage"] == {"include": True}

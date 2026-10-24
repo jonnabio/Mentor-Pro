@@ -49,6 +49,19 @@ def free_candidates(client: OpenRouterClient) -> list[str]:
     return [m.id for m in discovered[:AUTO_FREE_LIMIT]]
 
 
+def supports(client: OpenRouterClient, model: str, parameter: str) -> bool:
+    info = next((m for m in client.list_models() if m.id == model), None)
+    return info is not None and parameter in info.supported_parameters
+
+
+def reasoning_body(client: OpenRouterClient, model: str, purpose: str) -> dict[str, Any] | None:
+    """Reduced reasoning for question generation only, and only for models that list `reasoning`."""
+    effort = client.settings.generation_reasoning_effort
+    if purpose != "generation" or not effort or not supports(client, model, "reasoning"):
+        return None
+    return {"reasoning": {"effort": effort}}
+
+
 def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]], purpose: str,
           max_tokens: int | None = None, request_id: str | None = None,
           avoid: frozenset[str] = frozenset(), practice_set_id: str | None = None,
@@ -68,6 +81,9 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
         return RouteResult(status="auth_error", message=str(exc))
     except TransientError as exc:
         return RouteResult(status="discovery_error", message=str(exc))
+    if purpose == "generation":
+        # T012: some models are kept for blind solve and review but never generate questions.
+        free = [m for m in free if m not in settings.generation_excluded_models]
     free = [m for m in free if m not in avoid] + [m for m in free if m in avoid]
     plan = [(m, "free") for m in free]
     if settings.allow_paid and settings.paid_model:
@@ -89,7 +105,8 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
             return False
 
         try:
-            attempts = client.chat(model, messages, max_tokens=max_tokens, before_attempt=reserve)
+            attempts = client.chat(model, messages, max_tokens=max_tokens, before_attempt=reserve,
+                                   extra_body=reasoning_body(client, model, purpose))
         except AuthenticationError as exc:
             gate.settle(reserved[0], reserved[0] if tier == "paid" else 0)
             return RouteResult(status="auth_error", candidates=result.candidates, records=result.records,

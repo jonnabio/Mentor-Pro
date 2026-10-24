@@ -363,7 +363,7 @@ def test_only_generation_uses_the_configurable_limit(catalog_conn):
     assert fake.max_tokens == {"generation": [7000], "solve": [2000], "rubric": [3000]}
 
 
-def test_default_generation_limit_is_6000(catalog_conn):
+def test_default_generation_limit_is_4000(catalog_conn):
     fake = FakeLlm([MATH_ITEM])
     generate_one(client_for(fake), MemoryUsageStore(), bundle(catalog_conn), "easy")
-    assert fake.max_tokens["generation"] == [6000] and fake.max_tokens["rubric"] == [3000]
+    assert fake.max_tokens["generation"] == [4000] and fake.max_tokens["rubric"] == [3000]
