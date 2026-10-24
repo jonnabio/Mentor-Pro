@@ -1,7 +1,9 @@
 """Repeat-aware learning status per objective and subject (T014, ADR-015).
 
 Single anonymous student: every recorded answer in `practice.answer` belongs to
-that student, whatever the session or browser tab. A question is identified by
+that student, whatever the session or browser tab, except sessions classified
+`automated_test` or `quarantined` (ADR-017), which are left out before attempts
+are numbered. A question is identified by
 its canonical `item_id`, so a bank question served again in another practice
 is a repeat. The first answer to each distinct question is its first attempt;
 mastery accuracy uses first attempts only, so repeating a question can never
@@ -85,7 +87,9 @@ SELECT i.objective_code, i.evidence_id, i.item->>'item_id' AS question_id, a.is_
 FROM practice.answer a
 JOIN practice.item i USING (session_id, slot)
 JOIN practice.session s USING (session_id)
-WHERE s.subject = %s AND s.baseline_version = %s
+WHERE s.subject = %s AND s.baseline_version = %s AND NOT EXISTS (
+    SELECT 1 FROM practice.session_classification c
+    WHERE c.session_id = s.session_id AND c.classification <> 'student')
 """
 
 

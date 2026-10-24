@@ -102,7 +102,11 @@ class QuestionBank:
         PostgreSQL is the source of truth for exposure across practices, tabs and browser sessions.
         """
         with self._connect() as conn:
-            rows = conn.execute("SELECT DISTINCT item->>'item_id' AS item_id FROM practice.item").fetchall()
+            rows = conn.execute(  # student exposure only: classified test sessions are not history (ADR-017)
+                """SELECT DISTINCT i.item->>'item_id' AS item_id FROM practice.item i
+                   WHERE NOT EXISTS (SELECT 1 FROM practice.session_classification c
+                                     WHERE c.session_id = i.session_id AND c.classification <> 'student')"""
+            ).fetchall()
         return {r["item_id"] for r in rows}
 
     def compose(self, catalog: psycopg.Connection, baseline: str, subject: str, allocation: list[dict[str, Any]],

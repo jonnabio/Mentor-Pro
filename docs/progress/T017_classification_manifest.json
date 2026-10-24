@@ -1,0 +1,481 @@
+{
+ "audit_ref": "T017-2026-10-24",
+ "sessions": {
+  "0146de8246f2056ed046aa443c740ff2": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "021d7f83fca0855b92e0af402cd49825": {
+   "answers": 5,
+   "class": "presumed_student"
+  },
+  "039cb7229f1148672f5c23142aaa835e": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "062593fd4582c17b3702e6849644d7c9": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "089a858f727d2511ad833f55f949193d": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "0c220b74fce88cbd98a93d5c60ed2a00": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "0e7e5caec9241898ec532bfe9beee81a": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "0fcfd2feb73fcf9d8f9da4942a48d99c": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "100c6a5904b61f1e005ca5af222ca59b": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "114afad319838174297a4e2a685a0c08": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "128cf1b3a344bb37d16832cd7933ad2e": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "130ebac036cfca4766f099a2e593064b": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "1380fa29113f20a80f5a527d3166a0d3": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "13c9380839b584931f1f108372de57bb": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "1741896654a28c35a477ed9bbf6ee077": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "1cbe3cda0cab0e9635971ac2f19e4061": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "1e32b622a79fc6ba7cc17eace6785979": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "23e921afbec0e40d43434a0bf273f1f5": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "25f6b6d58a556269f8cc978003a16a38": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "29e84b122392d161bdca1b17f22b4a70": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "2ebaa3044aec932aabdebfed576392bb": {
+   "answers": 4,
+   "class": "probable_test"
+  },
+  "314f3f7d1c03dd0e019bb214baf1f8eb": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "321e5813abef68f395df142cf34223e9": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "3358cfc37574e583fd1cd6a62c3997aa": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "34c3baf53f54d622f4a56e12b3fde20c": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "3b4ca743b3627b20b054b803bf6d71fc": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "3b7b5f17bd1795bc307dc4a9f11a8c07": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "3c443f867344c1965749533fed8f4dce": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "41b933e03bbd54e719a9664ecfe8bdc0": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "42ca8d737c94c34a91b3956a37f13160": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "4651df3326283219efb81f1bf4cd5baa": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "490386df4969cf6d7e82a994d529aea1": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "49257d921911804c3d3363bfe60d89d8": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "4b180ed4fd64f4f3d5a9794dc162a3d4": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "4d2c0cd314af53c0adb2320f80ad5934": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "4e94a1d35ff8a6c5be6e1302057f90c6": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "573772cc0da4fc316e55f0fbdf3bcd41": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "58904b3d996d9d45388fb7bda290c4ec": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "594a8062849a7a791e8c70d13823ab52": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "5a40be2e40421752b022de468f99af30": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "5c6647d1faeb45854a7baaeda0d5bac5": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "5ef328bb2aa7b6f4c2ed75963449a854": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "60378d03f35fccf485cf0323b2032bbf": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "618f5ee1e9cd91b968d05290957bb558": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "655034d326be8c29db6db6a8e38f82db": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "69ebb2addece875b0e6aa223efa52c7b": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "6b0dd819d4c75073b5946acda3439dd2": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "6c523f88a7da9913ff5afe401e0afa31": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "6c5d81ae1b196135252a9994ba923369": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "6e06f024a43e7229a59864de27642144": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "6e3b83102120262b5a1b1af19f395ea2": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "70ca8235b8f2e16fdf0c01f160e4551d": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "75b0d01273840a29d2cf38c3742c7593": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "779e5ad798587e17932736337f9e274d": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "7846954a731d8467c84e93d49a1c292f": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "78a8566e8cd261ec02d3a112798c6078": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "796e148c95ad24ca9766e513a09d950a": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "7b6b6971924e4e183680103149252b13": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "7d51d3045122c18987388dbd0e05b09c": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "7f549cc62e1ab4f1743dc1bfbbb857a4": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "870eccf0f86cc659ac9220ad2801e6aa": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "89cdf62d2f4832bb359248062c1057b0": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "89d7dd9af2a2875d13789ad0d810df57": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "8a42943870de6f62bb904dae4da0eecc": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "8d9488142ebb9b2311e2168b99b26d70": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "8e57fa5a67df1dee279a758a3a1588d4": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "8f1ab1f1b8b6ae6e0826d4d6166831de": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "92a48589c7be838f22326b451ed47783": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "96adfaf585b1dc42748395d65a94a557": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "989d781d44c075f6c008fcb89ad4d6af": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "98d0352c177b8924be5154a9e8a5fba8": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "9a94a75783fc6117d2db803795fcb3ad": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "9d6360058cbd444590e942597d552638": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "9e906b3db6b5564171e180c832300ce1": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "a4b93f0d109305e84e3e43f9a80c17ea": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "a53b861216dddb8c9bede8024a152f37": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "a5865e9822f1bd3ef886e8de7c7a6079": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "a5cee8e3fc7d04bffc8f7960ff715530": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "a613e56614f3881f4cc0920a3d35d5e1": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "a6a17a066f4fe1d485f68e837a56f53a": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "a83e05eb501f4428063627c9ae4436e0": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "a9de2dde5baaf466b3bb44fdfcd47dd9": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "aca0d808549b000d7fb4ca6f8a186fa8": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "afd8734645e75b4dfef1a8f2676cee3f": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "b1ee6e6d3667a5cb0df6300c182cd2d5": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "b25ee7ac89992fc4af598320f10be14e": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "b65b610ff1923a0fecb60c92320073b2": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "ba73bd7813fb71c54dfb910c609d8564": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "bac7a5b55a5cf96c5226f607d521f594": {
+   "answers": 0,
+   "class": "presumed_student"
+  },
+  "baee3ed9fb466e1aa46342fe73e78db1": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "bd9a1bcfc4576f308d60fcbfff540f0a": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "bf01fce70a0c239bd71fd0e16c6b60f4": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "c096f195abba94cd118bf83f5a27a046": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "c21529cfc6e1437687f82361b4e48dc9": {
+   "answers": 1,
+   "class": "confirmed_test"
+  },
+  "c2ede106c8f8308bead707477d4e5d2a": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "c97ca499eadb67ac855be9656199642f": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "ca1c4a9c4ca130d262df2a8395850723": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "ce0ca5336f2fcad7d08ebb9f10efeda8": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "ce3e7a38d7c57cbd37cef321700eb686": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "d10545e3329c138ec547513117823f7e": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "d2ebe9f108bbbdccef3f156bf03506fe": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "d6641d630d8166f0e0ea12409261423f": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "d7c9dd141b1cf9783558cee57b3fc884": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "d9a527ef387cb5f041ecd5aaf1678724": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "d9a634a65f639c99fe91a50739f54835": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "dc0130eeee2fcfbfd4c232f7d8d8d6bd": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "dd9b7e252b1c6ea3387f0c48a866c06a": {
+   "answers": 5,
+   "class": "probable_test"
+  },
+  "de3384c0a5a8dcae18d191aaffaf7197": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "e4477c96fb85c349388554dd749ea35e": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "e47a3b0d4dbb551d472524088d6461ff": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "f04e2d8cd325f19075f60e7498441d53": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "f0872010979f2ed2cbf9ea8c019aed8b": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "f12705b8fe1830d64d3e3e54ce67242c": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "f17368f872154be79366c22dd0ba5087": {
+   "answers": 0,
+   "class": "confirmed_test"
+  },
+  "f50b7e12e6b27c68eee6d49da003a307": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "fa72cb389c32f80c2755586f0079c1fa": {
+   "answers": 4,
+   "class": "probable_test"
+  },
+  "fb8068dc5fe23b668dd70f9dec4aa05d": {
+   "answers": 2,
+   "class": "confirmed_test"
+  },
+  "fe2a91a2aad38d387d16d51fcb6b73be": {
+   "answers": 5,
+   "class": "confirmed_test"
+  },
+  "fe436e0cbd8e60afbb7661c899a259e0": {
+   "answers": 0,
+   "class": "confirmed_test"
+  }
+ }
+}

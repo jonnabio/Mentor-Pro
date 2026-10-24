@@ -527,6 +527,39 @@
       "result_file": "docs/progress/task_T016_result.md",
       "failures": [],
       "notes": "Suite 375; browser mock 182/182 on mentor_pro_test; student database unchanged."
+    },
+    {
+      "id": "T017",
+      "name": "Historical test data cleanup and learning integrity (PO task T017)",
+      "objective": "Classify historical sessions (automated_test, quarantined, student) without deleting; dashboard and exposure use student sessions only; backup, dry run, audit, rollback.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-017-session-classification.md",
+          "scripts/dev/classify_sessions.py",
+          "docs/progress/T017_classification_manifest.json",
+          "docs/progress/T017_metrics.json",
+          "tests/app/test_session_classification.py",
+          "docs/progress/task_T017_result.md"
+        ],
+        "modify": [
+          "app/practice/store.py",
+          "app/practice/mastery.py",
+          "app/practice/bank.py",
+          "app/main.py",
+          "tests/app/test_mastery.py"
+        ]
+      },
+      "depends_on": [
+        "T016"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T017_result.md",
+      "failures": [],
+      "notes": "103 automated_test, 14 quarantined, 2 student; suite 382; browser mock 182/182."
     }
   ]
 }

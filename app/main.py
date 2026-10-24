@@ -141,6 +141,7 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
     def dashboard(conn: psycopg.Connection = Depends(catalog)) -> dict:
         """Learning status for every selectable objective, from recorded answers (T014)."""
         thresholds = Thresholds.from_env()
+        app.state.practice.get()  # practice tables, including session_classification (ADR-017), exist
         subjects = []
         for code, name in SUBJECTS:
             summary = subject_dashboard(conn, baseline, code, list_objectives(conn, baseline, code), thresholds)

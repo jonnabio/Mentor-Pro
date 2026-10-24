@@ -71,7 +71,8 @@ def history(synthetic_client):
     def clean():
         with psycopg.connect(url, autocommit=True) as conn:
             sessions = "SELECT session_id FROM practice.session WHERE baseline_version = %s"
-            conn.execute(f"DELETE FROM practice.answer WHERE session_id IN ({sessions})", (SYNTHETIC,))
+            for table in ("classification_audit", "session_classification", "answer"):
+                conn.execute(f"DELETE FROM practice.{table} WHERE session_id IN ({sessions})", (SYNTHETIC,))
             conn.execute(f"DELETE FROM practice.item WHERE session_id IN ({sessions})", (SYNTHETIC,))
             conn.execute("DELETE FROM practice.session WHERE baseline_version = %s", (SYNTHETIC,))
 
@@ -86,6 +87,7 @@ def history(synthetic_client):
         store.finish(session["session_id"], "complete", None, None, items)
         for slot, label in answers.items():
             store.answer(session["session_id"], slot, label, label == questions[slot - 1][2])
+        return session["session_id"]
 
     clean()
     client = TestClient(create_app(url, schema, SYNTHETIC))
@@ -178,3 +180,48 @@ def test_generated_questions_without_answers_do_not_affect_progress(history):
     subject, m02 = objective()
     assert (m02["total_answers"], m02["distinct_questions"], m02["status"]) == (0, 0, "unpracticed")
     assert subject["status_counts"]["unpracticed"] == subject["objective_count"]
+
+
+def classify_session(url, session_id, classification):
+    with psycopg.connect(url, autocommit=True) as conn:
+        conn.execute("""INSERT INTO practice.session_classification (session_id, classification, reason, audit_ref)
+                        VALUES (%s, %s, 'test', 'test-ref')""", (session_id, classification))
+
+
+@pytest.mark.parametrize("excluded", ["automated_test", "quarantined"])
+def test_classified_sessions_are_excluded_and_first_attempts_recomputed(history, excluded):
+    """T017: excluded sessions vanish before attempts are numbered; the student's later answer becomes first."""
+    record, objective, url = history
+    test_session = record([("M02", f"Q-{n}", "A") for n in range(5)], {n: "A" for n in range(1, 6)})
+    record([("M02", "Q-0", "A")], {1: "B"})  # student, later, wrong
+    _, m02 = objective()
+    assert (m02["total_answers"], m02["repeat_answers"], m02["first_attempt_correct"]) == (6, 1, 5)
+    classify_session(url, test_session, excluded)
+    _, m02 = objective()
+    assert (m02["total_answers"], m02["distinct_questions"], m02["first_attempt_correct"]) == (1, 1, 0)
+    assert m02["repeat_answers"] == 0 and m02["status"] == "insufficient_evidence"
+
+
+def test_student_classification_and_cancelled_student_practices_still_count(history):
+    record, objective, url = history
+    kept = record([("M02", f"Q-{n}", "A") for n in range(5)], {1: "A", 2: "B"})
+    classify_session(url, kept, "student")
+    with psycopg.connect(url, autocommit=True) as conn:
+        conn.execute("UPDATE practice.session SET cancelled_at = now() WHERE session_id = %s", (kept,))
+    subject, m02 = objective()
+    assert (m02["total_answers"], m02["first_attempt_correct"]) == (2, 1)  # 3 unanswered: not incorrect
+    assert len(subject["objectives"]) == subject["objective_count"]
+    assert sum(subject["status_counts"].values()) == subject["objective_count"]
+
+
+def test_exposure_history_ignores_classified_sessions(history):
+    from app.practice.bank import QuestionBank
+
+    record, _, url = history
+    test_session = record([("M02", "Q-test-only", "A")], {1: "A"})
+    record([("M02", "Q-student", "A")], {})
+    bank = QuestionBank(url)
+    assert {"Q-test-only", "Q-student"} <= bank.seen_questions()
+    classify_session(url, test_session, "automated_test")
+    seen = bank.seen_questions()
+    assert "Q-student" in seen and "Q-test-only" not in seen

@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T016)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T017)
 
 ## Current Objective
 
@@ -57,6 +57,10 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   the student database (pytest exit 4, `practice_e2e.py` exit 2); read-only
   report of historical test records, nothing deleted
   ([ADR-016](../adr/ADR-016-test-database-isolation.md)).
+- **T017** — `practice.session_classification`: 103 sessions
+  `automated_test`, 14 `quarantined`, 2 `student` (audit `T017-2026-10-24`);
+  dashboard and exposure history use student sessions only; nothing deleted
+  ([ADR-017](../adr/ADR-017-session-classification.md)).
 
 ### Current State
 
@@ -72,15 +76,14 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 375 passing; browser (mocked) 182/182 and live 14/14 on
+- Tests: 382 passing; browser (mocked) 182/182 and live 14/14 on
   `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Product Owner decision on cleanup of historical test records
-   (`docs/progress/T016_test_data_report.md`): 103 confirmed and 14 probable
-   test sessions. No cleanup without explicit approval.
+1. Optional: review the 14 quarantined sessions; reclassify with a new
+   audit reference if any were real student practice.
 2. Restore a generation model fallback: only Nemotron 3 Ultra generates
    (MiniMax M3.1 Flash unlisted, Super VL excluded). Add another free text
    model to `OPENROUTER_FREE_MODELS` or evaluate the reasoning-effort setting
@@ -91,9 +94,9 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 
 ### Blockers/Issues
 
-- **Historical test data in the student history:** 308 confirmed and 68
-  probable test answers of 381 still appear in the dashboard until cleanup
-  is approved. New automated runs can no longer add any.
+- Student dashboard now reflects 5 answers (Ciencias C06). Backup before
+  T017: `%USERPROFILE%\mentor-pro-backups\mentor_pro_pre_T017_2026-10-24.dump`;
+  rollback: `scripts/dev/classify_sessions.py --rollback T017-2026-10-24`.
 - **No generation fallback model** (see Next Steps 2); free models also
   truncate or return 502 often.
 - Rubric and blind solve come from free models; bank quality inherits them.
@@ -134,5 +137,5 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-016](../adr/ADR-016-test-database-isolation.md)
+  [ADR-017](../adr/ADR-017-session-classification.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001, RCA-002)

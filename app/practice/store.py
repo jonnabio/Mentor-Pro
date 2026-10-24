@@ -65,6 +65,24 @@ CREATE TABLE IF NOT EXISTS practice.answer (
     PRIMARY KEY (session_id, slot),
     FOREIGN KEY (session_id, slot) REFERENCES practice.item (session_id, slot)
 );
+-- T017 (ADR-017): sessions without a row are student sessions; others are excluded from learning metrics.
+CREATE TABLE IF NOT EXISTS practice.session_classification (
+    session_id      TEXT PRIMARY KEY REFERENCES practice.session (session_id),
+    classification  TEXT NOT NULL CHECK (classification IN ('student', 'automated_test', 'quarantined')),
+    reason          TEXT NOT NULL,
+    audit_ref       TEXT NOT NULL,
+    classified_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS practice.classification_audit (
+    audit_id        BIGSERIAL PRIMARY KEY,
+    session_id      TEXT NOT NULL REFERENCES practice.session (session_id),
+    action          TEXT NOT NULL CHECK (action IN ('classify', 'rollback')),
+    previous        TEXT,
+    classification  TEXT,
+    reason          TEXT NOT NULL,
+    audit_ref       TEXT NOT NULL,
+    recorded_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 

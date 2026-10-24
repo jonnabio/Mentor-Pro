@@ -1,0 +1,134 @@
+{
+ "before": {
+  "espanol": {
+   "objective_count": 8,
+   "total_answers": 77,
+   "practice_accuracy": 0.7142857142857143,
+   "distinct_questions": 77,
+   "mastery_accuracy": 0.7142857142857143,
+   "repeat_exposure_rate": 0.0,
+   "status_counts": {
+    "unpracticed": 6,
+    "insufficient_evidence": 0,
+    "needs_reinforcement": 0,
+    "in_progress": 1,
+    "good_proficiency": 0,
+    "consolidated_mastery": 1
+   }
+  },
+  "matematicas": {
+   "objective_count": 22,
+   "total_answers": 178,
+   "practice_accuracy": 0.5842696629213483,
+   "distinct_questions": 145,
+   "mastery_accuracy": 0.6689655172413793,
+   "repeat_exposure_rate": 0.1853932584269663,
+   "status_counts": {
+    "unpracticed": 15,
+    "insufficient_evidence": 1,
+    "needs_reinforcement": 2,
+    "in_progress": 1,
+    "good_proficiency": 1,
+    "consolidated_mastery": 2
+   }
+  },
+  "ciencias": {
+   "objective_count": 19,
+   "total_answers": 71,
+   "practice_accuracy": 0.6901408450704225,
+   "distinct_questions": 71,
+   "mastery_accuracy": 0.6901408450704225,
+   "repeat_exposure_rate": 0.0,
+   "status_counts": {
+    "unpracticed": 16,
+    "insufficient_evidence": 0,
+    "needs_reinforcement": 1,
+    "in_progress": 0,
+    "good_proficiency": 0,
+    "consolidated_mastery": 2
+   }
+  },
+  "estudios_sociales": {
+   "objective_count": 29,
+   "total_answers": 55,
+   "practice_accuracy": 0.8,
+   "distinct_questions": 55,
+   "mastery_accuracy": 0.8,
+   "repeat_exposure_rate": 0.0,
+   "status_counts": {
+    "unpracticed": 27,
+    "insufficient_evidence": 0,
+    "needs_reinforcement": 0,
+    "in_progress": 1,
+    "good_proficiency": 0,
+    "consolidated_mastery": 1
+   }
+  }
+ },
+ "after": {
+  "espanol": {
+   "objective_count": 8,
+   "total_answers": 0,
+   "practice_accuracy": null,
+   "distinct_questions": 0,
+   "mastery_accuracy": null,
+   "repeat_exposure_rate": null,
+   "status_counts": {
+    "unpracticed": 8,
+    "insufficient_evidence": 0,
+    "needs_reinforcement": 0,
+    "in_progress": 0,
+    "good_proficiency": 0,
+    "consolidated_mastery": 0
+   }
+  },
+  "matematicas": {
+   "objective_count": 22,
+   "total_answers": 0,
+   "practice_accuracy": null,
+   "distinct_questions": 0,
+   "mastery_accuracy": null,
+   "repeat_exposure_rate": null,
+   "status_counts": {
+    "unpracticed": 22,
+    "insufficient_evidence": 0,
+    "needs_reinforcement": 0,
+    "in_progress": 0,
+    "good_proficiency": 0,
+    "consolidated_mastery": 0
+   }
+  },
+  "ciencias": {
+   "objective_count": 19,
+   "total_answers": 5,
+   "practice_accuracy": 1.0,
+   "distinct_questions": 5,
+   "mastery_accuracy": 1.0,
+   "repeat_exposure_rate": 0.0,
+   "status_counts": {
+    "unpracticed": 18,
+    "insufficient_evidence": 0,
+    "needs_reinforcement": 0,
+    "in_progress": 0,
+    "good_proficiency": 0,
+    "consolidated_mastery": 1
+   }
+  },
+  "estudios_sociales": {
+   "objective_count": 29,
+   "total_answers": 0,
+   "practice_accuracy": null,
+   "distinct_questions": 0,
+   "mastery_accuracy": null,
+   "repeat_exposure_rate": null,
+   "status_counts": {
+    "unpracticed": 29,
+    "insufficient_evidence": 0,
+    "needs_reinforcement": 0,
+    "in_progress": 0,
+    "good_proficiency": 0,
+    "consolidated_mastery": 0
+   }
+  }
+ }
+}
