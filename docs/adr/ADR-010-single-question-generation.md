@@ -61,6 +61,12 @@ rejected, and the key must not reach students before they answer.
   is `length`, `native_finish_reason` is a length reason, or no reason is
   given and output tokens reach the limit; empty content is invalid output.
   Truncation stays recorded as `invalid_output` / `truncated`.
+- T012: generation default restored to 4000 (6000 showed no gain).
+  `OPENROUTER_GENERATION_EXCLUDED_MODELS` (default Nemotron 3.5 Super VL)
+  removes models from generation routing only; blind solve and review still
+  use them. Optional `OPENROUTER_GENERATION_REASONING_EFFORT` sends
+  `reasoning: {effort}` on generation calls only, and only to models whose
+  OpenRouter listing includes `reasoning` in `supported_parameters`.
 
 ### Live hardening (2026-10-22)
 

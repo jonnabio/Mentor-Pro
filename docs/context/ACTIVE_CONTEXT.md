@@ -8,7 +8,7 @@
 
 ## Current Objective
 
-T011 (generation truncation) is complete. Next: the next Product
+T012 (navigation, generation routing) is complete. Next: the next Product
 Owner task after approval (not 10–30 question sets, answering or frontend
 without it).
 
@@ -59,6 +59,10 @@ without it).
 - T011 — `OPENROUTER_GENERATION_MAX_TOKENS` (default 6000), explicit
   truncation detection. Live probe: no measured reliability gain, higher
   latency (`docs/progress/task_T011_result.md`).
+- T012 — results/failed screens: "Nueva práctica" and "Volver al menú
+  principal" (no new job). Generation default 4000; Super VL excluded from
+  generation only; optional `OPENROUTER_GENERATION_REASONING_EFFORT` (off)
+  (`docs/progress/task_T012_result.md`).
 
 ### Current State
 
@@ -69,13 +73,13 @@ without it).
   `MENTOR_PRO_DEV_ENDPOINTS=true`.
 - Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`,
   `generation.practice_set`, `generation.practice_set_item`.
-- Tests: 328 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tests: 332 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Plan the next PO task with an ADR first. Truncation persists at 6000
-   (runaway reasoning); candidate levers: OpenRouter `reasoning` limits,
-   dropping Nemotron 3.5 Super VL from generation fallback (needs approval).
+1. Plan the next PO task with an ADR first. Only Nemotron 3 Ultra generates
+   now (MiniMax unlisted, VL excluded): no generation model fallback. The
+   reasoning-effort setting is untested live.
 2. Property cues are keyword heuristics (T009 limitations); a typed
    property check (divisibility, parity) would make such keys provable.
 3. Human spot checks of rubric scores (`question-evaluation`).

@@ -364,6 +364,38 @@
       "result_file": "docs/progress/task_T011_result.md",
       "failures": [],
       "notes": "Probe at 6000: truncation 7/19 (36.8%) vs 21/104 (20.2%) at 4000, p=0.14; median latency 61 s vs 39 s. No measured improvement."
+    },
+    {
+      "id": "T012",
+      "name": "Navigation fix and OpenRouter generation optimization (PO T012)",
+      "objective": "Results/failed screens offer 'Nueva práctica' and 'Volver al menú principal' without new jobs; generation default 4000, Super VL excluded from generation, optional reasoning effort for supporting models.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T012_result.md"
+        ],
+        "modify": [
+          "app/static/",
+          "app/llm/settings.py",
+          "app/llm/router.py",
+          "app/llm/client.py",
+          "scripts/dev/practice_e2e.py",
+          "tests/app/test_openrouter.py",
+          "tests/app/test_generation.py",
+          ".env.example",
+          "docs/adr/ADR-010-single-question-generation.md"
+        ]
+      },
+      "depends_on": [
+        "T011"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T012_result.md",
+      "failures": [],
+      "notes": "Browser 114/114. Only Nemotron 3 Ultra remains for generation (MiniMax unlisted, VL excluded): no model fallback."
     }
   ]
 }
