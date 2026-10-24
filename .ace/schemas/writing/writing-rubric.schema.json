@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mentor-pro.local/schemas/writing/writing-rubric.schema.json",
+  "title": "WritingRubric",
+  "description": "Verbatim transcription of an official written-production rubric: dimensions, criteria and 0-4 descriptors (ADR-019).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "rubric_id", "title_es", "source", "scale", "counting_note_es", "dimensions", "criteria"],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "rubric_id": { "type": "string", "pattern": "^[A-Z0-9-]+$" },
+    "title_es": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "file_name", "file_sha256", "publisher_es", "date_es", "transcription"],
+      "properties": {
+        "document_id": { "type": "string" },
+        "file_name": { "type": "string" },
+        "file_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "publisher_es": { "type": "string" },
+        "date_es": { "type": "string" },
+        "transcription": { "type": "string" }
+      }
+    },
+    "scale": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": { "min": { "const": 0 }, "max": { "const": 4 } }
+    },
+    "counting_note_es": { "type": "string", "minLength": 1 },
+    "dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ordinal", "name_es", "weight_pct"],
+        "properties": {
+          "ordinal": { "type": "integer", "minimum": 1 },
+          "name_es": { "type": "string", "minLength": 1 },
+          "weight_pct": { "type": "integer", "minimum": 0, "maximum": 100 }
+        }
+      }
+    },
+    "criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "rubric_number", "dimension", "pages", "statement_es", "descriptors_es"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^EE(0[1-9]|1[0-9]|20)$" },
+          "rubric_number": { "type": "integer", "minimum": 1 },
+          "dimension": { "type": "integer", "minimum": 1 },
+          "pages": { "type": "array", "minItems": 1, "items": { "type": "integer", "minimum": 1 } },
+          "statement_es": { "type": "string", "minLength": 1 },
+          "descriptors_es": {
+            "description": "Index = points (0..4).",
+            "type": "array", "minItems": 5, "maxItems": 5,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "transcription_note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

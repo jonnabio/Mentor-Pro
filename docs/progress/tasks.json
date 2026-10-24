@@ -619,6 +619,35 @@
       "result_file": "docs/progress/task_T019_result.md",
       "failures": [],
       "notes": "Suite 386; browser 259/259 (3 runs); T015 partial-exit test race fixed."
+    },
+    {
+      "id": "T020",
+      "name": "Producción escrita foundation (PO task T020)",
+      "objective": "Rubric transcription, five exercise levels mapped to EE01-EE20, exercise and human-evaluation contracts, writing schema, separate progress; no generation or UI.",
+      "status": "verified",
+      "role": "Architect",
+      "files": {
+        "create": [
+          "docs/adr/ADR-019-produccion-escrita-foundation.md",
+          "docs/planning/2026-10-24-produccion-escrita-mapping.md",
+          "curriculum/writing/MEP-RUBRICA-PE-2026.json",
+          "curriculum/writing/exercise-levels.json",
+          ".ace/schemas/writing/",
+          "app/writing/",
+          "tests/app/test_writing.py",
+          "docs/progress/task_T020_result.md"
+        ],
+        "modify": []
+      },
+      "depends_on": [
+        "T019"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T020_result.md",
+      "failures": [],
+      "notes": "Suite 408; browser 259/259; EE05 wording difference recorded, baseline unchanged."
     }
   ]
 }

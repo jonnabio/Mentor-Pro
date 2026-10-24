@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mentor-pro.local/schemas/writing/writing-exercise.schema.json",
+  "title": "WritingExercise",
+  "description": "One Producción escrita exercise: task, deliverable, target EE criteria, evaluation parameters and provenance (ADR-019). Cross-record rules (level mapping, rubric references) are checked by app/writing/contracts.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "exercise_id", "level", "exercise_type", "difficulty", "language", "topic_es",
+               "communicative_situation_es", "instructions_es", "deliverable", "target_criteria", "evaluation",
+               "provenance"],
+  "$defs": {
+    "criterion": { "type": "string", "pattern": "^EE(0[1-9]|1[0-9]|20)$" }
+  },
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "exercise_id": { "type": "string", "pattern": "^PE-L[1-5]-[A-Za-z0-9-]{3,60}$" },
+    "level": { "enum": ["writing_conventions", "idea_development", "paragraph_writing", "guided_composition",
+                        "full_composition"] },
+    "exercise_type": { "enum": ["conventions_editing", "conventions_production", "introduction_paragraph",
+                                "development_paragraphs", "conclusion_paragraph", "guided_composition",
+                                "full_composition"] },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+    "language": { "const": "es-CR" },
+    "text_type": { "const": "expositivo" },
+    "topic_es": { "type": "string", "minLength": 3 },
+    "communicative_situation_es": { "type": "string", "minLength": 10 },
+    "suggested_ideas_es": { "type": "array", "items": { "type": "string", "minLength": 3 } },
+    "source_text_es": { "type": "string", "description": "Text to correct (conventions_editing) or to continue." },
+    "scaffolding_es": { "type": "array", "items": { "type": "string" },
+                        "description": "Paragraph plan, sentence starters or connectors (guided levels only)." },
+    "instructions_es": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 3 } },
+    "deliverable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description_es", "unit", "min", "max", "evidence_mode"],
+      "properties": {
+        "description_es": { "type": "string", "minLength": 3 },
+        "unit": { "enum": ["sentences", "paragraphs"] },
+        "min": { "type": "integer", "minimum": 1 },
+        "max": { "type": "integer", "minimum": 1 },
+        "words_target": { "type": "integer", "minimum": 1 },
+        "time_limit_min": { "type": "integer", "minimum": 1 },
+        "evidence_mode": { "enum": ["typed", "handwritten"] },
+        "materials_es": { "type": "string" }
+      }
+    },
+    "target_criteria": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/criterion" } },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evaluator", "rubric_id", "rubric_sha256", "scale", "counting_rule", "parameters"],
+      "properties": {
+        "evaluator": { "const": "human" },
+        "rubric_id": { "type": "string" },
+        "rubric_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "scale": {
+          "type": "object", "additionalProperties": false, "required": ["min", "max"],
+          "properties": { "min": { "const": 0 }, "max": { "const": 4 } }
+        },
+        "counting_rule": { "const": "identical_repetition_counts_once" },
+        "parameters": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["criterion", "rubric_ref", "applicability"],
+            "properties": {
+              "criterion": { "$ref": "#/$defs/criterion" },
+              "rubric_ref": { "type": "string", "pattern": "^[A-Z0-9-]+#EE(0[1-9]|1[0-9]|20)$" },
+              "applicability": { "enum": ["scored", "not_evaluable"] },
+              "not_evaluable_reason": { "enum": ["handwritten_evidence_required"] },
+              "guidance_es": { "type": "string" }
+            },
+            "if": { "properties": { "applicability": { "const": "not_evaluable" } } },
+            "then": { "required": ["not_evaluable_reason"] }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseline_version", "curriculum_records", "sources", "authored_by"],
+      "properties": {
+        "baseline_version": { "type": "string", "pattern": "^PNE[0-9]{4}-[A-Z]+-v[0-9]+\\.[0-9]+$" },
+        "curriculum_records": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["workbook_code", "assertion_id"],
+            "properties": {
+              "workbook_code": { "$ref": "#/$defs/criterion" },
+              "assertion_id": { "type": "string", "pattern": "^PNE[0-9]{4}-PRI-ESP-PE-B[1-5]-A([1-9]|1[0-9]|20)$" }
+            }
+          }
+        },
+        "sources": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["document_id", "role"],
+            "properties": {
+              "document_id": { "type": "string" },
+              "role": { "enum": ["rubric", "task_model", "topic_model"] },
+              "file_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        },
+        "authored_by": { "enum": ["human", "llm_draft_human_reviewed"] },
+        "created": { "type": "string", "format": "date" }
+      }
+    }
+  }
+}

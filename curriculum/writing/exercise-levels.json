@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "rubric_id": "MEP-RUBRICA-PE-2026",
+  "baseline_version": "PNE2026-SUM-v1.0",
+  "component_es": "Producción escrita",
+  "rules": {
+    "scoring": "Every scored criterion uses its official 0-4 descriptors unchanged; a level never scores part of a criterion.",
+    "handwritten_criteria": ["EE19", "EE20"],
+    "handwritten_rule": "EE19 and EE20 are scored only from handwritten evidence (the original sheet or an image of it). For a typed submission they are recorded as not_evaluable with reason handwritten_evidence_required."
+  },
+  "levels": [
+    {
+      "ordinal": 1,
+      "code": "writing_conventions",
+      "name_es": "Convenciones de escritura",
+      "purpose": "Linguistic conventions in a short text the student writes or corrects.",
+      "exercise_types": ["conventions_editing", "conventions_production"],
+      "deliverable": { "unit": "sentences", "min": 3, "max": 8, "evidence_modes": ["typed", "handwritten"] },
+      "core_criteria": [],
+      "allowed_criteria": ["EE07", "EE08", "EE09", "EE10", "EE11", "EE12", "EE13", "EE14", "EE15", "EE16", "EE17", "EE18"],
+      "min_target_criteria": 1,
+      "notes": "An exercise targets one or more convention criteria. The descriptor counts the non-normative uses that remain in the student's final text; the rubric note on identical repetitions applies."
+    },
+    {
+      "ordinal": 2,
+      "code": "idea_development",
+      "name_es": "Desarrollo de ideas",
+      "purpose": "From a topic and communicative situation, state a main idea and at least two complementary ideas in an introduction paragraph.",
+      "exercise_types": ["introduction_paragraph"],
+      "deliverable": { "unit": "paragraphs", "min": 1, "max": 1, "evidence_modes": ["typed", "handwritten"] },
+      "core_criteria": ["EE03", "EE04"],
+      "allowed_criteria": ["EE03", "EE04", "EE07", "EE08", "EE09", "EE10", "EE11", "EE12", "EE13", "EE14", "EE15", "EE16", "EE17", "EE18"],
+      "min_target_criteria": 2,
+      "notes": "The paragraph is an introduction, so EE04 applies with its full descriptors; EE03 judges digressions in that paragraph."
+    },
+    {
+      "ordinal": 3,
+      "code": "paragraph_writing",
+      "name_es": "Redacción de párrafos",
+      "purpose": "Write the development paragraphs (causes and consequences) or the conclusion paragraph (actions or solutions).",
+      "exercise_types": ["development_paragraphs", "conclusion_paragraph"],
+      "deliverable": { "unit": "paragraphs", "min": 1, "max": 2, "evidence_modes": ["typed", "handwritten"] },
+      "core_criteria": ["EE03"],
+      "type_core_criteria": { "development_paragraphs": ["EE05"], "conclusion_paragraph": ["EE06"] },
+      "allowed_criteria": ["EE03", "EE05", "EE06", "EE07", "EE08", "EE09", "EE10", "EE11", "EE12", "EE13", "EE14", "EE15", "EE16", "EE17", "EE18"],
+      "min_target_criteria": 2,
+      "notes": "development_paragraphs asks for exactly two paragraphs (EE05); conclusion_paragraph for one (EE06)."
+    },
+    {
+      "ordinal": 4,
+      "code": "guided_composition",
+      "name_es": "Composición guiada",
+      "purpose": "A complete four-paragraph expository text with scaffolding (paragraph plan, suggested ideas and connectors); no time limit.",
+      "exercise_types": ["guided_composition"],
+      "deliverable": { "unit": "paragraphs", "min": 4, "max": 4, "words_target": 200, "evidence_modes": ["typed", "handwritten"] },
+      "core_criteria": ["EE01", "EE02", "EE03", "EE04", "EE05", "EE06"],
+      "allowed_criteria": ["EE01", "EE02", "EE03", "EE04", "EE05", "EE06", "EE07", "EE08", "EE09", "EE10", "EE11", "EE12", "EE13", "EE14", "EE15", "EE16", "EE17", "EE18", "EE19", "EE20"],
+      "min_target_criteria": 6,
+      "notes": "Scaffolding changes the support, not the criteria."
+    },
+    {
+      "ordinal": 5,
+      "code": "full_composition",
+      "name_es": "Composición expositiva completa",
+      "purpose": "The national-test task: an expository text of four paragraphs and 200 words in 90 minutes, without scaffolding beyond the suggested ideas.",
+      "exercise_types": ["full_composition"],
+      "deliverable": { "unit": "paragraphs", "min": 4, "max": 4, "words_target": 200, "time_limit_min": 90, "evidence_modes": ["handwritten", "typed"] },
+      "core_criteria": ["EE01", "EE02", "EE03", "EE04", "EE05", "EE06", "EE07", "EE08", "EE09", "EE10", "EE11", "EE12", "EE13", "EE14", "EE15", "EE16", "EE17", "EE18", "EE19", "EE20"],
+      "allowed_criteria": ["EE01", "EE02", "EE03", "EE04", "EE05", "EE06", "EE07", "EE08", "EE09", "EE10", "EE11", "EE12", "EE13", "EE14", "EE15", "EE16", "EE17", "EE18", "EE19", "EE20"],
+      "min_target_criteria": 20,
+      "notes": "Handwritten evidence is the exam condition (ballpoint pen, blue or black ink). A typed rehearsal targets all 20 criteria but records EE19 and EE20 as not_evaluable."
+    }
+  ]
+}

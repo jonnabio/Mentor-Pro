@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mentor-pro.local/schemas/writing/writing-evaluation.schema.json",
+  "title": "WritingEvaluation",
+  "description": "A human evaluation of one submission: criterion scores, feedback and status (ADR-019). It holds no student-identifying data. Cross-record rules are checked by app/writing/contracts.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "evaluation_id", "exercise_id", "submission", "evaluator", "status", "rubric_id",
+               "rubric_sha256", "criterion_scores", "feedback_es"],
+  "$defs": {
+    "criterion": { "type": "string", "pattern": "^EE(0[1-9]|1[0-9]|20)$" }
+  },
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "evaluation_id": { "type": "string", "pattern": "^EV-[A-Za-z0-9-]{3,60}$" },
+    "exercise_id": { "type": "string", "pattern": "^PE-L[1-5]-[A-Za-z0-9-]{3,60}$" },
+    "submission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["submission_id", "evidence_mode", "submitted_at"],
+      "properties": {
+        "submission_id": { "type": "string", "pattern": "^SUB-[A-Za-z0-9-]{3,60}$" },
+        "evidence_mode": { "enum": ["typed", "handwritten"] },
+        "word_count": { "type": "integer", "minimum": 0 },
+        "paragraph_count": { "type": "integer", "minimum": 0 },
+        "submitted_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "role"],
+      "properties": {
+        "kind": { "const": "human" },
+        "role": { "enum": ["teacher", "tutor", "parent"] }
+      }
+    },
+    "status": { "enum": ["pending", "in_progress", "completed", "voided"] },
+    "evaluated_at": { "type": "string", "format": "date-time" },
+    "rubric_id": { "type": "string" },
+    "rubric_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "criterion_scores": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["criterion", "status"],
+        "properties": {
+          "criterion": { "$ref": "#/$defs/criterion" },
+          "status": { "enum": ["scored", "not_evaluable", "pending"] },
+          "points": { "type": "integer", "minimum": 0, "maximum": 4,
+                      "description": "Equals the index of the matching official descriptor." },
+          "non_normative_uses": { "type": "integer", "minimum": 0,
+                                  "description": "Counted uses for EE07-EE18 (identical repetitions once)." },
+          "not_evaluable_reason": { "enum": ["handwritten_evidence_required"] },
+          "evidence_es": { "type": "string" }
+        },
+        "allOf": [
+          { "if": { "properties": { "status": { "const": "scored" } } }, "then": { "required": ["points"] } },
+          { "if": { "properties": { "status": { "const": "not_evaluable" } } },
+            "then": { "required": ["not_evaluable_reason"], "not": { "required": ["points"] } } },
+          { "if": { "properties": { "status": { "const": "pending" } } }, "then": { "not": { "required": ["points"] } } }
+        ]
+      }
+    },
+    "feedback_es": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strengths", "improvements"],
+      "properties": {
+        "strengths": { "type": "array", "items": { "type": "string", "minLength": 3 } },
+        "improvements": { "type": "array", "items": { "type": "string", "minLength": 3 } },
+        "next_step": { "type": "string" }
+      }
+    }
+  },
+  "if": { "properties": { "status": { "const": "completed" } } },
+  "then": { "required": ["evaluated_at"] }
+}

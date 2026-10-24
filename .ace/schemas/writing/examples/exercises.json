@@ -1,0 +1,386 @@
+[
+  {
+    "schema_version": "1.0",
+    "exercise_id": "PE-L2-ambiente-intro-001",
+    "level": "idea_development",
+    "exercise_type": "introduction_paragraph",
+    "difficulty": "medium",
+    "language": "es-CR",
+    "text_type": "expositivo",
+    "topic_es": "El cuidado del medio ambiente",
+    "communicative_situation_es": "Tu comunidad organiza una campaña para proteger el ambiente. Escribí el párrafo de introducción de un texto expositivo que explique por qué es importante cuidar el medio ambiente.",
+    "suggested_ideas_es": [
+      "Importancia del medio ambiente para la vida en el planeta.",
+      "Causas principales del deterioro ambiental (contaminación, deforestación, mal manejo de desechos)."
+    ],
+    "instructions_es": [
+      "Escribí un solo párrafo de introducción para un texto expositivo.",
+      "Presentá el tema con una idea principal clara.",
+      "Agregá al menos dos ideas complementarias relacionadas con la situación comunicativa.",
+      "Uní las ideas con conectores adecuados, por ejemplo «además» o «por esta razón».",
+      "No contés una historia: informá y explicá."
+    ],
+    "deliverable": {
+      "description_es": "Un párrafo de introducción (de 3 a 5 oraciones) con una idea principal y al menos dos ideas complementarias.",
+      "unit": "paragraphs",
+      "min": 1,
+      "max": 1,
+      "evidence_mode": "typed"
+    },
+    "target_criteria": [
+      "EE03",
+      "EE04",
+      "EE09",
+      "EE15",
+      "EE18"
+    ],
+    "evaluation": {
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d",
+      "scale": {
+        "min": 0,
+        "max": 4
+      },
+      "counting_rule": "identical_repetition_counts_once",
+      "parameters": [
+        {
+          "criterion": "EE03",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE04",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE04",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE09",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE09",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE15",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE15",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE18",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE18",
+          "applicability": "scored"
+        }
+      ]
+    },
+    "provenance": {
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "workbook_code": "EE03",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3"
+        },
+        {
+          "workbook_code": "EE04",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A4"
+        },
+        {
+          "workbook_code": "EE09",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A9"
+        },
+        {
+          "workbook_code": "EE15",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A15"
+        },
+        {
+          "workbook_code": "EE18",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A18"
+        }
+      ],
+      "sources": [
+        {
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "role": "rubric",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "document_id": "GUIA-PE-2026",
+          "role": "topic_model",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "human",
+      "created": "2026-10-24"
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "exercise_id": "PE-L5-agua-salud-001",
+    "level": "full_composition",
+    "exercise_type": "full_composition",
+    "difficulty": "medium",
+    "language": "es-CR",
+    "text_type": "expositivo",
+    "topic_es": "La importancia del agua para la salud",
+    "communicative_situation_es": "En tu escuela se realizará una feria científica sobre el cuidado del cuerpo humano. Debés escribir un texto expositivo en el que expliqués por qué el agua es esencial para la salud.",
+    "suggested_ideas_es": [
+      "Funciones del agua en el cuerpo humano (hidratación, regulación de temperatura).",
+      "Consecuencias de no beber suficiente agua (deshidratación, dolores de cabeza, cansancio).",
+      "Hábitos para consumir la cantidad adecuada de agua diariamente.",
+      "Importancia del agua limpia y acceso al agua potable."
+    ],
+    "instructions_es": [
+      "Escribí un texto expositivo. Recordá que su propósito es informar y explicar un tema, no narrar una historia.",
+      "Redactá el texto en cuatro párrafos: uno de introducción, dos de desarrollo y uno de conclusión.",
+      "Escribí al menos 200 palabras.",
+      "Disponés de 90 minutos. Usá bolígrafo con tinta azul o negra; no se permite el uso de lápiz.",
+      "Usá un solo tipo de letra (imprenta o cursiva) en todo el texto."
+    ],
+    "deliverable": {
+      "description_es": "Un texto expositivo de cuatro párrafos (introducción, dos de desarrollo y conclusión) de al menos 200 palabras, escrito a mano.",
+      "unit": "paragraphs",
+      "min": 4,
+      "max": 4,
+      "words_target": 200,
+      "time_limit_min": 90,
+      "evidence_mode": "handwritten",
+      "materials_es": "Hoja de respuesta y bolígrafo de tinta azul o negra."
+    },
+    "target_criteria": [
+      "EE01",
+      "EE02",
+      "EE03",
+      "EE04",
+      "EE05",
+      "EE06",
+      "EE07",
+      "EE08",
+      "EE09",
+      "EE10",
+      "EE11",
+      "EE12",
+      "EE13",
+      "EE14",
+      "EE15",
+      "EE16",
+      "EE17",
+      "EE18",
+      "EE19",
+      "EE20"
+    ],
+    "evaluation": {
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d",
+      "scale": {
+        "min": 0,
+        "max": 4
+      },
+      "counting_rule": "identical_repetition_counts_once",
+      "parameters": [
+        {
+          "criterion": "EE01",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE01",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE02",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE02",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE03",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE04",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE04",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE05",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE05",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE06",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE06",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE07",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE07",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE08",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE08",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE09",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE09",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE10",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE10",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE11",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE11",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE12",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE12",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE13",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE13",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE14",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE14",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE15",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE15",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE16",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE16",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE17",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE17",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE18",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE18",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE19",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE19",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE20",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE20",
+          "applicability": "scored"
+        }
+      ]
+    },
+    "provenance": {
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "workbook_code": "EE01",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B1-A1"
+        },
+        {
+          "workbook_code": "EE02",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B1-A2"
+        },
+        {
+          "workbook_code": "EE03",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3"
+        },
+        {
+          "workbook_code": "EE04",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A4"
+        },
+        {
+          "workbook_code": "EE05",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A5"
+        },
+        {
+          "workbook_code": "EE06",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A6"
+        },
+        {
+          "workbook_code": "EE07",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A7"
+        },
+        {
+          "workbook_code": "EE08",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A8"
+        },
+        {
+          "workbook_code": "EE09",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A9"
+        },
+        {
+          "workbook_code": "EE10",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A10"
+        },
+        {
+          "workbook_code": "EE11",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A11"
+        },
+        {
+          "workbook_code": "EE12",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A12"
+        },
+        {
+          "workbook_code": "EE13",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A13"
+        },
+        {
+          "workbook_code": "EE14",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A14"
+        },
+        {
+          "workbook_code": "EE15",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A15"
+        },
+        {
+          "workbook_code": "EE16",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A16"
+        },
+        {
+          "workbook_code": "EE17",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A17"
+        },
+        {
+          "workbook_code": "EE18",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A18"
+        },
+        {
+          "workbook_code": "EE19",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B5-A19"
+        },
+        {
+          "workbook_code": "EE20",
+          "assertion_id": "PNE2026-PRI-ESP-PE-B5-A20"
+        }
+      ],
+      "sources": [
+        {
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "role": "rubric",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "role": "task_model",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "document_id": "GUIA-PE-2026",
+          "role": "topic_model",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "human",
+      "created": "2026-10-24"
+    }
+  }
+]

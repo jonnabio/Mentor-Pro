@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mentor-pro.local/schemas/writing/writing-levels.schema.json",
+  "title": "WritingExerciseLevels",
+  "description": "The five Producción escrita exercise levels and the EE criteria each may score (ADR-019).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "rubric_id", "baseline_version", "component_es", "rules", "levels"],
+  "$defs": {
+    "criterion": { "type": "string", "pattern": "^EE(0[1-9]|1[0-9]|20)$" },
+    "criteria": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/criterion" } }
+  },
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "rubric_id": { "type": "string" },
+    "baseline_version": { "type": "string" },
+    "component_es": { "type": "string" },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scoring", "handwritten_criteria", "handwritten_rule"],
+      "properties": {
+        "scoring": { "type": "string" },
+        "handwritten_criteria": { "$ref": "#/$defs/criteria" },
+        "handwritten_rule": { "type": "string" }
+      }
+    },
+    "levels": {
+      "type": "array", "minItems": 5, "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ordinal", "code", "name_es", "purpose", "exercise_types", "deliverable", "core_criteria",
+                     "allowed_criteria", "min_target_criteria", "notes"],
+        "properties": {
+          "ordinal": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "code": { "enum": ["writing_conventions", "idea_development", "paragraph_writing", "guided_composition",
+                             "full_composition"] },
+          "name_es": { "type": "string" },
+          "purpose": { "type": "string" },
+          "exercise_types": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "deliverable": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["unit", "min", "max", "evidence_modes"],
+            "properties": {
+              "unit": { "enum": ["sentences", "paragraphs"] },
+              "min": { "type": "integer", "minimum": 1 },
+              "max": { "type": "integer", "minimum": 1 },
+              "words_target": { "type": "integer", "minimum": 1 },
+              "time_limit_min": { "type": "integer", "minimum": 1 },
+              "evidence_modes": { "type": "array", "minItems": 1, "items": { "enum": ["typed", "handwritten"] } }
+            }
+          },
+          "core_criteria": { "$ref": "#/$defs/criteria" },
+          "type_core_criteria": { "type": "object", "additionalProperties": { "$ref": "#/$defs/criteria" } },
+          "allowed_criteria": { "$ref": "#/$defs/criteria" },
+          "min_target_criteria": { "type": "integer", "minimum": 1 },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

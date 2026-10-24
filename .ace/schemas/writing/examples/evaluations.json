@@ -1,0 +1,209 @@
+[
+  {
+    "schema_version": "1.0",
+    "evaluation_id": "EV-ambiente-intro-001",
+    "exercise_id": "PE-L2-ambiente-intro-001",
+    "submission": {
+      "submission_id": "SUB-ambiente-intro-001",
+      "evidence_mode": "typed",
+      "word_count": 74,
+      "paragraph_count": 1,
+      "submitted_at": "2026-10-24T15:00:00-06:00"
+    },
+    "evaluator": {
+      "kind": "human",
+      "role": "tutor"
+    },
+    "status": "completed",
+    "evaluated_at": "2026-10-24T18:30:00-06:00",
+    "rubric_id": "MEP-RUBRICA-PE-2026",
+    "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d",
+    "criterion_scores": [
+      {
+        "criterion": "EE03",
+        "status": "scored",
+        "points": 4,
+        "evidence_es": "Todas las oraciones tratan el cuidado del ambiente; no hay digresiones."
+      },
+      {
+        "criterion": "EE04",
+        "status": "scored",
+        "points": 3,
+        "evidence_es": "Idea principal y dos ideas complementarias; el conector «pero» no se ajusta a la relación."
+      },
+      {
+        "criterion": "EE09",
+        "status": "scored",
+        "points": 4,
+        "non_normative_uses": 0
+      },
+      {
+        "criterion": "EE15",
+        "status": "scored",
+        "points": 2,
+        "non_normative_uses": 2,
+        "evidence_es": "«arboles», «tambien»."
+      },
+      {
+        "criterion": "EE18",
+        "status": "scored",
+        "points": 4,
+        "non_normative_uses": 0
+      }
+    ],
+    "feedback_es": {
+      "strengths": [
+        "La idea principal presenta el tema con claridad."
+      ],
+      "improvements": [
+        "Revisá las tildes de las palabras graves y agudas.",
+        "Usá un conector de causa, como «por esta razón», en lugar de «pero»."
+      ],
+      "next_step": "Practicá la acentuación con un ejercicio de convenciones de escritura."
+    }
+  },
+  {
+    "schema_version": "1.0",
+    "evaluation_id": "EV-agua-salud-001",
+    "exercise_id": "PE-L5-agua-salud-001",
+    "submission": {
+      "submission_id": "SUB-agua-salud-001",
+      "evidence_mode": "handwritten",
+      "word_count": 214,
+      "paragraph_count": 4,
+      "submitted_at": "2026-10-24T10:30:00-06:00"
+    },
+    "evaluator": {
+      "kind": "human",
+      "role": "teacher"
+    },
+    "status": "completed",
+    "evaluated_at": "2026-10-25T09:00:00-06:00",
+    "rubric_id": "MEP-RUBRICA-PE-2026",
+    "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d",
+    "criterion_scores": [
+      {
+        "criterion": "EE01",
+        "status": "scored",
+        "points": 4
+      },
+      {
+        "criterion": "EE02",
+        "status": "scored",
+        "points": 4
+      },
+      {
+        "criterion": "EE03",
+        "status": "scored",
+        "points": 3
+      },
+      {
+        "criterion": "EE04",
+        "status": "scored",
+        "points": 3
+      },
+      {
+        "criterion": "EE05",
+        "status": "scored",
+        "points": 2
+      },
+      {
+        "criterion": "EE06",
+        "status": "scored",
+        "points": 3
+      },
+      {
+        "criterion": "EE07",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE08",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE09",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE10",
+        "status": "scored",
+        "points": 1,
+        "non_normative_uses": 3
+      },
+      {
+        "criterion": "EE11",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE12",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE13",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE14",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE15",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE16",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE17",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE18",
+        "status": "scored",
+        "points": 3,
+        "non_normative_uses": 1
+      },
+      {
+        "criterion": "EE19",
+        "status": "scored",
+        "points": 4
+      },
+      {
+        "criterion": "EE20",
+        "status": "scored",
+        "points": 4
+      }
+    ],
+    "feedback_es": {
+      "strengths": [
+        "El texto tiene cuatro párrafos con la función que les corresponde.",
+        "La letra es legible y uniforme."
+      ],
+      "improvements": [
+        "En el segundo párrafo de desarrollo, agregá otra idea complementaria sobre las consecuencias.",
+        "Revisá el uso de s, c y z en palabras como «hidratación» y «cabeza»."
+      ]
+    }
+  }
+]

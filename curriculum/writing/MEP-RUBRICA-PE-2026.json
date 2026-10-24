@@ -1,0 +1,246 @@
+{
+  "schema_version": "1.0",
+  "rubric_id": "MEP-RUBRICA-PE-2026",
+  "title_es": "Rúbrica para calificar la Producción del texto escrito, primaria 2026",
+  "source": {
+    "document_id": "MEP-RUBRICA-PE-2026",
+    "file_name": "Rubricas-de-evaluacion-Prueba-Nacional-de-Produccion-de-texto-escrito-2026-primaria.pdf",
+    "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d",
+    "publisher_es": "Ministerio de Educación Pública, Dirección de Gestión y Evaluación de la Calidad",
+    "date_es": "Abril 2026",
+    "transcription": "Verbatim from the PDF; page numbers are PDF pages (page 1 is the cover). Checked against page images on 2026-10-24."
+  },
+  "scale": { "min": 0, "max": 4 },
+  "counting_note_es": "Nota: Cuando un mismo tipo de uso no normativo se repita de forma idéntica en el texto, se contabilizará una sola vez para efectos de la calificación.",
+  "dimensions": [
+    { "ordinal": 1, "name_es": "Dimensión 1. Extensión y organización del texto producido", "weight_pct": 20 },
+    { "ordinal": 2, "name_es": "Dimensión 2. Unidad temática del texto expositivo", "weight_pct": 20 },
+    { "ordinal": 3, "name_es": "Dimensión 3. Cohesión y coherencia discursiva", "weight_pct": 40 },
+    { "ordinal": 4, "name_es": "Dimensión 4. Convenciones lingüísticas del código escrito", "weight_pct": 15 },
+    { "ordinal": 5, "name_es": "Dimensión 5. Legibilidad y uniformidad del código alfabético", "weight_pct": 5 }
+  ],
+  "criteria": [
+    {
+      "code": "EE01", "rubric_number": 1, "dimension": 1, "pages": [2],
+      "statement_es": "Redacta un texto con una extensión de 200 palabras.",
+      "descriptors_es": [
+        "El texto presenta menos de 50 palabras.",
+        "El texto presenta de 50 a 99 palabras.",
+        "El texto presenta de 100 a 149 palabras.",
+        "El texto presenta de 150 a 199 palabras.",
+        "El texto presenta una extensión de 200 palabras."
+      ]
+    },
+    {
+      "code": "EE02", "rubric_number": 2, "dimension": 1, "pages": [2],
+      "statement_es": "Construye un texto estructurado a partir de párrafos de introducción, desarrollo y conclusión.",
+      "descriptors_es": [
+        "El texto no evidencia la estructura a partir de párrafos de introducción, desarrollo y conclusión.",
+        "El texto se estructura a partir de un párrafo que no distingue la introducción, el desarrollo ni la conclusión.",
+        "El texto se estructura en párrafos que no logran evidenciar la relación entre la introducción, el desarrollo y la conclusión.",
+        "El texto se estructura a partir de tres párrafos donde el primero evidencia la introducción, el segundo el desarrollo y tercero la conclusión.",
+        "El texto se estructura a partir de un párrafo introductorio, dos de desarrollo y uno de conclusión."
+      ]
+    },
+    {
+      "code": "EE03", "rubric_number": 3, "dimension": 2, "pages": [3],
+      "statement_es": "Desarrolla el mensaje expositivo con unidad temática (coherencia) a partir de la situación comunicativa.",
+      "descriptors_es": [
+        "El texto no desarrolla el mensaje expositivo respecto al tema ni a la situación comunicativa.",
+        "El texto desarrolla el mensaje expositivo con coherencia temática respecto a la situación comunicativa, pero presenta tres digresiones.",
+        "El texto desarrolla el mensaje expositivo con coherencia temática respecto a la situación comunicativa, pero presenta dos digresiones.",
+        "El texto desarrolla el mensaje expositivo con coherencia temática respecto a la situación comunicativa, pero presenta una digresión.",
+        "El texto desarrolla el mensaje expositivo con unidad temática a partir de la situación comunicativa."
+      ]
+    },
+    {
+      "code": "EE04", "rubric_number": 4, "dimension": 3, "pages": [4],
+      "statement_es": "Redacta el párrafo de introducción con cohesión entre la idea principal y, al menos, dos ideas complementarias, en relación con el tema y la situación comunicativa.",
+      "descriptors_es": [
+        "El texto presenta un párrafo que no cumple la función de introducción, en relación con el tema planteado.",
+        "El texto presenta un párrafo de introducción con una idea principal, pero sin integrar ideas complementarias en relación con el tema y la situación comunicativa.",
+        "El texto presenta un párrafo de introducción con una idea principal que enuncia el tema e integra una idea complementaria derivada de la situación comunicativa; no obstante, la relación lógica entre las ideas se rompe por el uso de conectores o nexos que no se ajustan a la normativa.",
+        "El texto presenta un párrafo de introducción con una idea principal que enuncia el tema e integra al menos dos ideas complementarias derivadas de la situación comunicativa; no obstante, la relación lógica entre las ideas se rompe por el uso de conectores o nexos que no se ajustan a la normativa.",
+        "El texto evidencia el párrafo de introducción con cohesión entre la idea principal y, al menos, dos ideas complementarias, en relación con el tema y la situación comunicativa."
+      ]
+    },
+    {
+      "code": "EE05", "rubric_number": 5, "dimension": 3, "pages": [5, 6],
+      "statement_es": "Redacta con cohesión dos párrafos de desarrollo y cada uno con su idea principal y al menos dos ideas complementarias, en relación con las causas y consecuencias derivadas del tema y la situación comunicativa.",
+      "descriptors_es": [
+        "El texto presenta párrafos que no cumplen la función de desarrollo.",
+        "El texto presenta un párrafo de desarrollo con la idea principal del tema, pero sin incorporar las ideas complementarias, en relación con las causas y consecuencias derivadas de la situación comunicativa.",
+        "El texto presenta un párrafo de desarrollo que contiene la idea principal del tema e incorpora al menos dos ideas complementarias relacionadas con las causas y consecuencias derivadas de la situación comunicativa; no obstante, la relación lógica entre las ideas se rompe por el uso de conectores o nexos que no se ajustan a la normativa.",
+        "El texto presenta dos párrafos de desarrollo y cada uno contiene la idea principal del tema e incorpora al menos dos ideas complementarias relacionadas con las causas y consecuencias derivadas de la situación comunicativa; no obstante, la relación lógica entre las ideas se rompe por el uso de conectores o nexos que no se ajustan a la normativa.",
+        "El texto evidencia cohesión dos párrafos de desarrollo y cada uno con su idea principal y al menos dos ideas complementarias, en relación con las causas y consecuencias derivadas del tema y la situación comunicativa."
+      ]
+    },
+    {
+      "code": "EE06", "rubric_number": 6, "dimension": 3, "pages": [6, 7],
+      "statement_es": "Redacta el párrafo de conclusión que evidencie cohesión entre la idea principal y, al menos, dos ideas complementarias, en relación con las acciones o soluciones derivadas de la situación comunicativa.",
+      "descriptors_es": [
+        "El texto presenta un párrafo que no cumple la función de conclusión.",
+        "El texto presenta el párrafo de conclusión con una idea principal, pero sin integrar las ideas complementarias, en relación con las acciones o soluciones derivadas de la situación comunicativa.",
+        "El texto presenta un párrafo de conclusión con una idea principal que integra una idea complementaria en relación con las acciones o soluciones derivadas de la situación comunicativa; no obstante, la relación lógica entre las ideas se rompe por el uso de conectores o nexos que no se ajustan a la normativa.",
+        "El texto presenta un párrafo de conclusión con una idea principal que integra al menos dos ideas complementarias en relación con las acciones o soluciones derivadas de la situación comunicativa; no obstante, la relación lógica entre las ideas se rompe por el uso de conectores o nexos que no se ajustan a la normativa.",
+        "El texto evidencia el párrafo de conclusión que presenta cohesión entre la idea principal y, al menos, dos ideas complementarias, en relación con las acciones o soluciones derivadas de la situación comunicativa."
+      ]
+    },
+    {
+      "code": "EE07", "rubric_number": 7, "dimension": 4, "pages": [7],
+      "statement_es": "Emplea la concordancia gramatical entre el artículo, el sustantivo y el adjetivo, conforme a la normativa en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de la concordancia gramatical (entre el artículo, el sustantivo y el adjetivo) que no se ajustan a la normativa.",
+        "El texto presenta tres usos de la concordancia gramatical (entre el artículo, el sustantivo y el adjetivo) que no se ajustan a la normativa.",
+        "El texto presenta dos usos de la concordancia gramatical (entre el artículo, el sustantivo y el adjetivo) que no se ajustan a la normativa.",
+        "El texto presenta un uso de la concordancia gramatical (entre el artículo, el sustantivo y el adjetivo) que no se ajusta a la normativa.",
+        "El texto evidencia concordancia gramatical entre el artículo, el sustantivo y el adjetivo, conforme a la normativa."
+      ]
+    },
+    {
+      "code": "EE08", "rubric_number": 8, "dimension": 4, "pages": [7],
+      "statement_es": "Emplea la concordancia gramatical entre el verbo y el sujeto, conforme a la normativa en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de la concordancia gramatical (entre el verbo y el sujeto) que no se ajustan a la normativa.",
+        "El texto presenta tres usos de la concordancia gramatical (entre el verbo y el sujeto) que no se ajustan a la normativa.",
+        "El texto presenta dos usos de la concordancia gramatical (entre el verbo y el sujeto) que no se ajustan a la normativa.",
+        "El texto presenta un uso de la concordancia gramatical (entre el verbo y el sujeto) que no se ajusta a la normativa.",
+        "El texto evidencia concordancia gramatical entre el verbo y el sujeto, conforme a la normativa."
+      ]
+    },
+    {
+      "code": "EE09", "rubric_number": 9, "dimension": 4, "pages": [8],
+      "statement_es": "Emplea los usos normativos de las letras b-v en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de las letras b-v que no se ajustan a la normativa.",
+        "El texto presenta tres usos de las letras b-v que no se ajustan a la normativa.",
+        "El texto presenta dos usos de las letras b-v que no se ajustan a la normativa.",
+        "El texto presenta un uso de las letras b-v que no se ajusta a la normativa.",
+        "El texto evidencia los usos normativos de las letras b-v."
+      ]
+    },
+    {
+      "code": "EE10", "rubric_number": 10, "dimension": 4, "pages": [8],
+      "statement_es": "Emplea los usos normativos de las letras s-c-z en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de las letras s-c-z que no se ajustan a la normativa.",
+        "El texto presenta tres usos de las letras s-c-z que no se ajustan a la normativa.",
+        "El texto presenta dos usos de las letras s-c-z que no se ajustan a la normativa.",
+        "El texto presenta un uso de las letras s-c-z que no se ajusta a la normativa.",
+        "El texto evidencia los usos normativos de las letras s-c-z."
+      ]
+    },
+    {
+      "code": "EE11", "rubric_number": 11, "dimension": 4, "pages": [8],
+      "statement_es": "Emplea el uso normativo de la letra h en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de la letra h que no se ajustan a la normativa.",
+        "El texto presenta tres usos de la letra h que no se ajustan a la normativa.",
+        "El texto presenta dos usos de la letra h que no se ajustan a la normativa.",
+        "El texto presenta un uso de la letra h que no se ajusta a la normativa.",
+        "El texto evidencia el uso normativo de la letra h."
+      ]
+    },
+    {
+      "code": "EE12", "rubric_number": 12, "dimension": 4, "pages": [8],
+      "statement_es": "Emplea los usos normativos de las letras g-j en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de las letras g-j que no se ajustan a la normativa.",
+        "El texto presenta tres usos de las letras g-j que no se ajustan a la normativa.",
+        "El texto presenta dos usos de las letras g-j que no se ajustan a la normativa.",
+        "El texto presenta un uso de las letras g-j que no se ajusta a la normativa.",
+        "El texto evidencia los usos normativos de las letras g-j."
+      ]
+    },
+    {
+      "code": "EE13", "rubric_number": 13, "dimension": 4, "pages": [8],
+      "statement_es": "Emplea los usos normativos de la r-rr en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de la r-rr que no se ajustan a la normativa.",
+        "El texto presenta tres usos de la r-rr que no se ajustan a la normativa.",
+        "El texto presenta dos usos de la r-rr que no se ajustan a la normativa.",
+        "El texto presenta un uso de la r-rr que no se ajusta a la normativa.",
+        "El texto evidencia los usos normativos de la rrr."
+      ],
+      "transcription_note": "The 4-point descriptor reads \"rrr\" in the source; kept verbatim."
+    },
+    {
+      "code": "EE14", "rubric_number": 14, "dimension": 4, "pages": [9],
+      "statement_es": "Emplea los usos normativos de las letras m-n en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de las letras m-n, que no se ajustan a la normativa.",
+        "El texto presenta tres usos de las letras m-n que no se ajustan a la normativa.",
+        "El texto presenta dos usos de las letras m-n que no se ajustan a la normativa.",
+        "El texto presenta un uso de las letras m-n que no se ajusta a la normativa.",
+        "El texto evidencia los usos normativos de las letras m-n."
+      ]
+    },
+    {
+      "code": "EE15", "rubric_number": 15, "dimension": 4, "pages": [9],
+      "statement_es": "Emplea las reglas de acentuación de las palabras agudas, graves, esdrújulas y sobreesdrújulas en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de la acentuación de las palabras agudas, graves, esdrújulas y sobreesdrújulas que no se ajustan a la normativa.",
+        "El texto presenta tres usos de la acentuación de las palabras agudas, graves, esdrújulas y sobreesdrújulas que no se ajustan a la normativa.",
+        "El texto presenta dos usos de la acentuación de las palabras agudas, graves, esdrújulas y sobreesdrújulas que no se ajustan a la normativa.",
+        "El texto presenta un uso de la acentuación de las palabras agudas, graves, esdrújulas y sobreesdrújulas que no se ajusta a la normativa.",
+        "El texto evidencia la acentuación de las palabras agudas, graves, esdrújulas y sobreesdrújulas conforme a la normativa."
+      ]
+    },
+    {
+      "code": "EE16", "rubric_number": 16, "dimension": 4, "pages": [9],
+      "statement_es": "Emplea el punto y seguido y el punto y aparte, según la normativa en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más del punto y seguido y el punto y aparte que no se ajustan a la normativa.",
+        "El texto presenta tres usos del punto y seguido y el punto y aparte que no se ajustan a la normativa.",
+        "El texto presenta dos usos del punto y seguido y el punto y aparte que no se ajustan a la normativa.",
+        "El texto presenta un uso del punto y seguido y el punto y aparte que no se ajusta a la normativa.",
+        "El texto evidencia el uso del punto y seguido y el punto y aparte conforme a la normativa."
+      ]
+    },
+    {
+      "code": "EE17", "rubric_number": 17, "dimension": 4, "pages": [10],
+      "statement_es": "Emplea la coma en enumeraciones y los signos de interrogación y exclamación (al inicio y al final de los enunciados), conforme a la normativa en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de la coma en enumeraciones y los signos de interrogación y exclamación (al inicio y al final de los enunciados) que no se ajustan a la normativa.",
+        "El texto presenta tres usos de la coma en enumeraciones y los signos de interrogación y exclamación (al inicio y final de los enunciados) que no se ajustan a la normativa.",
+        "El texto presenta dos usos de la coma en enumeraciones y los signos de interrogación y exclamación (al inicio y al final de los enunciados) que no se ajustan a la normativa.",
+        "El texto presenta un uso de la coma en enumeraciones y los signos de interrogación y exclamación (al inicio y al final de los enunciados) que no se ajusta a la normativa.",
+        "El texto evidencia la coma en enumeraciones y los signos de interrogación y exclamación (al inicio y al final de los enunciados) conforme a la normativa."
+      ],
+      "transcription_note": "The 1-point descriptor reads \"al inicio y final\" in the source; kept verbatim."
+    },
+    {
+      "code": "EE18", "rubric_number": 18, "dimension": 4, "pages": [10],
+      "statement_es": "Emplea el uso normativo de la mayúscula al inicio de las oraciones y en los sustantivos propios en el texto.",
+      "descriptors_es": [
+        "El texto presenta cuatro usos o más de la mayúscula al inicio de las oraciones y en los sustantivos propios que no se ajustan a la normativa.",
+        "El texto presenta tres usos de la mayúscula al inicio de las oraciones y en los sustantivos propios que no se ajustan a la normativa.",
+        "El texto presenta dos usos de la mayúscula al inicio de las oraciones y en los sustantivos propios que no se ajustan a la normativa.",
+        "El texto presenta un uso de la mayúscula al inicio de las oraciones y en los sustantivos propios que no se ajusta a la normativa.",
+        "El texto evidencia el uso de la mayúscula al inicio de las oraciones y en los sustantivos propios conforme a la normativa."
+      ]
+    },
+    {
+      "code": "EE19", "rubric_number": 19, "dimension": 5, "pages": [10],
+      "statement_es": "Redacta el texto con trazo legible de las letras.",
+      "descriptors_es": [
+        "El texto presenta cuatro o más palabras cuyo trazo de las letras es ilegible.",
+        "El texto presenta tres palabras cuyo trazo de las letras es ilegible.",
+        "El texto presenta dos palabras cuyo trazo de las letras es ilegible.",
+        "El texto presenta una palabra cuyo trazo de las letras es ilegible.",
+        "El texto evidencia trazo legible de las letras."
+      ]
+    },
+    {
+      "code": "EE20", "rubric_number": 20, "dimension": 5, "pages": [11],
+      "statement_es": "Redacta el texto con letras de un mismo tipo (imprenta o cursiva) conforme a la normativa.",
+      "descriptors_es": [
+        "El texto presenta cuatro o más palabras que evidencian mezcla de tipos de letras.",
+        "El texto presenta tres palabras que evidencian mezcla de tipos de letras.",
+        "El texto presenta dos palabras que evidencian mezcla de tipos de letras.",
+        "El texto presenta una palabra que evidencia mezcla de tipos de letras.",
+        "El texto evidencia letras de un mismo tipo (imprenta o cursiva), conforme a la normativa."
+      ]
+    }
+  ]
+}
