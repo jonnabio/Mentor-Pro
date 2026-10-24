@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T020)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T021)
 
 ## Current Objective
 
@@ -71,6 +71,9 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   mapped to EE01–EE20, exercise and human-evaluation contracts, `writing`
   schema, separate progress; no generation or UI
   ([ADR-019](../adr/ADR-019-produccion-escrita-foundation.md)).
+- **T021** — first generated writing exercise (L2, EE03+EE04) through
+  OpenRouter; checks W01–W08, review, `writing.generation_attempt`
+  ([ADR-020](../adr/ADR-020-writing-exercise-generation.md)).
 
 ### Current State
 
@@ -86,7 +89,7 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 408 passing; browser (mocked) 259/259 and live 14/14 on
+- Tests: 427 passing; browser (mocked) 259/259 and live 14/14 on
   `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
@@ -132,7 +135,8 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   (mocked; seeds `e2e-bank-…` items) and `--live` (real OpenRouter; generate,
   repeat from the test bank, mixed). Both run only on `TEST_DATABASE_URL`;
   live OpenRouter usage is recorded in the test database.
-- Live helpers: `scripts/dev/generate_examples.py`,
+- Live helpers: `scripts/dev/generate_writing_exercise.py`,
+  `scripts/dev/generate_examples.py`,
   `scripts/dev/generate_practice_set.py`; connectivity
   `.venv/Scripts/python.exe -m app.llm.connectivity`.
 - Gate: `bash .ace/scripts/verify.sh` (tests need `mentor_pro_test`); logs per
@@ -151,5 +155,5 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-019](../adr/ADR-019-produccion-escrita-foundation.md)
+  [ADR-020](../adr/ADR-020-writing-exercise-generation.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-003)

@@ -648,6 +648,34 @@
       "result_file": "docs/progress/task_T020_result.md",
       "failures": [],
       "notes": "Suite 408; browser 259/259; EE05 wording difference recorded, baseline unchanged."
+    },
+    {
+      "id": "T021",
+      "name": "First AI-generated writing exercise (PO task T021)",
+      "objective": "Generate one Producción escrita exercise with OpenRouter from the T020 contracts; checks W01-W08, bounded retries, generation metadata in PostgreSQL.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-020-writing-exercise-generation.md",
+          "app/writing/generation.py",
+          "scripts/dev/generate_writing_exercise.py",
+          "tests/app/test_writing_generation.py",
+          "docs/progress/task_T021_result.md"
+        ],
+        "modify": [
+          "app/writing/store.py"
+        ]
+      },
+      "depends_on": [
+        "T020"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T021_result.md",
+      "failures": [],
+      "notes": "Live L2 EE03+EE04 accepted on request 3/3; 4 calls, 3558/5337 tokens, USD 0. Suite 427."
     }
   ]
 }
