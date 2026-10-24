@@ -218,7 +218,10 @@ function renderProgress(session) {
   const failed = session.status === "failed";
   $("progress-message").textContent = failed ? "" : session.message_es;
   showError($("progress-error"), failed ? session.message_es : "");
-  $("progress-new").hidden = !failed;
+  $("progress-actions").hidden = !failed;
+  $("progress-title").textContent = failed ? "No se pudo preparar la práctica" : "Preparando su práctica";
+  $("progress-hint").hidden = failed;
+  document.querySelector(".progress").hidden = failed;
   const total = session.slots_total || 5;
   const done = Math.min(session.slots_done, total);
   $("progress-bar").style.width = `${Math.round((100 * done) / total)}%`;
@@ -373,17 +376,33 @@ function renderResult(summary) {
   }
 }
 
+// Leaving a practice never calls the server: its result stays stored, and a new generation job
+// starts only when the student presses "Generar práctica" again.
 function resetToForm(message) {
   clearTimeout(state.pollTimer);
   state.session = null;
+  state.requestId = null;
   storeSession(null);
   show("practice-form");
   showError($("form-error"), message || "");
   updateState();
 }
 
+// "Volver al menú principal": the initial screen, with no subject or objectives selected.
+function backToMenu() {
+  resetToForm("");
+  form.reset();
+  state.objectives = [];
+  $("objectives").replaceChildren();
+  $("objectives-card").disabled = true;
+  $("settings-card").disabled = true;
+  updateState();
+}
+
 $("progress-new").addEventListener("click", () => resetToForm(""));
 $("result-new").addEventListener("click", () => resetToForm(""));
+$("progress-menu").addEventListener("click", backToMenu);
+$("result-menu").addEventListener("click", backToMenu);
 
 // ------------------------------------------------------------------ start
 

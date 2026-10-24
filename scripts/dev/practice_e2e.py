@@ -162,8 +162,38 @@ def scenario_subject(page: Page, runner: ScriptedRunner, report: Report, subject
     report.check(not leaks, f"[{viewport}-{subject}] no key or explanation before submission ({leaks})")
     report.check(no_overflow(page), f"[{viewport}-{subject}] no horizontal overflow")
     page.screenshot(path=str(shots / f"{viewport}-{subject}-result.png"), full_page=True)
-    page.get_by_role("button", name="Nueva práctica").click()
+    # Alternate the two exits from the results screen across subjects (T012).
+    action = "menu" if subject in ("matematicas", "ciencias") else "new"
+    leave_practice(page, runner, report, f"{viewport}-{subject}", action, subject)
+
+
+def leave_practice(page: Page, runner: ScriptedRunner, report: Report, name: str, action: str,
+                   subject: str | None) -> None:
+    """Leave a finished or failed practice; check the form state, no new job and the stored result."""
+    session_id = page.evaluate("sessionStorage.getItem('mentorpro.session')")
+    calls = runner.calls
+    label = "Volver al menú principal" if action == "menu" else "Nueva práctica"
+    page.get_by_role("button", name=label).click()
     expect(page.locator("#practice-form")).to_be_visible()
+    page.wait_for_timeout(300)
+    checked = page.evaluate("document.querySelector('input[name=\"subject\"]:checked')?.value || null")
+    if action == "menu":
+        # Playwright's is_disabled() ignores <fieldset disabled>, so read the DOM property.
+        ok = (checked is None and page.evaluate("document.getElementById('objectives-card').disabled")
+              and page.locator('input[name="objective"]').count() == 0)
+        report.check(ok, f"[{name}] 'Volver al menú principal' shows the initial selection screen")
+    else:
+        report.check(checked == subject, f"[{name}] 'Nueva práctica' keeps the previous subject ({checked})")
+    report.check(page.locator("#submit").inner_text() == "Generar práctica",
+                 f"[{name}] generate button ready on the form")
+    report.check(runner.calls == calls, f"[{name}] no generation job started by navigation")
+    report.check(page.evaluate("sessionStorage.getItem('mentorpro.session')") is None,
+                 f"[{name}] stored session cleared (reload does not resume it)")
+    if session_id:
+        stored = page.evaluate("async (sid) => (await fetch(`/api/practice/sessions/${sid}`)).json()", session_id)
+        kept = stored.get("summary") is not None if stored["status"] != "failed" else stored["status"] == "failed"
+        report.check(kept, f"[{name}] practice still stored in PostgreSQL ({stored['status']})")
+    report.check(no_overflow(page), f"[{name}] no horizontal overflow after navigation")
 
 
 def scenario_duplicate_clicks(page: Page, runner: ScriptedRunner, report: Report) -> None:
@@ -223,8 +253,11 @@ def scenario_failures(page: Page, runner: ScriptedRunner, report: Report, shots:
     expect(page.locator("#progress-error")).to_be_visible(timeout=20000)
     text = page.locator("#progress-error").inner_text()
     report.check("no respondió" in text and "ninguna pregunta" in text, f"[llm-down] failure shown: '{text}'")
+    report.check(page.locator("#progress-title").inner_text() == "No se pudo preparar la práctica"
+                 and page.locator(".progress").is_hidden() and page.locator("#progress-hint").is_hidden(),
+                 "[llm-down] failed state has its own title and no progress bar or wait hint")
     page.screenshot(path=str(shots / "failure-llm.png"), full_page=True)
-    page.get_by_role("button", name="Configurar otra práctica").click()
+    leave_practice(page, runner, report, "llm-down", "menu", None)
 
     runner.mode = "budget"
     configure(page, "espanol", ["EL01", "EL02"])
@@ -236,6 +269,7 @@ def scenario_failures(page: Page, runner: ScriptedRunner, report: Report, shots:
     page.screenshot(path=str(shots / "partial-budget.png"), full_page=True)
     answer_all(page, report, "budget", ["B", "B"], KEYS[:2])
     report.check(page.locator("#result-percentage").inner_text() == "50 %", "[budget] summary 50 %")
+    leave_practice(page, runner, report, "budget", "new", "espanol")
     page.evaluate("sessionStorage.clear()")
 
 

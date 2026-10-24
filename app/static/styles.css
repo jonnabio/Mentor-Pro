@@ -133,9 +133,11 @@ button.primary:focus-visible, label:focus-within { outline: 3px solid var(--acce
 button.secondary {
   width: 100%; min-height: 44px; border: 1px solid var(--accent); border-radius: var(--radius);
   background: var(--surface); color: var(--accent); font-size: 1rem; font-weight: 650; cursor: pointer;
-  margin-top: 8px;
 }
+.actions { display: grid; gap: 8px; margin-top: 12px; }
+@media (min-width: 720px) { .actions { grid-template-columns: 1fr 1fr; } }
 
+.progress[hidden] { display: none; }
 .progress { height: 12px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); overflow: hidden; }
 .progress-bar { height: 100%; width: 0; background: var(--accent); transition: width 0.4s ease; }
 .plain-list { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px; }
