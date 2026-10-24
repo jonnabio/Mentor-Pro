@@ -105,7 +105,19 @@
         <p id="feedback-explanation"></p>
         <button type="button" id="next" class="primary"></button>
       </div>
+      <button type="button" id="quiz-exit" class="secondary">Salir de la práctica</button>
     </section>
+
+    <dialog id="exit-dialog" aria-labelledby="exit-title" aria-describedby="exit-message">
+      <h2 id="exit-title">¿Querés salir de la práctica?</h2>
+      <p id="exit-message">Tus respuestas anteriores se conservarán, pero las preguntas pendientes quedarán sin
+        responder.</p>
+      <p id="exit-error" class="alert" role="alert" hidden></p>
+      <div class="actions">
+        <button type="button" id="exit-stay" class="primary">Seguir practicando</button>
+        <button type="button" id="exit-confirm" class="secondary">Salir al menú principal</button>
+      </div>
+    </dialog>
 
     <section id="result-view" class="card" hidden>
       <h2>Resultado de la práctica</h2>

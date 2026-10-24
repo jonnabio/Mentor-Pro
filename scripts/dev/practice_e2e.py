@@ -279,6 +279,80 @@ def scenario_failures(page: Page, runner: ScriptedRunner, report: Report, shots:
     page.evaluate("sessionStorage.clear()")
 
 
+def math_answers(page: Page) -> int:
+    data = page.evaluate("async () => (await fetch('/api/dashboard')).json()")
+    return next(x for x in data["subjects"] if x["subject"] == "matematicas")["total_answers"]
+
+
+def exit_practice(page: Page, runner: ScriptedRunner, report: Report, name: str, out: Path | None) -> dict:
+    """Leave the active practice through the confirmation dialog; returns the stored session."""
+    sid = page.evaluate("sessionStorage.getItem('mentorpro.session')")
+    calls = runner.calls
+    page.get_by_role("button", name="Salir de la práctica").click()
+    dialog = page.locator("#exit-dialog")
+    expect(dialog).to_be_visible()
+    report.check(page.locator("#exit-title").inner_text() == "¿Querés salir de la práctica?"
+                 and "se conservarán" in page.locator("#exit-message").inner_text(),
+                 f"[{name}] confirmation dialog in Spanish")
+    if out:
+        page.screenshot(path=str(out / f"{name}-exit-dialog.png"), full_page=True)
+    page.get_by_role("button", name="Salir al menú principal").click()
+    expect(page.locator("#practice-form")).to_be_visible()
+    stored = page.evaluate("async (sid) => (await fetch(`/api/practice/sessions/${sid}`)).json()", sid)
+    report.check(stored["cancelled"] is True, f"[{name}] practice marked cancelled (status {stored['status']})")
+    report.check(page.evaluate("sessionStorage.getItem('mentorpro.session')") is None
+                 and page.evaluate("document.querySelector('input[name=\"subject\"]:checked')") is None,
+                 f"[{name}] back on the initial screen, active practice cleared")
+    report.check(runner.calls == calls, f"[{name}] no generation job started")
+    page.reload()
+    expect(page.locator("#practice-form")).to_be_visible()
+    page.wait_for_timeout(300)
+    report.check(page.locator("#quiz-view").is_hidden(), f"[{name}] reload does not resume the cancelled practice")
+    report.check(no_overflow(page), f"[{name}] no horizontal overflow")
+    return stored
+
+
+def scenario_exit(page: Page, runner: ScriptedRunner, report: Report, viewport: str, out: Path) -> None:
+    runner.mode, runner.delay = "ok", 0.05
+    before = math_answers(page)
+    configure(page, "matematicas", ["M10", "M11"])
+    page.get_by_role("button", name="Generar práctica").click()
+    expect(page.locator("#quiz-view")).to_be_visible(timeout=20000)
+    for label in ("A", "C"):  # Q1 wrong, Q2 right (keys BCDAB)
+        page.locator(f'.option[data-label="{label}"]').click()
+        page.get_by_role("button", name="Responder").click()
+        page.locator("#next").click()
+    page.get_by_role("button", name="Salir de la práctica").click()
+    expect(page.locator("#exit-dialog")).to_be_visible()
+    page.get_by_role("button", name="Seguir practicando").click()
+    report.check(page.locator("#exit-dialog").is_hidden()
+                 and page.locator("#quiz-position").inner_text() == "Pregunta 3 de 5",
+                 f"[{viewport}-exit] 'Seguir practicando' closes the dialog and stays on question 3")
+    stored = exit_practice(page, runner, report, f"{viewport}-exit-after-2", out)
+    report.check([q["answered"] for q in stored["questions"]] == [True, True, False, False, False],
+                 f"[{viewport}-exit-after-2] two answers kept, three left unanswered")
+    report.check(math_answers(page) == before + 2,
+                 f"[{viewport}-exit-after-2] dashboard counts only the 2 submitted answers")
+
+    configure(page, "matematicas", ["M10", "M12"])
+    page.get_by_role("button", name="Generar práctica").click()
+    expect(page.locator("#quiz-view")).to_be_visible(timeout=20000)
+    stored = exit_practice(page, runner, report, f"{viewport}-exit-before-answer", None)
+    report.check(not any(q["answered"] for q in stored["questions"]), f"[{viewport}-exit-before-answer] no answers")
+
+    if viewport == "desktop":
+        runner.mode = "budget"
+        configure(page, "matematicas", ["M11", "M12"])
+        page.get_by_role("button", name="Generar práctica").click()
+        expect(page.locator("#quiz-notice")).to_be_visible(timeout=20000)
+        page.locator('.option[data-label="B"]').click()
+        page.get_by_role("button", name="Responder").click()
+        stored = exit_practice(page, runner, report, "desktop-exit-partial", None)
+        report.check(stored["status"] == "partial" and [q["answered"] for q in stored["questions"]] == [True, False],
+                     "[desktop-exit-partial] partial practice cancelled; 1 of 2 answered")
+        runner.mode = "ok"
+
+
 def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None:
     """T014: learning dashboard from the main menu; every subject, objective and status is shown."""
     page.goto(BASE)
@@ -331,6 +405,7 @@ def run_mock(out: Path) -> Report:
                 scenario_refresh_and_resubmit(page, runner, report, out)
                 scenario_failures(page, runner, report, out)
                 scenario_bank_only(page, runner, report, out)
+            scenario_exit(page, runner, report, viewport, out)
             scenario_dashboard(page, report, viewport, out)
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()

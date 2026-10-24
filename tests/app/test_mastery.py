@@ -158,3 +158,13 @@ def test_untouched_objectives_are_unpracticed(history):
     subject, m01 = objective("M01")
     assert m01["status"] == "unpracticed" and m01["status_es"] == "Sin practicar"
     assert subject["status_counts"]["unpracticed"] == subject["objective_count"]
+
+
+def test_answers_from_cancelled_practices_count_and_unanswered_do_not(history):
+    record, objective, url = history
+    record([("M02", f"Q-{n}", "A") for n in range(5)], {1: "A", 2: "B"})   # two answered, three left open
+    with psycopg.connect(url, autocommit=True) as conn:
+        conn.execute("UPDATE practice.session SET cancelled_at = now() WHERE baseline_version = %s", (SYNTHETIC,))
+    _, m02 = objective()
+    assert (m02["total_answers"], m02["distinct_questions"], m02["first_attempt_correct"]) == (2, 2, 1)
+    assert m02["status"] == "insufficient_evidence"

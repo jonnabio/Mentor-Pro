@@ -54,6 +54,8 @@ ALTER TABLE practice.session ADD COLUMN IF NOT EXISTS bank_count INTEGER NOT NUL
 ALTER TABLE practice.item ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'generated'
     CHECK (source IN ('bank', 'generated'));
 ALTER TABLE practice.item ADD COLUMN IF NOT EXISTS source_request_id TEXT;
+-- Practice cancellation: the student left before answering every question. Generation status is kept.
+ALTER TABLE practice.session ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS practice.answer (
     session_id    TEXT NOT NULL,
     slot          INTEGER NOT NULL,
@@ -175,6 +177,27 @@ class PracticeStore:
                VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING""",
             (session_id, row["slot"], row["objective_code"], row["evidence_id"], Jsonb(row["item"]),
              row.get("source", "generated"), row.get("source_request_id")))
+
+    def cancel(self, session_id: str) -> str:
+        """Mark a ready practice as cancelled; answers stay, unanswered questions stay unanswered.
+
+        Returns "cancelled", "already_cancelled", "finished" (every question answered) or "not_ready".
+        """
+        with psycopg.connect(self.url, row_factory=dict_row) as conn, conn.transaction():
+            session = conn.execute("SELECT status, cancelled_at FROM practice.session WHERE session_id = %s "
+                                   "FOR UPDATE", (session_id,)).fetchone()
+            if session["cancelled_at"] is not None:
+                return "already_cancelled"
+            if session["status"] not in ("complete", "partial"):
+                return "not_ready"
+            open_slots = conn.execute(
+                """SELECT COUNT(*) AS n FROM practice.item i LEFT JOIN practice.answer a USING (session_id, slot)
+                   WHERE i.session_id = %s AND a.slot IS NULL""", (session_id,)).fetchone()["n"]
+            if open_slots == 0:
+                return "finished"
+            conn.execute("UPDATE practice.session SET cancelled_at = now(), updated_at = now() "
+                         "WHERE session_id = %s", (session_id,))
+            return "cancelled"
 
     def _update(self, session_id: str, assignment: str, *params: Any) -> None:
         with self._connect() as conn:

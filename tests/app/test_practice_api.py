@@ -221,3 +221,68 @@ def test_server_restart_marks_active_sessions_interrupted(synthetic_client):
     PracticeService(lambda: url, lambda: FakeRunner()).get()  # a new server process starts
     after = store.get(session["session_id"])
     assert after["status"] == "failed" and after["stop_reason"] == "interrupted"
+
+
+# ---------------------------------------------------------------- cancellation
+
+def cancel(client, sid):
+    return client.post(f"/api/practice/sessions/{sid}/cancel")
+
+
+def test_cancel_after_some_answers_keeps_them_and_counts_no_unanswered(synthetic_client):
+    runner = FakeRunner()
+    client = practice_client(synthetic_client, runner)
+    sid = wait_ready(client, start(client)["session_id"])["session_id"]
+    client.post(f"/api/practice/sessions/{sid}/answers", json={"slot": 1, "label": "B"})  # correct
+    client.post(f"/api/practice/sessions/{sid}/answers", json={"slot": 2, "label": "A"})  # wrong
+    first = cancel(client, sid).json()
+    again = cancel(client, sid).json()
+    assert first["outcome"] == "cancelled" and again["outcome"] == "already_cancelled" and again["cancelled"]
+    data = client.get(f"/api/practice/sessions/{sid}").json()
+    assert data["cancelled"] is True and data["status"] == "complete"          # generation status kept
+    assert [q["answered"] for q in data["questions"]] == [True, True, False, False, False]
+    assert data["summary"] is None                                             # unanswered are not wrong
+    late = client.post(f"/api/practice/sessions/{sid}/answers", json={"slot": 3, "label": "D"})
+    assert late.status_code == 409 and late.json()["error"] == "cancelled"
+    assert runner.calls == 1                                                   # no new generation
+
+
+def test_cancel_before_any_answer_and_from_a_partial_practice(synthetic_client):
+    client = practice_client(synthetic_client, FakeRunner(accepted=2, stop_reason="daily_budget"))
+    sid = wait_ready(client, start(client)["session_id"])["session_id"]
+    assert cancel(client, sid).json()["outcome"] == "cancelled"
+    data = client.get(f"/api/practice/sessions/{sid}").json()
+    assert data["status"] == "partial" and data["cancelled"] and not any(q["answered"] for q in data["questions"])
+
+
+def test_cancel_after_the_final_answer_is_graceful(synthetic_client):
+    client = practice_client(synthetic_client, FakeRunner(accepted=1, stop_reason="daily_budget"))
+    sid = wait_ready(client, start(client)["session_id"])["session_id"]
+    client.post(f"/api/practice/sessions/{sid}/answers", json={"slot": 1, "label": "B"})
+    result = cancel(client, sid).json()
+    assert result == {"session_id": sid, "outcome": "finished", "cancelled": False}
+    data = client.get(f"/api/practice/sessions/{sid}").json()
+    assert data["cancelled"] is False and data["summary"]["answered"] == 1
+
+
+def test_cancel_is_refused_while_generating_and_for_unknown_sessions(synthetic_client):
+    gate = threading.Event()
+    client = practice_client(synthetic_client, FakeRunner(gate=gate))
+    sid = start(client)["session_id"]
+    assert cancel(client, sid).status_code == 409
+    gate.set()
+    wait_ready(client, sid)
+    assert cancel(client, "0" * 32).status_code == 404
+
+
+def test_parallel_cancellations_cancel_once(synthetic_client):
+    client = practice_client(synthetic_client, FakeRunner())
+    sid = wait_ready(client, start(client)["session_id"])["session_id"]
+    outcomes = []
+    threads = [threading.Thread(target=lambda: outcomes.append(cancel(client, sid).json()["outcome"]))
+               for _ in range(5)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(outcomes) == ["already_cancelled"] * 4 + ["cancelled"]

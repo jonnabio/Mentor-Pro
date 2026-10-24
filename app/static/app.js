@@ -234,6 +234,10 @@ function renderPreparing() {
 // ------------------------------------------------------------------ generation progress
 
 function handleSession(session) {
+  if (session.cancelled) {
+    resetToForm(""); // a cancelled practice is never resumed
+    return;
+  }
   state.session = session;
   if (session.status === "queued" || session.status === "running") {
     renderProgress(session);
@@ -435,6 +439,38 @@ $("progress-new").addEventListener("click", () => resetToForm(""));
 $("result-new").addEventListener("click", () => resetToForm(""));
 $("progress-menu").addEventListener("click", backToMenu);
 $("result-menu").addEventListener("click", backToMenu);
+
+// ------------------------------------------------------------------ leaving an active practice
+// The server marks the practice as cancelled; submitted answers are kept and still count for progress,
+// unanswered questions stay unanswered, and no generation is started.
+
+const exitDialog = $("exit-dialog");
+
+$("quiz-exit").addEventListener("click", () => {
+  showError($("exit-error"), "");
+  $("exit-confirm").disabled = false;
+  exitDialog.showModal();
+  $("exit-stay").focus();
+});
+
+$("exit-stay").addEventListener("click", () => exitDialog.close());
+
+$("exit-confirm").addEventListener("click", async () => {
+  const button = $("exit-confirm");
+  if (button.disabled || !state.session) return;
+  button.disabled = true; // one cancellation request; the server is also idempotent
+  try {
+    await api(`/api/practice/sessions/${state.session.session_id}/cancel`, { method: "POST" });
+  } catch (error) {
+    if (error.status !== 404) {
+      showError($("exit-error"), error.message);
+      button.disabled = false;
+      return;
+    }
+  }
+  exitDialog.close();
+  backToMenu();
+});
 
 // ------------------------------------------------------------------ learning dashboard (T014)
 // Statuses come from the server, computed from first attempts on distinct questions; percentages are

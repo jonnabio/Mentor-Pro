@@ -138,6 +138,7 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
         return {
             "session_id": session["session_id"],
             "status": session["status"],
+            "cancelled": session.get("cancelled_at") is not None,
             "stop_reason": session["stop_reason"],
             "message_es": message_es(session, len(rows)),
             "subject": session["subject"],
@@ -190,6 +191,8 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
         store, session = load(session_id)
         if session["status"] not in ("complete", "partial"):
             raise api_error(409, "not_ready", "La práctica todavía no está lista.")
+        if session.get("cancelled_at") is not None:
+            raise api_error(409, "cancelled", "Esta práctica fue cancelada; configure una nueva.")
         rows = store.items(session_id)
         row = next((r for r in rows if r["slot"] == request.slot), None)
         if row is None:
@@ -200,5 +203,15 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
         rows = [row if r["slot"] == request.slot else r for r in rows]
         return {"slot": request.slot, **feedback(row, stored["chosen_label"], stored["is_correct"]),
                 "already_answered": not first, "summary": summary(session, rows)}
+
+    @router.post("/sessions/{session_id}/cancel")
+    def cancel(session_id: str = SESSION_ID) -> dict:
+        """Leave a practice early. Idempotent; never starts generation; answers are kept."""
+        store, _ = load(session_id)
+        outcome = store.cancel(session_id)
+        if outcome == "not_ready":
+            raise api_error(409, "not_ready", "La práctica todavía no está lista.")
+        return {"session_id": session_id, "outcome": outcome,
+                "cancelled": outcome in ("cancelled", "already_cancelled")}
 
     return router
