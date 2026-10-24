@@ -46,12 +46,33 @@ Every gate run in T018 has a summary under `.ace/logs/verify/<run>/`.
 
 ---
 
+## Final Verification (Product Owner approval)
+
+| Check | Result |
+|-------|--------|
+| Local server restarted (`uvicorn app.main:app --port 8000`) | Running; served `app.js` contains the fix |
+| Smoke test, "Ver mi progreso" clicked with `/api/subjects` delayed 1.5 s (desktop, mobile) | 0 subjects loaded at click; dashboard visible; no JavaScript errors |
+| Smoke test, normal load | Dashboard visible; no JavaScript errors |
+| Writes during the smoke test | None (GET requests only; no practice started, no answer sent) |
+| Final ACE gate | `VERIFY_RESULT=pass gate=all` |
+| Commit check (`b4a34e2`) | 9 intended files; no secrets, credentials, student data, logs, `.env` or dumps; `.ace/logs/` git-ignored |
+| Push | `a875cc1..b4a34e2 main -> main` |
+
+---
+
 ## Unresolved Risks
 
-- The T016 `gate=test` failure has no evidence and may recur; the next
+- **Unresolved:** the T016 `gate=test` failure. No evidence was kept and it
+  was not reproduced; its root cause is unknown and not fixed. The next
   occurrence will keep its full logs.
-- `fail_interrupted()` fails every queued or running session in the shared
-  test database when any new app starts; a job left running by one test can
-  be failed by the next. Not observed to fail a test.
 - The regression scenario lives in the browser script, which is not part of
   the ACE gate.
+
+## Follow-up (not part of T018)
+
+- **Shared test-database job interference:** `fail_interrupted()` fails
+  every queued or running session in the shared test database when any new
+  app instance starts, so a job left running by one test (or a concurrent
+  browser run) can be marked failed by another. Not observed to fail a
+  test. Candidate fix for a separate task: scope the cleanup per process or
+  isolate practice tables per test schema.

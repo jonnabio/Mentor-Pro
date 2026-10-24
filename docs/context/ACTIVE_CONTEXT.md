@@ -92,7 +92,10 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
    model to `OPENROUTER_FREE_MODELS` or evaluate the reasoning-effort setting
    live (small sample).
 3. Receive and plan the next Product Owner task (ADR first).
-4. Optional quality work: typed property checks (divisibility, parity) so
+4. Follow-up from T018: shared test-database job interference
+   (`fail_interrupted()` fails every active session on app start); see
+   `docs/progress/task_T018_result.md`.
+5. Optional quality work: typed property checks (divisibility, parity) so
    property questions become provable; human spot checks of rubric scores.
 
 ### Blockers/Issues
