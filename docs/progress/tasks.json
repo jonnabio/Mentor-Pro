@@ -710,6 +710,43 @@
       "result_file": "docs/progress/task_T022_result.md",
       "failures": [],
       "notes": "Suite 435; browser 295/295 (desktop, mobile)."
+    },
+    {
+      "id": "T023",
+      "name": "Populate Nivel 1 writing exercises (PO task T023)",
+      "objective": "Correction exercises for L1 with tutor-only references; three validated exercises (punctuation, spelling, agreement) stored and visible.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-022-nivel-1-correction-exercises.md",
+          "app/writing/editing.py",
+          "app/writing/seeding.py",
+          "scripts/dev/seed_writing_l1.py",
+          "scripts/dev/fixtures/writing-exercises-L1-T023.json",
+          "tests/app/test_writing_editing.py",
+          "docs/progress/task_T023_result.md",
+          "docs/progress/screenshots/T023/"
+        ],
+        "modify": [
+          "app/writing/store.py",
+          "app/writing/generation.py",
+          "app/writing/contracts.py",
+          "app/writing/routes.py",
+          ".ace/schemas/writing/writing-exercise.schema.json",
+          "app/static/",
+          "scripts/dev/practice_e2e.py"
+        ]
+      },
+      "depends_on": [
+        "T022"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T023_result.md",
+      "failures": [],
+      "notes": "3/3 categories after 20 requests (USD 0); live 15/15; browser 309/309; suite 467."
     }
   ]
 }

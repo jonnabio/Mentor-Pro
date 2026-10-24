@@ -61,8 +61,10 @@ def _unit_es(unit: str, n: int) -> str:
     return {"sentences": "oración" if n == 1 else "oraciones", "paragraphs": "párrafo" if n == 1 else "párrafos"}[unit]
 
 
-def requirements_es(deliverable: dict[str, Any]) -> list[str]:
+def requirements_es(deliverable: dict[str, Any], exercise_type: str = "") -> list[str]:
     """Plain Spanish requirements of the deliverable (no rubric content)."""
+    if exercise_type == "conventions_editing":
+        return ["El texto completo, ya corregido", "Sin cambiar las ideas del texto", "Escrito en la computadora"]
     low, high = deliverable["min"], deliverable["max"]
     amount = f"{low} {_unit_es(deliverable['unit'], low)}" if low == high else \
         f"De {low} a {high} {_unit_es(deliverable['unit'], high)}"
@@ -117,7 +119,8 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             raise api_error(404, "level_not_found", "Ese nivel no existe.")
         rows = service.get().exercises(level)
         return {"level": level, "exercises": [
-            {"exercise_id": r["exercise_id"], "topic_es": r["record"]["topic_es"], "difficulty": r["difficulty"],
+            {"exercise_id": r["exercise_id"], "topic_es": r["record"].get("title_es") or r["record"]["topic_es"],
+             "difficulty": r["difficulty"],
              "evidence_mode": r["evidence_mode"], "state": state(r)} for r in rows]}
 
     @router.get("/exercises/{exercise_id}")
@@ -131,11 +134,14 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             "exercise_id": exercise_id, "level": level["code"],
             "level_label_es": f"Nivel {level['ordinal']}: {level['name_es']}",
             "difficulty": record["difficulty"], "topic_es": record["topic_es"],
+            "title_es": record.get("title_es"),
+            # T023: the text with deliberate errors; the tutor-only reference correction is never read here.
+            "source_text_es": record.get("source_text_es"),
             "communicative_situation_es": record["communicative_situation_es"],
             "suggested_ideas_es": record.get("suggested_ideas_es", []),
             "instructions_es": record["instructions_es"],
             "deliverable": {"description_es": record["deliverable"]["description_es"],
-                            "requirements_es": requirements_es(record["deliverable"]),
+                            "requirements_es": requirements_es(record["deliverable"], record["exercise_type"]),
                             "evidence_mode": record["deliverable"]["evidence_mode"]},
             "handwritten": handwritten, "handwritten_es": HANDWRITTEN_ES if handwritten else None,
             "draft": None if handwritten or draft is None else {"text": draft["text_es"],

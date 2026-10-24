@@ -232,3 +232,7 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 .submitted-text { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--border);
   border-radius: 8px; padding: 10px 12px; }
 #writing-back-levels, #writing-back-list, #writing-menu { margin-top: 12px; }
+
+/* ------------------------------------------------------------------ correction exercises (T023) */
+.source-text { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px dashed var(--border);
+  border-radius: 8px; padding: 10px 12px; background: var(--surface); line-height: 1.6; }

@@ -686,7 +686,12 @@ async function openWritingExercise(exerciseId) {
   }
   rememberWriting(exerciseId);
   $("writing-ex-level").textContent = `${data.level_label_es} · ${difficultyLabel(data.difficulty)}`;
-  $("writing-ex-topic").textContent = data.topic_es;
+  $("writing-ex-topic").textContent = data.title_es || data.topic_es;
+  $("writing-ex-subtitle").textContent = data.title_es ? `Tema: ${data.topic_es}` : "";
+  $("writing-ex-subtitle").hidden = !data.title_es;
+  // T023 correction exercises: the text with errors stays visible above the editor.
+  $("writing-source-text").textContent = data.source_text_es || "";
+  $("writing-source").hidden = !data.source_text_es;
   $("writing-ex-situation").textContent = data.communicative_situation_es;
   $("writing-ex-ideas").replaceChildren(...data.suggested_ideas_es.map((idea) => el("li", {}, idea)));
   $("writing-ex-ideas-title").hidden = data.suggested_ideas_es.length === 0;
@@ -713,6 +718,8 @@ function renderWritingState() {
   const text = data.draft ? data.draft.text : "";
   $("writing-text").value = text;
   writing.savedText = text;
+  $("writing-text").placeholder = data.source_text_es
+    ? "Escribí aquí el texto completo, ya corregido." : "";
   $("writing-saved").textContent = data.draft
     ? ` · Borrador guardado ${new Date(data.draft.saved_at).toLocaleString("es-CR")}` : "";
   updateWordCount();

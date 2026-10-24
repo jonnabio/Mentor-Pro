@@ -65,8 +65,13 @@ WORDS = ("río", "mesa", "nube", "faro", "trigo", "lápiz", "volcán", "puente",
 
 
 WRITING_FIXTURES = (db.REPO_ROOT / "scripts" / "dev" / "fixtures" / "writing-exercise-T021.json",
+                    db.REPO_ROOT / "scripts" / "dev" / "fixtures" / "writing-exercises-L1-T023.json",
                     db.REPO_ROOT / ".ace" / "schemas" / "writing" / "examples" / "exercises.json")
 HEALTHY = "PE-L2-alimentacion-saludable-rendimiento-19a72a"  # generated in T021
+L1_TITLES = ["El fútbol en mi comunidad", "Corrección de texto expositivo: El manglar de Térraba",
+             "Corrección de un texto expositivo: La feria de la ciencia"]  # generated in T023
+REFERENCE_TUTOR_ID = "PE-L1-futbol-comunidad-f136a4"
+REFERENCE_SECRET = "Los entrenadores voluntarios enseñan"  # test-only tutor reference text (seeded below)
 WRITING_TEXT = ("La alimentación saludable es muy importante para los estudiantes. Cuando comemos frutas, verduras "
                 "y granos tenemos más energía para aprender. Además, una buena alimentación ayuda a concentrarse en "
                 "clase y a convivir mejor con los compañeros.")
@@ -80,7 +85,11 @@ def prepare_writing(url: str) -> None:
     for path in WRITING_FIXTURES:
         data = json.loads(path.read_text(encoding="utf-8"))
         for exercise in data if isinstance(data, list) else [data]:
-            store.add_exercise(exercise)
+            reference = None
+            if exercise["exercise_id"] == REFERENCE_TUTOR_ID:  # a tutor-only reference that must never be shown
+                reference = {"corrected_text_es": f"{REFERENCE_SECRET} técnicas básicas.", "corrections": [],
+                             "ambiguities_es": []}
+            store.add_exercise(exercise, reference=reference)
 
 
 def test_database() -> str:
@@ -583,6 +592,44 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
     report.check(no_overflow(page), f"[{name}] levels: no horizontal overflow")
     page.screenshot(path=str(out / f"{name}-levels.png"), full_page=True)
 
+    page.locator('.level-choice[data-level="writing_conventions"]').click()
+    expect(page.locator(".exercise-choice").first).to_be_visible()
+    titles = page.locator(".exercise-choice .level-label").all_inner_texts()
+    report.check(titles == L1_TITLES, f"[{name}] Nivel 1 lists the three correction exercises {titles}")
+    for index in range(3):
+        page.locator(".exercise-choice").nth(index).click()
+        expect(page.locator("#writing-source")).to_be_visible()
+        source = page.locator("#writing-source-text").inner_text()
+        panel = page.locator("#writing-exercise-panel").inner_text()
+        html = page.content()
+        state = page.evaluate("JSON.stringify(sessionStorage) + JSON.stringify(localStorage)")
+        leaked = [w for w in (REFERENCE_SECRET, "EE0", "EE1", "El texto evidencia", "rúbrica", "corrected_text",
+                              "corrections") if w in html or w in state]
+        report.check(len(source.split()) >= 40 and "Corregí" in panel and "El texto completo, ya corregido" in panel
+                     and not leaked, f"[{name}] L1 #{index + 1}: text to correct, instructions, no reference "
+                                     f"or rubric ({leaked})")
+        if index == 0:
+            editor = page.locator("#writing-text")
+            report.check(editor.get_attribute("spellcheck") == "false"
+                         and page.locator("#writing-source").bounding_box()["y"] < editor.bounding_box()["y"],
+                         f"[{name}] original text stays above the editor, spell check off")
+            editor.fill(source.replace("las niños", "los niños"))
+            page.get_by_role("button", name="Guardar borrador").click()
+            expect(page.locator("#writing-saved")).to_contain_text("Borrador guardado")
+            page.screenshot(path=str(out / f"{name}-l1.png"), full_page=True)
+            page.reload()
+            expect(page.locator("#writing-editor")).to_be_visible()
+            report.check("los niños" in page.locator("#writing-text").input_value(),
+                         f"[{name}] L1 draft resumed after reload")
+            page.get_by_role("button", name="Entregar texto").click()
+            page.get_by_role("button", name="Entregar", exact=True).click()
+            expect(page.locator("#writing-pending")).to_be_visible()
+            after = page.content()
+            report.check(REFERENCE_SECRET not in after and REFERENCE_SECRET not in page.evaluate(
+                "JSON.stringify(sessionStorage)"), f"[{name}] reference not revealed after submission")
+        page.get_by_role("button", name="Volver a los ejercicios").click()
+    page.get_by_role("button", name="Volver a los niveles").click()
+
     page.locator('.level-choice[data-level="paragraph_writing"]').click()
     expect(page.locator("#writing-empty")).to_be_visible()
     report.check("Todavía no hay ejercicios" in page.locator("#writing-empty").inner_text(),
@@ -659,7 +706,8 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
     page.get_by_role("button", name="Volver al menú principal").click()
     expect(page.locator("#practice-form")).to_be_visible()
     report.check(page.locator("#subjects input").count() == 4, f"[{name}] main menu with the four subjects")
-    kept = writing_rows(url, "SELECT text_es FROM writing.draft WHERE exercise_id <> %s", HEALTHY)
+    kept = writing_rows(url, "SELECT text_es FROM writing.draft WHERE exercise_id NOT IN (%s, %s)", HEALTHY,
+                        REFERENCE_TUTOR_ID)
     report.check(kept == [("Borrador sin guardar sobre el ambiente.",)],
                  f"[{name}] leaving to the main menu kept the draft {kept}")
     report.check(no_overflow(page) and not errors, f"[{name}] no overflow, no JavaScript errors {errors}")

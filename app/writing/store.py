@@ -98,6 +98,16 @@ CREATE TABLE IF NOT EXISTS writing.draft (
 );
 ALTER TABLE writing.submission ADD COLUMN IF NOT EXISTS client_request_id TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_submission_exercise ON writing.submission (exercise_id);
+-- T023 (ADR-022): tutor-only reference correction of a correction exercise. Separate from writing.exercise,
+-- whose record feeds the student API; no student endpoint reads this table.
+CREATE TABLE IF NOT EXISTS writing.reference_correction (
+    exercise_id        TEXT PRIMARY KEY REFERENCES writing.exercise (exercise_id),
+    corrected_text_es  TEXT NOT NULL,
+    corrections        JSONB NOT NULL,
+    ambiguities_es     JSONB NOT NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE writing.generation_attempt ADD COLUMN IF NOT EXISTS reference JSONB;
 """
 
 
@@ -128,7 +138,8 @@ class WritingStore:
     def _connect(self) -> psycopg.Connection:
         return psycopg.connect(self.url, row_factory=dict_row)
 
-    def add_exercise(self, exercise: dict[str, Any], generation_request_id: str | None = None) -> None:
+    def add_exercise(self, exercise: dict[str, Any], generation_request_id: str | None = None,
+                     reference: dict[str, Any] | None = None) -> None:
         problems = contracts.validate_exercise(exercise)
         if problems:
             raise InvalidRecord(problems)
@@ -141,6 +152,25 @@ class WritingStore:
                  exercise["deliverable"]["evidence_mode"], exercise["provenance"]["baseline_version"],
                  exercise["evaluation"]["rubric_id"], exercise["evaluation"]["rubric_sha256"],
                  exercise["target_criteria"], Jsonb(exercise), generation_request_id))
+            if reference is not None:
+                conn.execute(
+                    """INSERT INTO writing.reference_correction (exercise_id, corrected_text_es, corrections,
+                           ambiguities_es) VALUES (%s, %s, %s, %s)""",
+                    (exercise["exercise_id"], reference["corrected_text_es"], Jsonb(reference["corrections"]),
+                     Jsonb(reference.get("ambiguities_es", []))))
+
+    def reference_correction(self, exercise_id: str) -> dict[str, Any] | None:
+        """Tutor-only; never used by the student API (app/writing/routes.py)."""
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.reference_correction WHERE exercise_id = %s",
+                                (exercise_id,)).fetchone()
+
+    def source_texts(self, level: str) -> list[str]:
+        """Texts to correct already stored for a level (near-duplicate check, T023)."""
+        with self._connect() as conn:
+            return [r["text"] for r in conn.execute(
+                "SELECT record->>'source_text_es' AS text FROM writing.exercise WHERE level = %s "
+                "AND record ? 'source_text_es'", (level,))]
 
     def topics(self) -> list[str]:
         """Topics already stored, so generation does not repeat them."""
@@ -156,14 +186,15 @@ class WritingStore:
             conn.execute(
                 """INSERT INTO writing.generation_attempt (request_id, level, difficulty, target_criteria, status,
                        exercise_id, models_used, calls, tokens_in, tokens_out, cost_usd, cost_complete,
-                       prompt_version, checks, review, reasons, exercise)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                       prompt_version, checks, review, reasons, exercise, reference)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                 (attempt.request_id, level, difficulty, criteria, attempt.status,
                  exercise["exercise_id"] if exercise and attempt.status == "accepted" else None,
                  summary["models_used"], summary["calls"], summary["tokens_in"], summary["tokens_out"],
                  summary["cost_usd"], summary["cost_complete"], prompt_version, Jsonb(attempt.checks),
                  Jsonb(attempt.review) if attempt.review else None, Jsonb(attempt.reasons),
-                 Jsonb(exercise) if exercise else None))
+                 Jsonb(exercise) if exercise else None,
+                 Jsonb(getattr(attempt, "reference", None)) if getattr(attempt, "reference", None) else None))
 
     # ------------------------------------------------------------ student writing (T022)
 

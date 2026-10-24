@@ -1,0 +1,271 @@
+[
+  {
+    "level": "writing_conventions",
+    "language": "es-CR",
+    "title_es": "El fútbol en mi comunidad",
+    "topic_es": "El fútbol en la comunidad",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE07",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE07",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE08",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE08",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A7",
+          "workbook_code": "EE07"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A8",
+          "workbook_code": "EE08"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 6,
+      "min": 6,
+      "unit": "sentences",
+      "evidence_mode": "typed",
+      "description_es": "El texto completo corregido, sin errores de concordancia."
+    },
+    "exercise_id": "PE-L1-futbol-comunidad-f136a4",
+    "exercise_type": "conventions_editing",
+    "schema_version": "1.0",
+    "source_text_es": "El fútbol es el deporte más popular en mi comunidad. Cada tarde, las niños y las niñas se reúne en la cancha del barrio para jugar partidos amistosos. La entrenadores voluntarios enseña técnicas básicas y el valores como el respeto y la solidaridad. Los padres apoyan a los equipos llevando refrescos y animando desde la gradería. Este juego fortalece la amistad y mejora la salud de todos. Además, la municipalidad organiza torneos cada año para celebrar el talento local.",
+    "instructions_es": [
+      "Leé el texto con atención.",
+      "Corregí los errores de concordancia entre artículo, sustantivo, adjetivo y entre sujeto y verbo.",
+      "Escribí el texto completo corregido.",
+      "No cambies las ideas del texto."
+    ],
+    "target_criteria": [
+      "EE07",
+      "EE08"
+    ],
+    "communicative_situation_es": "Un estudiante de sexto grado escribió este texto para el boletín del grado."
+  },
+  {
+    "level": "writing_conventions",
+    "language": "es-CR",
+    "title_es": "Corrección de texto expositivo: El manglar de Térraba",
+    "topic_es": "Los manglares de Térraba",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE09",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE09",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE11",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE11",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE15",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE15",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A9",
+          "workbook_code": "EE09"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A11",
+          "workbook_code": "EE11"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A15",
+          "workbook_code": "EE15"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 7,
+      "min": 7,
+      "unit": "sentences",
+      "evidence_mode": "typed",
+      "description_es": "El texto corregido completo."
+    },
+    "exercise_id": "PE-L1-manglares-terraba-cafb78",
+    "exercise_type": "conventions_editing",
+    "schema_version": "1.0",
+    "source_text_es": "El manglar de Térraba es un umedal muy importante para la viodiversidad de la zona. En sus raíces viven muchas especies de peces y aves que dependen de este ambiente. Los guardaparques trabajan para conservar el ecosistema y enseñan a los visitantes a hacer recorridos sin dañar la vegetación. Además, ay programas para ahorrar agua y proteger los árboles. Cada árbol es un árbol que sostiene la vida. Los niños aprenden rapido la importancia de cuidar el manglar. La canción del viento entre las ramas recuerda la vida.",
+    "instructions_es": [
+      "Leé el texto con atención.",
+      "Corregí los errores de b y v, de la h y de las tildes.",
+      "Escribí el texto completo corregido sin cambiar las ideas.",
+      "No agregues ni quites información."
+    ],
+    "target_criteria": [
+      "EE09",
+      "EE11",
+      "EE15"
+    ],
+    "communicative_situation_es": "Un compañero de sexto grado escribió este texto para el boletín del grado sobre los manglares de Térraba."
+  },
+  {
+    "level": "writing_conventions",
+    "language": "es-CR",
+    "title_es": "Corrección de un texto expositivo: La feria de la ciencia",
+    "topic_es": "La feria de la ciencia en la escuela",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE16",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE16",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE17",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE17",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE18",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE18",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A16",
+          "workbook_code": "EE16"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A17",
+          "workbook_code": "EE17"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B4-A18",
+          "workbook_code": "EE18"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 6,
+      "min": 6,
+      "unit": "sentences",
+      "evidence_mode": "typed",
+      "description_es": "El texto completo corregido, listo para publicar en el boletín."
+    },
+    "exercise_id": "PE-L1-feria-ciencia-escuela-c9576f",
+    "exercise_type": "conventions_editing",
+    "schema_version": "1.0",
+    "source_text_es": "La feria de la ciencia se celebra cada año en la escuela primaria de san josé. Los estudiantes presentan experimentos proyectos y charlas sobre temas variados, Los profesores guían a los grupos y evalúan la creatividad. Además, los padres visitan los stands y preguntan cuál es el experimento más sorprendente? La actividad fomenta el trabajo en equipo y el interés por la investigación. también se entregan premios a los mejores proyectos al final del día. Los niños disfrutan mucho de esta experiencia educativa.",
+    "instructions_es": [
+      "Leé el texto con atención.",
+      "Corregí los errores de mayúsculas, puntos, comas en enumeraciones y signos de interrogación o exclamación.",
+      "Escribí el texto completo corregido sin cambiar las ideas.",
+      "No agregues ni quites información."
+    ],
+    "target_criteria": [
+      "EE16",
+      "EE17",
+      "EE18"
+    ],
+    "communicative_situation_es": "Un estudiante de sexto grado escribió este texto para el boletín del grado."
+  }
+]

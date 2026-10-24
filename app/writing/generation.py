@@ -124,7 +124,7 @@ def exercise_type_for(level: dict[str, Any], criteria: list[str]) -> str:
 
 def deliverable_for(level: dict[str, Any], exercise_type: str, difficulty: str) -> dict[str, Any]:
     spec = level["deliverable"]
-    if exercise_type == "conventions_production":
+    if exercise_type in ("conventions_production", "conventions_editing"):
         low, high = {"easy": (3, 4), "medium": (4, 6), "hard": (6, 8)}[difficulty]
     elif exercise_type == "development_paragraphs":
         low = high = 2
@@ -139,13 +139,15 @@ def deliverable_for(level: dict[str, Any], exercise_type: str, difficulty: str) 
 
 
 def build_grounding(catalog: psycopg.Connection, baseline: str, level: str, difficulty: str,
-                    criteria: list[str]) -> Grounding:
+                    criteria: list[str], exercise_type: str | None = None) -> Grounding:
     """Check the request against the level map and join catalog records with the official rubric."""
     lv = resolve_level(level)
     if difficulty not in DIFFICULTY_ES:
         raise WritingRequestError(f"difficulty must be one of {sorted(DIFFICULTY_ES)}")
     codes = list(dict.fromkeys(c.upper() for c in criteria))
-    exercise_type = exercise_type_for(lv, codes)
+    if exercise_type is not None and exercise_type not in lv["exercise_types"]:
+        raise WritingRequestError(f"exercise type {exercise_type} is not part of level {lv['code']}")
+    exercise_type = exercise_type or exercise_type_for(lv, codes)
     core = set(lv["core_criteria"]) | set(lv.get("type_core_criteria", {}).get(exercise_type, []))
     if not codes or set(codes) - set(lv["allowed_criteria"]) or core - set(codes) \
             or len(codes) < lv["min_target_criteria"]:
@@ -316,8 +318,10 @@ def _plain(text: str) -> str:
 
 
 def _student_text(exercise: dict[str, Any]) -> str:
-    return " ".join([exercise["topic_es"], exercise["communicative_situation_es"], *exercise["suggested_ideas_es"],
-                     *exercise["instructions_es"], exercise["deliverable"]["description_es"]])
+    """Everything the student sees (T023: also the title and the text to correct)."""
+    return " ".join([exercise.get("title_es", ""), exercise["topic_es"], exercise["communicative_situation_es"],
+                     *exercise.get("suggested_ideas_es", []), *exercise["instructions_es"],
+                     exercise["deliverable"]["description_es"], exercise.get("source_text_es", "")]).strip()
 
 
 def deterministic_checks(g: Grounding, exercise: dict[str, Any], avoid_topics: list[str]) -> list[dict[str, str]]:
@@ -339,6 +343,7 @@ def deterministic_checks(g: Grounding, exercise: dict[str, Any], avoid_topics: l
     instructions = _plain(" ".join(exercise["instructions_es"] + [exercise["deliverable"]["description_es"]]))
     need = {
         "conventions_production": [("oracion",)],
+        "conventions_editing": [("corregi", "corrige", "correg"), ("texto",)],
         "introduction_paragraph": [("parrafo",), ("introduccion",), ("idea principal",),
                                    ("dos ideas", "ideas complementarias", "ideas que la apoyen")],
         "development_paragraphs": [("dos parrafos",), ("causa",), ("consecuencia",)],
@@ -352,17 +357,19 @@ def deterministic_checks(g: Grounding, exercise: dict[str, Any], avoid_topics: l
     check("W04", not missing, f"instructions do not state: {missing}")
 
     long_items = [i for i in exercise["instructions_es"] if len(i) > 220]
-    parts = [exercise["topic_es"], exercise["communicative_situation_es"], *exercise["suggested_ideas_es"],
-             *exercise["instructions_es"], exercise["deliverable"]["description_es"]]
+    ideas = exercise.get("suggested_ideas_es", [])
+    parts = [exercise["topic_es"], exercise["communicative_situation_es"], *ideas,
+             *exercise["instructions_es"], exercise["deliverable"]["description_es"],
+             exercise.get("source_text_es", "")]
     sentences = [s for part in parts for s in re.split(r"(?<=[.!?;:])\s+", part) if s.strip()]
     long_sentences = [s for s in sentences if len(s.split()) > 30]
     sizes_ok = (3 <= len(exercise["instructions_es"]) <= 7 and not long_items and not long_sentences
                 and 60 <= len(exercise["communicative_situation_es"]) <= 700 and len(exercise["topic_es"]) <= 90
-                and 2 <= len(exercise["suggested_ideas_es"]) <= 4)
+                and (0 if g.exercise_type == "conventions_editing" else 2) <= len(ideas) <= 4)
     check("W05", sizes_ok, f"length limits: {len(exercise['instructions_es'])} instructions, "
                            f"{len(long_items)} long items, {len(long_sentences)} sentences over 30 words, "
                            f"situation {len(exercise['communicative_situation_es'])} chars, "
-                           f"{len(exercise['suggested_ideas_es'])} ideas")
+                           f"{len(ideas)} ideas")
 
     topic = _plain(exercise["topic_es"]).strip(" .")
     reused = [t for t in list(MODEL_TOPICS) + avoid_topics if _plain(t).strip(" .") == topic]
