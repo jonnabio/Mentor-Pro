@@ -1,112 +1,99 @@
-# Active Context: Session Handoff 2026-10-23
+# Active Context: Session Handoff 2026-10-24
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-23
+- **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T015)
 
 ## Current Objective
 
-T015 (practice cancellation) is complete. Next: the next Product
-Owner task after approval (not 10–30 question sets, answering or frontend
-without it).
+No task in progress. Wait for the next Product Owner task; plan it with an
+ADR first. Do not start 10–30 question sets or new features without approval.
 
 ## Handoff Summary
 
 ### Completed
 
-- Repository reset to an ACE 2.7.0 baseline; MEP sources kept out of Git
-  (checksums in `references/MANIFEST.sha256`, generic names).
-- PostgreSQL 17: role `mentor_pro_admin` owns `mentor_pro` and
-  `mentor_pro_test`.
-- T001 — nine question-engine skills, standard, schemas, deterministic checker,
-  skill validator ([ADR-005](../adr/ADR-005-question-engine-skill-suite.md)).
-- T002 — curriculum baseline `PNE2026-SUM-v1.0` (98 objectives, 344
-  evidencias) ([ADR-006](../adr/ADR-006-curriculum-baseline-v1.md)).
-- T003 (PO T002.1) — catalog in PostgreSQL schema `curriculum`
-  ([ADR-007](../adr/ADR-007-postgresql-curriculum-catalog.md)).
-- T004 (PO T003) — practice configuration API and Spanish UI
-  ([ADR-008](../adr/ADR-008-practice-configuration-api.md)).
-- T005 — OpenRouter client, free-first routing, paid gate, budgets, usage
-  records ([ADR-009](../adr/ADR-009-openrouter-integration.md)); live
-  connectivity verified ($0).
-- T006 — single grounded question: grounding, prompt 1.1.0, checker 1.3.0
-  (math `select`, M04 operand grounding), blind solve, rubric, dev endpoint
-  ([ADR-010](../adr/ADR-010-single-question-generation.md)). Final (checker
-  1.4.0, prompt 1.2.0): M02, C01, EL01, ES01 each accepted; $0.00 over 82
-  calls. C09 now rejects material key-length cues (PO decision). Seven live
-  defects fixed (`docs/progress/task_T006_result.md`).
-- T007 — practice sets ([ADR-011](../adr/ADR-011-validated-practice-sets.md)):
-  `generate_set`, limits 5 questions / 3 requests per slot / 80 calls per set,
-  checker 1.5.0 (L01–L03, M04 property selection), prompts generation 1.3.0
-  and rubric 1.1.0, tables `generation.practice_set` and `practice_set_item`,
-  `POST /api/dev/practice-sets/generate`. Live: complete 5/5, 31 calls, $0.00,
-  22 min (`docs/progress/task_T007_result.md`).
-- T008 — parallel slots ([ADR-012](../adr/ADR-012-controlled-parallel-generation.md)):
-  `QUESTION_GENERATION_CONCURRENCY` (default 2), `BudgetGate` reserves budget
-  before every HTTP attempt, commit-time D01, slot-ordered results. Live 5/5
-  in 628 s (T007: 1 342 s), $0.00 (`docs/progress/task_T008_result.md`).
-- T009 — checker 1.6.0: a maths proof counts only if it establishes what the
-  stem asks (number properties or extra conditions → blind solve required);
-  [RCA-002](../rca/RCA-002-math-proof-not-establishing-question.md) and guard
-  (`docs/progress/task_T009_result.md`).
-- T010 — student practice ([ADR-013](../adr/ADR-013-student-practice-sessions.md)):
-  schema `practice` (session, item, answer), in-process job queue with
-  polling, server-side evaluation, one question at a time, feedback, summary;
-  `scripts/dev/practice_e2e.py` (Playwright + Chrome). Live: 5/5 in 366 s,
-  $0.00 (`docs/progress/task_T010_result.md`).
-- T011 — `OPENROUTER_GENERATION_MAX_TOKENS` (default 6000), explicit
-  truncation detection. Live probe: no measured reliability gain, higher
-  latency (`docs/progress/task_T011_result.md`).
-- T012 — results/failed screens: "Nueva práctica" and "Volver al menú
-  principal" (no new job). Generation default 4000; Super VL excluded from
-  generation only; optional `OPENROUTER_GENERATION_REASONING_EFFORT` (off)
-  (`docs/progress/task_T012_result.md`).
-- T013 — question bank ([ADR-014](../adr/ADR-014-validated-question-bank.md)):
-  practices reuse eligible accepted questions by slot (current checker or
-  recorded revalidation in `generation.bank_revalidation`); only missing slots
-  are generated. Live: bank-only practice in 1.9 s with 0 calls
-  (`docs/progress/task_T013_result.md`).
-- T014 — learning dashboard ([ADR-015](../adr/ADR-015-repeat-aware-learning-status.md)):
-  six configurable statuses from first attempts on distinct questions,
-  `GET /api/dashboard`, "Ver mi progreso"; bank freshness from global history
-  (`docs/progress/task_T014_result.md`).
-- T015 — "Salir de la práctica" with confirmation; `practice.session.cancelled_at`;
-  answers kept and counted (`docs/progress/task_T015_result.md`).
+Baseline before this session: ACE 2.7.0 reset, T001 skills and checker
+(ADR-005), T002 baseline `PNE2026-SUM-v1.0` (ADR-006), T003 PostgreSQL
+catalog (ADR-007), T004 configuration API and UI (ADR-008), T005 OpenRouter
+client and budgets (ADR-009).
+
+This session (reports in `docs/progress/task_T0xx_result.md`):
+
+- **T006** — single grounded question completed for M02, C01, EL01, ES01; C09
+  rejects material key-length cues; per-attempt reasons recorded
+  ([ADR-010](../adr/ADR-010-single-question-generation.md)).
+- **T007** — validated 5-question practice sets, checker 1.5.0 (L01–L03
+  linguistic checks), `generation.practice_set(_item)`
+  ([ADR-011](../adr/ADR-011-validated-practice-sets.md)).
+- **T008** — bounded parallel slots (`QUESTION_GENERATION_CONCURRENCY`=2),
+  atomic `BudgetGate` per HTTP attempt, commit-time duplicate check; 53 %
+  faster ([ADR-012](../adr/ADR-012-controlled-parallel-generation.md)).
+- **T009** — checker 1.6.0: maths proofs count only if they establish what
+  the stem asks; RCA-002 and regression guard
+  ([RCA-002](../rca/RCA-002-math-proof-not-establishing-question.md)).
+- **T010** — student practice in the web page: server-managed jobs with
+  polling, server-side evaluation, feedback, summary, keys never sent early;
+  `scripts/dev/practice_e2e.py` (Playwright + Chrome)
+  ([ADR-013](../adr/ADR-013-student-practice-sessions.md)).
+- **T011** — configurable generation token limit and explicit truncation
+  detection; 6000 gave no measured gain.
+- **T012** — "Volver al menú principal" / "Nueva práctica" on results and
+  failed screens; generation default 4000; Nemotron 3.5 Super VL excluded
+  from generation only; optional `OPENROUTER_GENERATION_REASONING_EFFORT`.
+- **T013** — validated question bank: reuse eligible accepted questions by
+  slot, revalidation records, generate only missing slots
+  ([ADR-014](../adr/ADR-014-validated-question-bank.md)).
+- **T014** — learning dashboard: six configurable statuses from first
+  attempts on distinct questions, repeat-aware metrics, "Ver mi progreso"
+  ([ADR-015](../adr/ADR-015-repeat-aware-learning-status.md)).
+- **T015** — "Salir de la práctica" with confirmation;
+  `practice.session.cancelled_at`; answers kept and counted.
 
 ### Current State
 
-- `main` pushed to `origin/main`; working tree clean; no task locks; no
-  background servers.
-- `.env` exists (git-ignored) with `OPENROUTER_API_KEY`, pinned free models,
-  `OPENROUTER_MAX_REQUESTS_PER_DAY=1000` (account not free tier) and
-  `MENTOR_PRO_DEV_ENDPOINTS=true`.
-- Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`,
-  `generation.practice_set`, `generation.practice_set_item`,
-  `generation.bank_revalidation`, `practice.session`, `practice.item`,
-  `practice.answer`.
-- Tests: 365 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- `main` committed and pushed to `origin/main`; working tree clean; no task
+  locks; no running servers or generation jobs.
+- Generation: free models only (paid disabled), checker 1.6.0, prompts
+  generation 1.3.0 / rubric 1.1.0, generation limit 4000 tokens, daily
+  request budget 1000 (`.env`), 5 questions per practice, 80 calls per set,
+  3 requests per slot, concurrency 2.
+- Student app: configure → bank composition → (job for missing slots) →
+  one question at a time → summary; exit with cancellation; dashboard.
+- PostgreSQL tables: `curriculum.*`, `llm.usage_record`,
+  `generation.question_attempt`, `generation.practice_set`,
+  `generation.practice_set_item`, `generation.bank_revalidation`,
+  `practice.session`, `practice.item`, `practice.answer`.
+- Tests: 365 passing; browser (mocked) 182/182; ACE gate
+  `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Plan the next PO task with an ADR first. Only Nemotron 3 Ultra generates
-   now (MiniMax unlisted, VL excluded): no generation model fallback. The
-   reasoning-effort setting is untested live.
-2. Property cues are keyword heuristics (T009 limitations); a typed
-   property check (divisibility, parity) would make such keys provable.
-3. Human spot checks of rubric scores (`question-evaluation`).
-4. `scripts/pubs/check_lane.py` (session start prompt) does not exist here.
+1. Decide on mocked browser test data (see Blockers): isolate
+   `practice_e2e.py` mock mode in a separate database or schema, and
+   optionally remove existing `Q-mock-…` practices.
+2. Restore a generation model fallback: only Nemotron 3 Ultra generates
+   (MiniMax M3.1 Flash unlisted, Super VL excluded). Add another free text
+   model to `OPENROUTER_FREE_MODELS` or evaluate the reasoning-effort setting
+   live (small sample).
+3. Receive and plan the next Product Owner task (ADR first).
+4. Optional quality work: typed property checks (divisibility, parity) so
+   property questions become provable; human spot checks of rubric scores.
 
 ### Blockers/Issues
 
-- Mocked browser tests write to the same database as the single student:
-  275 of 343 stored answers are test data (`Q-mock-…`); decision pending.
-
-- Free models: Gemma 429 (upstream), Nemotron Super 404, Inkling 403 for this
-  account; only Nemotron 3 Ultra, MiniMax M3.1 Flash, Nemotron 3.5 Super VL
-  pinned.
-- Rubric is model-scored by one free model; it missed awkward M02 wording.
+- **Test data in the student history:** mocked browser runs write to the
+  same database; 275 of 343 stored answers are `Q-mock-…` items and appear
+  in the dashboard. Decision pending.
+- **No generation fallback model** (see Next Steps 2); free models also
+  truncate or return 502 often.
+- Rubric and blind solve come from free models; bank quality inherits them.
+- Property detection (T009) is keyword-based; unusual phrasing can slip
+  through.
+- `scripts/pubs/check_lane.py` from the session-start prompt does not exist.
 - Local `pg_hba.conf` uses `trust`; `mentor_pro_admin` has no password.
 - Edge cannot start under automation; browser tests use installed Chrome.
 - Docker not installed; `docker-compose.yml` untested.
@@ -116,15 +103,24 @@ without it).
 
 ### Notes
 
-- Tracker IDs `^T[0-9]{3}$`; PO labels kept in task names/notes.
 - App: `.venv/Scripts/python.exe -m uvicorn app.main:app --port 8000`
-  (reads `.env`).
-- Connectivity: `.venv/Scripts/python.exe -m app.llm.connectivity`.
-- Dev generation: `POST /api/dev/questions/generate` (only with
-  `MENTOR_PRO_DEV_ENDPOINTS=true`).
-- Gate: `bash .ace/scripts/verify.sh` (tests need `mentor_pro_test`).
-- Never expose keys or student data; `approved_baseline` items are not official
-  MEP wording.
+  (reads `.env`). Restart after code changes. A server start marks
+  `queued`/`running` practices of the shared database as interrupted.
+- Browser tests: `.venv/Scripts/python.exe scripts/dev/practice_e2e.py --out DIR`
+  (mocked; uses M10–M12 and "Difícil", where the bank is empty) and
+  `--live` (real OpenRouter; bank-only and mixed practices).
+- Live helpers: `scripts/dev/generate_examples.py`,
+  `scripts/dev/generate_practice_set.py`; connectivity
+  `.venv/Scripts/python.exe -m app.llm.connectivity`.
+- Gate: `bash .ace/scripts/verify.sh` (tests need `mentor_pro_test`). Check
+  the `VERIFY_RESULT` line exactly before committing.
+- Key settings: `OPENROUTER_GENERATION_MAX_TOKENS`,
+  `OPENROUTER_GENERATION_EXCLUDED_MODELS`,
+  `OPENROUTER_GENERATION_REASONING_EFFORT`, `QUESTION_GENERATION_CONCURRENCY`,
+  `MENTOR_PRO_SET_MAX_*`, `MENTOR_PRO_MASTERY_*` (see `.env.example`).
+- Tracker IDs `^T[0-9]{3}$`; PO labels kept in task names and notes.
+- Never expose keys or student data; `approved_baseline` items are not
+  official MEP wording; learning statuses are not official MEP levels.
 
 ## Active Constraints
 
@@ -132,3 +128,4 @@ without it).
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
   [ADR-015](../adr/ADR-015-repeat-aware-learning-status.md)
+- Regression guards: `docs/rca/regression-guards.yaml` (RCA-001, RCA-002)
