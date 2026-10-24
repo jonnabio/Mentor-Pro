@@ -20,7 +20,19 @@ from app.practice.store import PracticeStore
 log = logging.getLogger("mentor_pro.practice")
 
 # runner(session_row, on_slot_done) -> PracticeSetResult; injected for tests and mocked browser runs.
+# The session row passed in carries only the allocation slots still missing (T013: the rest came from the
+# bank) and `seed_items`, the bank items already in the set (for set-wide duplicate checks).
 SetRunner = Callable[[dict[str, Any], Callable[[Any], None]], PracticeSetResult]
+
+
+def missing_allocation(allocation: list[dict[str, Any]], filled: set[int]) -> list[dict[str, Any]]:
+    """The allocation restricted to slots without an item, keeping objective, evidencia and slot numbers."""
+    rows = []
+    for row in allocation:
+        slots = [s for s in row["slots"] if s["slot"] not in filled]
+        if slots:
+            rows.append({**row, "slots": slots, "questions": len(slots)})
+    return rows
 
 
 def live_set_runner(llm_factory: Callable[[], tuple[Any, Any, Any]], open_catalog: Callable[[], Any]) -> SetRunner:
@@ -31,7 +43,8 @@ def live_set_runner(llm_factory: Callable[[], tuple[Any, Any, Any]], open_catalo
         conn = open_catalog()
         try:
             result = generate_set(conn, client, usage_store, generation_store, session["baseline_version"],
-                                  session["subject"], session["allocation"], limits, on_slot_done=on_slot_done)
+                                  session["subject"], session["allocation"], limits, on_slot_done=on_slot_done,
+                                  seed_items=session.get("seed_items", []))
         finally:
             conn.close()
             client.close()
@@ -57,21 +70,27 @@ class JobQueue:
         if session is None or session["status"] != "queued":
             return
         self.store.mark_running(session_id)
-        done = [0]
+        existing = self.store.items(session_id)  # bank items chosen when the session was created
+        done = [len(existing)]
+        pending = {**session, "allocation": missing_allocation(session["allocation"], {r["slot"] for r in existing}),
+                   "seed_items": [r["item"] for r in existing]}
 
         def on_slot_done(_slot: Any) -> None:
             done[0] += 1
             self.store.progress(session_id, done[0])
 
         try:
-            result = self.runner(session, on_slot_done)
+            result = self.runner(pending, on_slot_done)
         except Exception as exc:  # noqa: BLE001 - any failure must end the job, not leave it running
             log.error("practice job %s failed: %s", session_id, type(exc).__name__)
-            self.store.finish(session_id, "failed", "internal_error", None, [])
+            self.store.finish(session_id, "partial" if existing else "failed", "internal_error", None, [])
             return
-        items = [{"slot": s.slot, "objective_code": s.objective_code, "evidence_id": s.evidence_id, "item": s.item}
+        items = [{"slot": s.slot, "objective_code": s.objective_code, "evidence_id": s.evidence_id, "item": s.item,
+                  "source": "generated", "source_request_id": s.request_id}
                  for s in result.slots if s.status == "accepted"]
-        status = "complete" if result.status == "complete" else ("partial" if items else "failed")
+        total = len(existing) + len(items)
+        status = "complete" if total == session["slots_total"] else ("partial" if total else "failed")
         stop_reason = None if status == "complete" else (result.stop_reason or "slot_retries_exhausted")
         self.store.finish(session_id, status, stop_reason, result.practice_set_id, items)
-        log.info("practice job %s finished: %s (%s/%s)", session_id, status, len(items), len(result.slots))
+        log.info("practice job %s finished: %s (%s bank + %s generated of %s)", session_id, status,
+                 len(existing), len(items), session["slots_total"])

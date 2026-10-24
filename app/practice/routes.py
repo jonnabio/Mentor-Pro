@@ -1,4 +1,4 @@
-"""Student practice API (T010, ADR-013).
+"""Student practice API (T010 ADR-013; question bank T013 ADR-014).
 
 Answer keys and explanations never leave the server before the student answers
 a question; answers are evaluated here. All student-facing text is Spanish
@@ -7,6 +7,7 @@ a question; answers are evaluated here. All student-facing text is Spanish
 
 from __future__ import annotations
 
+import hashlib
 import threading
 from collections.abc import Callable
 from typing import Any, Literal
@@ -16,6 +17,7 @@ from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, Field
 
 from app.allocation import allocate
+from app.practice.bank import QuestionBank
 from app.practice.jobs import JobQueue, SetRunner
 from app.practice.store import PracticeStore
 from curriculum.catalog import PracticeScope, SelectionError, select_objectives
@@ -23,8 +25,8 @@ from curriculum.catalog import PracticeScope, SelectionError, select_objectives
 SESSION_ID = Path(pattern=r"^[0-9a-f]{32}$")
 
 STATUS_ES = {
-    "queued": "La práctica está en cola y comenzará en un momento.",
-    "running": "Estamos generando y revisando sus preguntas. Esto puede tardar varios minutos.",
+    "queued": "Generando preguntas adicionales. La generación comenzará en un momento.",
+    "running": "Generando preguntas adicionales. Esto puede tardar varios minutos.",
     "complete": "Su práctica está lista.",
 }
 STOP_ES = {
@@ -44,6 +46,8 @@ class SessionRequest(BaseModel):
     difficulty: Literal["easy", "medium", "hard", "mixed"]
     question_count: Literal[5]
     client_request_id: str = Field(pattern=r"^[A-Za-z0-9-]{8,64}$")
+    # Anonymous per-tab token (sessionStorage); only its hash is stored, to prefer unseen bank questions.
+    browser_token: str | None = Field(default=None, pattern=r"^[A-Za-z0-9-]{16,64}$")
 
 
 class AnswerRequest(BaseModel):
@@ -57,19 +61,23 @@ class PracticeService:
     def __init__(self, url_factory: Callable[[], str], runner_factory: Callable[[], SetRunner]):
         self._url_factory, self._runner_factory = url_factory, runner_factory
         self._lock = threading.Lock()
-        self._ready: tuple[PracticeStore, JobQueue] | None = None
+        self._ready: tuple[PracticeStore, JobQueue, QuestionBank] | None = None
 
-    def get(self) -> tuple[PracticeStore, JobQueue]:
+    def get(self) -> tuple[PracticeStore, JobQueue, QuestionBank]:
         with self._lock:
             if self._ready is None:
-                store = PracticeStore(self._url_factory())
+                url = self._url_factory()
+                store = PracticeStore(url)
                 store.fail_interrupted()  # jobs of a previous process cannot finish
-                self._ready = (store, JobQueue(store, self._runner_factory()))
+                self._ready = (store, JobQueue(store, self._runner_factory()), QuestionBank(url))
             return self._ready
 
 
 def message_es(session: dict[str, Any], available: int) -> str:
     status = session["status"]
+    if status in ("queued", "running") and session.get("bank_count"):
+        return (f"Generando preguntas adicionales. {session['bank_count']} de {session['slots_total']} preguntas "
+                "ya están listas del banco de preguntas.")
     if status in STATUS_ES:
         return STATUS_ES[status]
     reason = STOP_ES.get(session["stop_reason"] or "", STOP_ES["internal_error"])
@@ -118,7 +126,7 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
     router = APIRouter(prefix="/api/practice", tags=["practice"])
 
     def load(session_id: str) -> tuple[PracticeStore, dict[str, Any]]:
-        store, _ = service.get()
+        store = service.get()[0]
         session = store.get(session_id)
         if session is None:
             raise api_error(404, "session_not_found", "No encontramos esta práctica. Configure una nueva.")
@@ -136,6 +144,8 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
             "difficulty": session["config"]["difficulty"],
             "slots_total": session["slots_total"],
             "slots_done": session["slots_done"],
+            "composition": {"bank": session.get("bank_count", 0),
+                            "generated": sum(1 for r in rows if r.get("source") == "generated")},
             "objectives": [{"code": row["workbook_code"], "text_es": texts[row["workbook_code"]],
                             "questions": row["questions"]} for row in session["allocation"]],
             "questions": [question_view(r) for r in rows],
@@ -155,11 +165,19 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
         texts = {o["workbook_code"]: o["text_es"] for o in selection.objectives}
         for row in plan["allocation"]:
             row["text_es"] = texts[row["workbook_code"]]
-        config = request.model_dump(mode="json", exclude={"client_request_id"})
-        store, queue = service.get()
-        session, created = store.create_or_get(request.client_request_id, baseline, config, plan["allocation"])
+        config = request.model_dump(mode="json", exclude={"client_request_id", "browser_token"})
+        browser_hash = (hashlib.sha256(request.browser_token.encode("ascii")).hexdigest()
+                        if request.browser_token else None)
+        store, queue, bank = service.get()
+        session, created = store.create_or_get(request.client_request_id, baseline, config, plan["allocation"],
+                                               browser_hash)
         if created:
-            queue.submit(session["session_id"])
+            # Fill slots from the validated bank first; generate only what is missing (ADR-014).
+            picks = bank.compose(conn, baseline, request.subject, plan["allocation"], browser_hash)
+            complete = len(picks) == session["slots_total"]
+            session = store.add_bank_items(session["session_id"], list(picks.values()), complete)
+            if not complete:
+                queue.submit(session["session_id"])
         return {**view(store, session), "created": created}
 
     @router.get("/sessions/{session_id}")

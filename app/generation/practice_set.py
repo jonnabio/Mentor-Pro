@@ -134,10 +134,13 @@ def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store
                  baseline: str, subject: str, allocation: list[dict[str, Any]], limits: SetLimits,
                  practice_set_id: str | None = None,
                  clock: Callable[[], float] = time.monotonic,
-                 on_slot_done: Callable[[SlotResult], None] | None = None) -> PracticeSetResult:
+                 on_slot_done: Callable[[SlotResult], None] | None = None,
+                 seed_items: list[dict[str, Any]] | None = None) -> PracticeSetResult:
     """Generate every slot of `allocation` (the `allocation` list returned by `allocate`).
 
     `on_slot_done` (progress reporting) is called from a worker thread when a slot finishes.
+    `seed_items` are items already in the practice (from the question bank); new items must not
+    duplicate them.
     """
     set_id = practice_set_id or f"set-{uuid.uuid4().hex[:16]}"
     slots = [SlotResult(s["slot"], row["workbook_code"], s["evidence_id"], s["evidence_ordinal"], s["difficulty"])
@@ -149,7 +152,7 @@ def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store
 
     gate = BudgetGate(usage_store, client.settings, max_calls=limits.max_calls_per_set)
     lock = threading.Lock()
-    committed: list[dict[str, Any]] = []
+    committed: list[dict[str, Any]] = list(seed_items or [])
     outcomes: dict[int, list[GenerationOutcome]] = {s.slot: [] for s in slots}
     stop: list[str | None] = [None]
     started = clock()

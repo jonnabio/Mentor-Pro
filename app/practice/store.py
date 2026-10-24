@@ -48,6 +48,12 @@ CREATE TABLE IF NOT EXISTS practice.item (
     item            JSONB NOT NULL,
     PRIMARY KEY (session_id, slot)
 );
+-- T013 (ADR-014): set composition (bank vs generated) and an anonymous per-tab hash for freshness.
+ALTER TABLE practice.session ADD COLUMN IF NOT EXISTS browser_hash TEXT;
+ALTER TABLE practice.session ADD COLUMN IF NOT EXISTS bank_count INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE practice.item ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'generated'
+    CHECK (source IN ('bank', 'generated'));
+ALTER TABLE practice.item ADD COLUMN IF NOT EXISTS source_request_id TEXT;
 CREATE TABLE IF NOT EXISTS practice.answer (
     session_id    TEXT NOT NULL,
     slot          INTEGER NOT NULL,
@@ -76,7 +82,8 @@ class PracticeStore:
         return psycopg.connect(self.url, row_factory=dict_row, autocommit=True)
 
     def create_or_get(self, client_request_id: str, baseline: str, config: dict[str, Any],
-                      allocation: list[dict[str, Any]]) -> tuple[dict[str, Any], bool]:
+                      allocation: list[dict[str, Any]], browser_hash: str | None = None
+                      ) -> tuple[dict[str, Any], bool]:
         """Insert a queued session, or return the existing one for the same request or active configuration."""
         fp = fingerprint(baseline, config)
         slots_total = sum(len(row["slots"]) for row in allocation)
@@ -87,11 +94,11 @@ class PracticeStore:
                 return existing, False
             row = conn.execute(
                 """INSERT INTO practice.session (session_id, client_request_id, fingerprint, baseline_version,
-                       subject, config, allocation, status, slots_total)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, 'queued', %s)
+                       subject, config, allocation, status, slots_total, browser_hash)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, 'queued', %s, %s)
                    ON CONFLICT DO NOTHING RETURNING *""",
                 (secrets.token_hex(16), client_request_id, fp, baseline, config["subject"], Jsonb(config),
-                 Jsonb(allocation), slots_total)).fetchone()
+                 Jsonb(allocation), slots_total, browser_hash)).fetchone()
             if row:
                 return row, True
             # Lost a race: same request id, or an active session for the same configuration.
@@ -105,6 +112,17 @@ class PracticeStore:
         with self._connect() as conn:
             return conn.execute("SELECT * FROM practice.session WHERE session_id = %s", (session_id,)).fetchone()
 
+    def add_bank_items(self, session_id: str, picks: list[dict[str, Any]], complete: bool) -> dict[str, Any]:
+        """Store bank items for their slots; a fully covered set is complete at once (no job)."""
+        with psycopg.connect(self.url, row_factory=dict_row) as conn, conn.transaction():
+            for pick in picks:
+                self._insert_item(conn, session_id, pick)
+            status = "'complete', finished_at = now(), started_at = now()" if complete else "status"
+            return conn.execute(
+                f"""UPDATE practice.session SET bank_count = %s, slots_done = %s, status = {status},
+                        updated_at = now() WHERE session_id = %s RETURNING *""",
+                (len(picks), len(picks), session_id)).fetchone()
+
     def mark_running(self, session_id: str) -> None:
         self._update(session_id, "status = 'running', started_at = now()")
 
@@ -116,10 +134,7 @@ class PracticeStore:
         """Store accepted items and the final status in one transaction."""
         with psycopg.connect(self.url) as conn, conn.transaction():
             for row in items:
-                conn.execute(
-                    """INSERT INTO practice.item (session_id, slot, objective_code, evidence_id, item)
-                       VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING""",
-                    (session_id, row["slot"], row["objective_code"], row["evidence_id"], Jsonb(row["item"])))
+                self._insert_item(conn, session_id, row)
             conn.execute(
                 """UPDATE practice.session SET status = %s, stop_reason = %s, practice_set_id = %s,
                        slots_done = slots_total, finished_at = now(), updated_at = now() WHERE session_id = %s""",
@@ -136,7 +151,7 @@ class PracticeStore:
     def items(self, session_id: str) -> list[dict[str, Any]]:
         with self._connect() as conn:
             return conn.execute(
-                """SELECT i.slot, i.objective_code, i.evidence_id, i.item, a.chosen_label, a.is_correct
+                """SELECT i.slot, i.objective_code, i.evidence_id, i.item, i.source, a.chosen_label, a.is_correct
                    FROM practice.item i LEFT JOIN practice.answer a USING (session_id, slot)
                    WHERE i.session_id = %s ORDER BY i.slot""", (session_id,)).fetchall()
 
@@ -151,6 +166,15 @@ class PracticeStore:
                 return row, True
             return conn.execute("SELECT chosen_label, is_correct FROM practice.answer "
                                 "WHERE session_id = %s AND slot = %s", (session_id, slot)).fetchone(), False
+
+    @staticmethod
+    def _insert_item(conn: psycopg.Connection, session_id: str, row: dict[str, Any]) -> None:
+        conn.execute(
+            """INSERT INTO practice.item (session_id, slot, objective_code, evidence_id, item, source,
+                   source_request_id)
+               VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING""",
+            (session_id, row["slot"], row["objective_code"], row["evidence_id"], Jsonb(row["item"]),
+             row.get("source", "generated"), row.get("source_request_id")))
 
     def _update(self, session_id: str, assignment: str, *params: Any) -> None:
         with self._connect() as conn:

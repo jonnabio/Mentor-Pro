@@ -32,8 +32,10 @@ BASE = f"http://127.0.0.1:{PORT}/"
 DESKTOP = {"width": 1280, "height": 900}
 MOBILE = {"width": 390, "height": 844}
 KEYS = "BCDAB"
+# Mocked-generator scenarios use objectives and a difficulty ("Difícil") with no bank inventory, so the
+# scripted runner, not the real question bank, supplies their questions.
 SUBJECTS = {  # label, objective codes
-    "matematicas": ("Matemáticas", ["M02", "M04", "M05"]),
+    "matematicas": ("Matemáticas", ["M10", "M11", "M12"]),
     "espanol": ("Español", ["EL01", "EL02"]),
     "ciencias": ("Ciencias", ["C01", "C02"]),
     "estudios_sociales": ("Estudios Sociales", ["ES01", "ES02"]),
@@ -88,13 +90,14 @@ def no_overflow(page: Page) -> bool:
     return page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
 
 
-def configure(page: Page, subject: str, codes: list[str]) -> None:
+def configure(page: Page, subject: str, codes: list[str], difficulty: str = "Difícil") -> None:
+    """Mocked-generator scenarios use "Difícil", where the real bank has no inventory."""
     page.goto(BASE)
     page.locator(f'input[name="subject"][value="{subject}"]').check()
     page.get_by_label("Varios objetivos").check()
     for code in codes:
         page.locator(f'input[name="objective"][value="{code}"]').check()
-    page.get_by_label("Intermedia").check()
+    page.get_by_label(difficulty).check()
     page.get_by_label("5", exact=True).check()
 
 
@@ -199,15 +202,16 @@ def leave_practice(page: Page, runner: ScriptedRunner, report: Report, name: str
 def scenario_duplicate_clicks(page: Page, runner: ScriptedRunner, report: Report) -> None:
     runner.mode, runner.delay = "ok", 0.3
     before = runner.calls
-    configure(page, "matematicas", ["M02", "M05"])
+    configure(page, "matematicas", ["M10", "M12"])
     # Five clicks in the same tick, then a "second tab" posting the same configuration with its own request id.
     page.evaluate("""() => { const b = document.getElementById('submit');
                              for (let i = 0; i < 5; i++) b.click(); }""")
     expect(page.locator("#progress-view")).to_be_visible()
+    page.wait_for_function("sessionStorage.getItem('mentorpro.session') !== null")  # first POST answered
     other = page.evaluate("""async () => (await fetch('/api/practice/sessions', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({subject: 'matematicas', scope: 'selected_objectives', objective_codes: ['M05', 'M02'],
-                              difficulty: 'medium', question_count: 5, client_request_id: crypto.randomUUID()})
+        body: JSON.stringify({subject: 'matematicas', scope: 'selected_objectives', objective_codes: ['M12', 'M10'],
+                              difficulty: 'hard', question_count: 5, client_request_id: crypto.randomUUID()})
         })).json()""")
     own = page.evaluate("sessionStorage.getItem('mentorpro.session')")
     report.check(other["session_id"] == own and other["created"] is False,
@@ -222,6 +226,8 @@ def scenario_refresh_and_resubmit(page: Page, runner: ScriptedRunner, report: Re
     configure(page, "ciencias", ["C01", "C02"])
     page.get_by_role("button", name="Generar práctica").click()
     expect(page.locator("#progress-count")).to_contain_text("de 5")
+    report.check(page.locator("#progress-actions").is_hidden(),
+                 "[refresh] leave-practice buttons hidden while generation runs")
     page.screenshot(path=str(shots / "progress.png"), full_page=True)
     page.reload()
     expect(page.locator("#progress-view")).to_be_visible()
@@ -292,13 +298,37 @@ def run_mock(out: Path) -> Report:
                 page.evaluate("sessionStorage.clear()")
                 scenario_refresh_and_resubmit(page, runner, report, out)
                 scenario_failures(page, runner, report, out)
+                scenario_bank_only(page, runner, report, out)
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()
     return report
 
 
+def run_practice(page: Page, report: Report, name: str, out: Path) -> dict:
+    """Generate (or retrieve) and complete the configured practice; returns timing and composition."""
+    started = time.monotonic()
+    page.get_by_role("button", name="Generar práctica").click()
+    page.wait_for_selector("#quiz-view:not([hidden]), #progress-error:not([hidden])", timeout=45 * 60 * 1000)
+    elapsed = time.monotonic() - started
+    sid = page.evaluate("sessionStorage.getItem('mentorpro.session')")
+    info = page.evaluate("async (sid) => (await fetch(`/api/practice/sessions/${sid}`)).json()", sid)
+    report.check(True, f"[{name}] ready after {elapsed:.1f} s; status {info['status']}; "
+                       f"composition {info['composition']}")
+    if page.locator("#progress-error").is_visible():
+        report.check(False, f"[{name}] generation failed: {page.locator('#progress-error').inner_text()}")
+        return {"elapsed": elapsed, "info": info}
+    total = int(page.locator("#quiz-position").inner_text().split(" de ")[1])
+    counts = answer_all(page, report, name, ["A", "B", "C", "D", "A"][:total], None, out)
+    report.check(counts["correct"] + counts["incorrect"] == total,
+                 f"[{name}] answered {total}: {counts['correct']} correct, {counts['incorrect']} incorrect, "
+                 f"result {page.locator('#result-percentage').inner_text()}")
+    page.screenshot(path=str(out / f"{name}-result.png"), full_page=True)
+    return {"elapsed": elapsed, "info": info, "session_id": sid}
+
+
 def run_live(out: Path) -> Report:
+    """T013 acceptance: a bank-only practice (no OpenRouter), then one where only missing slots are generated."""
     report = Report()
     with serve(create_app()), sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome", headless=True)
@@ -307,33 +337,45 @@ def run_live(out: Path) -> Report:
         page.on("pageerror", lambda exc: errors.append(str(exc)))
         leaks: list[str] = []
         watch_disclosure(page, leaks)
-        configure(page, "matematicas", ["M02", "M04", "M05"])
-        started = time.monotonic()
+
+        configure(page, "matematicas", ["M02", "M04", "M05"], difficulty="Intermedia")
+        bank = run_practice(page, report, "live-bank", out)
+        report.check(bank["info"]["status"] == "complete" and bank["info"]["composition"]["bank"] == 5,
+                     "[live-bank] all 5 questions from the bank")
+        report.check(bank["elapsed"] < 10, f"[live-bank] practice started immediately ({bank['elapsed']:.1f} s)")
+        print(f"LIVE_BANK_SESSION={bank.get('session_id')}", flush=True)
+        page.get_by_role("button", name="Volver al menú principal").click()
+
+        configure(page, "matematicas", ["M02", "M06"], difficulty="Intermedia")
         page.get_by_role("button", name="Generar práctica").click()
-        expect(page.locator("#progress-view")).to_be_visible()
-        page.screenshot(path=str(out / "live-progress.png"), full_page=True)
+        expect(page.locator("#progress-message")).to_contain_text("Generando preguntas adicionales", timeout=15000)
+        page.screenshot(path=str(out / "live-mixed-progress.png"), full_page=True)
+        report.check(True, f"[live-mixed] progress: '{page.locator('#progress-message').inner_text()}'")
         page.wait_for_selector("#quiz-view:not([hidden]), #progress-error:not([hidden])", timeout=45 * 60 * 1000)
-        elapsed = time.monotonic() - started
-        report.check(True, f"[live] generation finished after {elapsed:.0f} s")
-        if page.locator("#progress-error").is_visible():
-            report.check(False, f"[live] generation failed: {page.locator('#progress-error').inner_text()}")
-        else:
-            notice = page.locator("#quiz-notice")
-            report.check(notice.is_hidden(), f"[live] complete set (notice: '{notice.inner_text()}')")
+        sid = page.evaluate("sessionStorage.getItem('mentorpro.session')")
+        info = page.evaluate("async (sid) => (await fetch(`/api/practice/sessions/${sid}`)).json()", sid)
+        report.check(info["status"] in ("complete", "partial"),
+                     f"[live-mixed] {info['status']}; composition {info['composition']}")
+        print(f"LIVE_MIXED_SESSION={sid}", flush=True)
+        if page.locator("#quiz-view").is_visible():
             total = int(page.locator("#quiz-position").inner_text().split(" de ")[1])
-            labels = ["A", "B", "C", "D", "A"][:total]
-            counts = answer_all(page, report, "live", labels, None, out)
-            report.check(counts["correct"] + counts["incorrect"] == total,
-                         f"[live] answered {total}: {counts['correct']} correct, {counts['incorrect']} incorrect")
-            report.check(page.locator("#result-percentage").is_visible(),
-                         f"[live] result {page.locator('#result-percentage').inner_text()}")
-            page.screenshot(path=str(out / "live-result.png"), full_page=True)
-            sid = page.evaluate("sessionStorage.getItem('mentorpro.session')")
-            report.check(bool(sid), f"[live] session {sid}")
+            counts = answer_all(page, report, "live-mixed", ["A", "B", "C", "D", "A"][:total], None, out)
+            report.check(sum(counts.values()) == total, f"[live-mixed] answered {total}")
+            page.screenshot(path=str(out / "live-mixed-result.png"), full_page=True)
         report.check(not leaks, f"[live] no key or explanation before submission ({leaks})")
         report.check(not errors, f"[live] no JavaScript errors {errors}")
         browser.close()
     return report
+
+
+def scenario_bank_only(page: Page, runner: ScriptedRunner, report: Report, out: Path) -> None:
+    """Real bank inventory (Matemáticas M02, M04, M05, Intermedia): ready at once, no generation job."""
+    before = runner.calls
+    configure(page, "matematicas", ["M02", "M04", "M05"], difficulty="Intermedia")
+    result = run_practice(page, report, "bank", out)
+    report.check(result["info"]["composition"] == {"bank": 5, "generated": 0} and runner.calls == before,
+                 "[bank] 5 bank questions, no generation job")
+    leave_practice(page, runner, report, "bank", "menu", None)
 
 
 class serve:

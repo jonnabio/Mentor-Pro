@@ -5,6 +5,7 @@
 "use strict";
 
 const SESSION_KEY = "mentorpro.session";
+const BROWSER_KEY = "mentorpro.browser"; // anonymous per-tab token: prefer bank questions not seen yet
 const POLL_MS = 3000;
 
 const $ = (id) => document.getElementById(id);
@@ -65,6 +66,19 @@ function storeSession(id) {
     else sessionStorage.removeItem(SESSION_KEY);
   } catch {
     // Storage may be unavailable (private mode); the practice still works without resume.
+  }
+}
+
+function browserToken() {
+  try {
+    let token = sessionStorage.getItem(BROWSER_KEY);
+    if (!token) {
+      token = `b-${newRequestId()}`.replace(/[^A-Za-z0-9-]/g, "").slice(0, 64);
+      sessionStorage.setItem(BROWSER_KEY, token);
+    }
+    return token;
+  } catch {
+    return undefined; // without storage every practice is treated as a new browser
   }
 }
 
@@ -185,19 +199,35 @@ form.addEventListener("submit", async (event) => {
     difficulty: form.elements.difficulty.value,
     question_count: Number(form.elements.question_count.value),
     client_request_id: state.requestId,
+    browser_token: browserToken(),
   };
+  // The server first fills the practice from the validated question bank.
+  renderPreparing();
   try {
     const session = await api("/api/practice/sessions", { method: "POST", body: JSON.stringify(payload) });
     state.requestId = null;
     storeSession(session.session_id);
     handleSession(session);
   } catch (error) {
+    show("practice-form");
     showError($("form-error"), error.message);
     updateState();
   } finally {
     button.textContent = "Generar práctica";
   }
 });
+
+function renderPreparing() {
+  show("progress-view");
+  $("progress-title").textContent = "Preparando su práctica";
+  $("progress-message").textContent = "Preparando práctica con preguntas disponibles…";
+  showError($("progress-error"), "");
+  $("progress-actions").hidden = true;
+  $("progress-hint").hidden = true;
+  document.querySelector(".progress").hidden = true;
+  $("progress-count").textContent = "";
+  $("progress-objectives").replaceChildren();
+}
 
 // ------------------------------------------------------------------ generation progress
 

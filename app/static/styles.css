@@ -135,6 +135,7 @@ button.secondary {
   background: var(--surface); color: var(--accent); font-size: 1rem; font-weight: 650; cursor: pointer;
 }
 .actions { display: grid; gap: 8px; margin-top: 12px; }
+.actions[hidden] { display: none; }  /* `display: grid` would otherwise override [hidden] */
 @media (min-width: 720px) { .actions { grid-template-columns: 1fr 1fr; } }
 
 .progress[hidden] { display: none; }
