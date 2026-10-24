@@ -85,6 +85,23 @@ class Attempt:
     error_kind: str | None = None
 
 
+NATIVE_LENGTH_REASONS = frozenset({"length", "max_tokens", "max_output_tokens", "model_length"})
+
+
+def reached_output_limit(choice: dict[str, Any], tokens_out: int | None, max_tokens: int) -> bool:
+    """True when a reply stopped at its output-token limit, so its content is incomplete.
+
+    OpenRouter normalizes the stop to `finish_reason: "length"`; some providers only set
+    `native_finish_reason`, and some report no reason at all, in which case output tokens
+    reaching the limit are taken as truncation.
+    """
+    if choice.get("finish_reason") == "length":
+        return True
+    if str(choice.get("native_finish_reason") or "").lower() in NATIVE_LENGTH_REASONS:
+        return True
+    return choice.get("finish_reason") is None and tokens_out is not None and tokens_out >= max_tokens
+
+
 def _is_zero(price: Any) -> bool:
     try:
         return float(price) == 0.0
@@ -202,11 +219,12 @@ class OpenRouterClient:
                                         error_kind=f"http_{response.status_code}"))
                 return attempts
 
-            attempts.append(self._parse_success(model, number, latency, response))
+            attempts.append(self._parse_success(model, number, latency, response, payload["max_tokens"]))
             return attempts
         return attempts
 
-    def _parse_success(self, model: str, number: int, latency: int, response: httpx.Response) -> Attempt:
+    def _parse_success(self, model: str, number: int, latency: int, response: httpx.Response,
+                       max_tokens: int) -> Attempt:
         try:
             body = response.json()
             choice = body["choices"][0]
@@ -227,9 +245,11 @@ class OpenRouterClient:
             generation_id=body.get("id"),
             content=content,
         )
-        if choice.get("finish_reason") == "length":
+        if reached_output_limit(choice, attempt.tokens_out, max_tokens):
             # Cut off by max_tokens (often reasoning models): the answer is incomplete.
             attempt.status, attempt.error_kind = "invalid_output", "truncated"
+        elif not (content or "").strip():
+            attempt.status, attempt.error_kind = "invalid_output", "empty"
         if isinstance(usage.get("cost"), (int, float)):
             attempt.cost_usd, attempt.cost_source = float(usage["cost"]), "provider_reported"
         elif attempt.generation_id:

@@ -380,3 +380,70 @@ def test_truncated_reply_is_invalid_output_and_moves_on():
     result = route(client, store, MSG, "connectivity_test")
     assert store.records[0]["status"] == "invalid_output" and store.records[0]["error_kind"] == "truncated"
     assert result.status == "ok" and result.final.model_requested == "acme/small:free"
+
+
+# ---------------------------------------------------------------- generation output limit and truncation (T011)
+
+def clean_env(monkeypatch):
+    for name in list(__import__("os").environ):
+        if name.startswith("OPENROUTER_"):
+            monkeypatch.delenv(name)
+
+
+def test_generation_limit_defaults_to_6000_and_is_configurable(tmp_path, monkeypatch):
+    clean_env(monkeypatch)
+    env = tmp_path / ".env"
+    env.write_text(f"OPENROUTER_API_KEY={KEY}\n", encoding="utf-8")
+    settings = LlmSettings.load(env)
+    assert settings.generation_max_tokens == 6000 and settings.max_tokens == 1024
+    monkeypatch.setenv("OPENROUTER_GENERATION_MAX_TOKENS", "8000")
+    assert LlmSettings.load(env).generation_max_tokens == 8000
+
+
+@pytest.mark.parametrize("value,ok", [("999", False), ("1000", True), ("16000", True), ("16001", False),
+                                      ("abc", False)])
+def test_generation_limit_boundaries(tmp_path, monkeypatch, value, ok):
+    clean_env(monkeypatch)
+    env = tmp_path / ".env"
+    env.write_text(f"OPENROUTER_API_KEY={KEY}\nOPENROUTER_GENERATION_MAX_TOKENS={value}\n", encoding="utf-8")
+    if ok:
+        assert LlmSettings.load(env).generation_max_tokens == int(value)
+    else:
+        with pytest.raises(LlmConfigurationError):
+            LlmSettings.load(env)
+
+
+def reply(finish=None, native=None, tokens_out=3, content="listo"):
+    body = completion("acme/big:free", tokens=(12, tokens_out), content=content)
+    if finish is not None:
+        body["choices"][0]["finish_reason"] = finish
+    if native is not None:
+        body["choices"][0]["native_finish_reason"] = native
+    return body
+
+
+@pytest.mark.parametrize("body,status,kind", [
+    (reply(finish="length", tokens_out=500), "invalid_output", "truncated"),
+    (reply(finish="stop", native="MAX_TOKENS", tokens_out=500), "invalid_output", "truncated"),
+    (reply(native="max_output_tokens", tokens_out=500), "invalid_output", "truncated"),
+    (reply(tokens_out=1000), "invalid_output", "truncated"),          # no reason, output at the limit
+    (reply(tokens_out=999), "ok", None),                               # no reason, below the limit
+    (reply(finish="stop", tokens_out=1000), "ok", None),               # explicit stop at exactly the limit
+    (reply(finish="stop", content="   "), "invalid_output", "empty"),
+])
+def test_truncation_and_empty_replies_are_detected(body, status, kind):
+    client, _ = make(FakeOpenRouter({"acme/big:free": [(200, body, {})]}))
+    attempt = client.chat("acme/big:free", MSG, max_tokens=1000)[-1]
+    assert (attempt.status, attempt.error_kind) == (status, kind)
+
+
+def test_truncated_generation_falls_back_and_is_recorded():
+    fake = FakeOpenRouter({"acme/big:free": [(200, reply(finish="length", tokens_out=6000), {})]})
+    client, _ = make(fake)
+    store = MemoryUsageStore()
+    result = route(client, store, MSG, "generation", max_tokens=6000)
+    assert result.status == "ok" and result.final.model_requested == "acme/small:free"
+    first = store.records[0]
+    assert (first["status"], first["error_kind"], first["tokens_out"]) == ("invalid_output", "truncated", 6000)
+    assert [json.loads(r.content)["max_tokens"] for r in fake.requests
+            if r.url.path.endswith("/chat/completions")] == [6000, 6000]

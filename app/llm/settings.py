@@ -36,6 +36,12 @@ def _bool(value: str) -> bool:
     raise LlmConfigurationError(f"not a boolean: {value!r}")
 
 
+# Generation output limit (T011): 4000 truncated free reasoning models before they answered.
+GENERATION_MAX_TOKENS_DEFAULT = 6000
+GENERATION_MAX_TOKENS_MIN = 1000
+GENERATION_MAX_TOKENS_MAX = 16000
+
+
 @dataclass(frozen=True)
 class LlmSettings:
     api_key: str = field(repr=False)
@@ -46,6 +52,7 @@ class LlmSettings:
     timeout_s: float = 60.0
     max_retries: int = 2                    # retries per model on 429 / 5xx / timeout
     max_tokens: int = 1024
+    generation_max_tokens: int = 6000       # question generation only (ADR-010); solve/review limits unchanged
     max_requests_per_day: int = 50
     max_usd_per_day: float = 0.0
     app_title: str = "Mentor Pro"
@@ -71,6 +78,7 @@ class LlmSettings:
                 timeout_s=float(get("OPENROUTER_TIMEOUT_S", "60")),
                 max_retries=int(get("OPENROUTER_MAX_RETRIES", "2")),
                 max_tokens=int(get("OPENROUTER_MAX_TOKENS", "1024")),
+                generation_max_tokens=int(get("OPENROUTER_GENERATION_MAX_TOKENS", str(GENERATION_MAX_TOKENS_DEFAULT))),
                 max_requests_per_day=int(get("OPENROUTER_MAX_REQUESTS_PER_DAY", "50")),
                 max_usd_per_day=float(get("OPENROUTER_MAX_USD_PER_DAY", "0")),
             )
@@ -86,5 +94,8 @@ class LlmSettings:
             raise LlmConfigurationError("OPENROUTER_MAX_RETRIES must be 0..5")
         if self.timeout_s <= 0 or self.max_tokens <= 0 or self.max_requests_per_day < 0 or self.max_usd_per_day < 0:
             raise LlmConfigurationError("timeouts, token and budget limits must be positive")
+        if not GENERATION_MAX_TOKENS_MIN <= self.generation_max_tokens <= GENERATION_MAX_TOKENS_MAX:
+            raise LlmConfigurationError(f"OPENROUTER_GENERATION_MAX_TOKENS must be "
+                                        f"{GENERATION_MAX_TOKENS_MIN}..{GENERATION_MAX_TOKENS_MAX}")
         if self.allow_paid and not self.paid_model:
             raise LlmConfigurationError("OPENROUTER_ALLOW_PAID=true requires OPENROUTER_PAID_MODEL")

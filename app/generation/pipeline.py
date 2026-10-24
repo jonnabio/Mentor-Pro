@@ -23,8 +23,8 @@ from app.llm.client import OpenRouterClient
 from app.llm.router import Store, route
 
 MAX_GENERATION_ATTEMPTS = 2
-# Generous limits: free reasoning models spend many tokens before answering.
-GENERATION_MAX_TOKENS = 4000
+# Generous limits: free reasoning models spend many tokens before answering. The generation limit is
+# configurable (OPENROUTER_GENERATION_MAX_TOKENS, default 6000, T011); solve and review limits are fixed.
 SOLVE_MAX_TOKENS = 2000
 RUBRIC_MAX_TOKENS = 3000
 SUBJECT_ID = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
@@ -138,8 +138,9 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
 
     for number in range(1, MAX_GENERATION_ATTEMPTS + 1):
         messages = prompts.generation_messages(bundle, difficulty, revision_notes=notes, avoid_stems=avoid_stems)
-        gen = route(client, store, messages, purpose="generation", max_tokens=GENERATION_MAX_TOKENS,
-                    request_id=request_id, practice_set_id=practice_set_id, gate=gate)
+        gen = route(client, store, messages, purpose="generation",
+                    max_tokens=client.settings.generation_max_tokens, request_id=request_id,
+                    practice_set_id=practice_set_id, gate=gate)
         outcome.usage += gen.records
         if gen.status != "ok":
             outcome.status = "unavailable"

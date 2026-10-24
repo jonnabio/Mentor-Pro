@@ -65,6 +65,7 @@ class FakeLlm:
         self.solve, self.rubric, self.cost = solve, rubric or RUBRIC_OK, cost
         self.calls: list[tuple[str, str]] = []
         self.lock = threading.Lock()  # practice-set workers call concurrently
+        self.max_tokens: dict[str, list[int]] = {}
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         with self.lock:
@@ -84,6 +85,7 @@ class FakeLlm:
         else:
             purpose, content = "rubric", json.dumps(self.rubric)
         self.calls.append((purpose, body["model"]))
+        self.max_tokens.setdefault(purpose, []).append(body["max_tokens"])
         return httpx.Response(200, json={
             "id": f"gen-{len(self.calls)}", "model": body["model"], "provider": "Fake",
             "choices": [{"message": {"content": content}}],
@@ -349,3 +351,19 @@ def test_property_question_rejected_when_blind_solve_unavailable(catalog_conn):
     outcome = generate_one(client_for(NoSolve([PROPERTY_ITEM])), MemoryUsageStore(), bundle(catalog_conn), "medium")
     assert outcome.status == "rejected" and outcome.validation["verdict"] == "pending"
     assert "independent solve unavailable" in outcome.reasons
+
+
+# ---------------------------------------------------------------- per-purpose output limits (T011)
+
+def test_only_generation_uses_the_configurable_limit(catalog_conn):
+    fake = FakeLlm([READING_ITEM])
+    client = OpenRouterClient(LlmSettings(api_key=KEY, generation_max_tokens=7000),
+                              transport=httpx.MockTransport(fake), sleep=lambda s: None)
+    assert generate_one(client, MemoryUsageStore(), bundle(catalog_conn, "espanol", "EL01"), "medium").status         == "accepted"
+    assert fake.max_tokens == {"generation": [7000], "solve": [2000], "rubric": [3000]}
+
+
+def test_default_generation_limit_is_6000(catalog_conn):
+    fake = FakeLlm([MATH_ITEM])
+    generate_one(client_for(fake), MemoryUsageStore(), bundle(catalog_conn), "easy")
+    assert fake.max_tokens["generation"] == [6000] and fake.max_tokens["rubric"] == [3000]
