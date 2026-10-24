@@ -5,6 +5,7 @@
 "use strict";
 
 const SESSION_KEY = "mentorpro.session";
+const WRITING_KEY = "mentorpro.writing"; // exercise open in Producción escrita, restored after a reload
 const BROWSER_KEY = "mentorpro.browser"; // anonymous per-tab token: prefer bank questions not seen yet
 const POLL_MS = 3000;
 
@@ -91,7 +92,8 @@ function storedSession() {
 }
 
 function show(view) {
-  for (const id of ["practice-form", "progress-view", "quiz-view", "result-view", "dashboard-view"]) {
+  for (const id of ["practice-form", "progress-view", "quiz-view", "result-view", "dashboard-view",
+    "writing-view"]) {
     $(id).hidden = id !== view;
   }
   window.scrollTo({ top: 0 });
@@ -577,10 +579,239 @@ $("form-progress").addEventListener("click", () => openDashboard(form.elements.s
 $("result-progress").addEventListener("click", () => openDashboard(state.session && state.session.subject));
 $("dashboard-menu").addEventListener("click", () => backToMenu());
 
+// ------------------------------------------------------------------ Producción escrita (T022)
+// Stored, validated exercises only; nothing here generates. Typed work: draft saved in PostgreSQL,
+// submitted once, then "Pendiente de revisión del tutor". Handwritten (L5) work shows its conditions only.
+// The editor disables spell checking and autocorrection so spelling errors stay visible to the tutor.
+
+const writing = { level: null, exercise: null, savedText: "", requestId: null, busy: false };
+
+function rememberWriting(exerciseId) {
+  try {
+    if (exerciseId) sessionStorage.setItem(WRITING_KEY, exerciseId);
+    else sessionStorage.removeItem(WRITING_KEY);
+  } catch {
+    // Without storage a reload returns to the main menu; the draft is still in PostgreSQL.
+  }
+}
+
+function rememberedWriting() {
+  try {
+    return sessionStorage.getItem(WRITING_KEY);
+  } catch {
+    return null;
+  }
+}
+
+const countWords = (text) => (text.trim() ? text.trim().split(/\s+/).length : 0);
+const difficultyLabel = (code) => ({ easy: "Fácil", medium: "Intermedia", hard: "Difícil" })[code] || code;
+const writingDirty = () =>
+  Boolean(writing.exercise) && !writing.exercise.submission && !writing.exercise.handwritten &&
+  $("writing-text").value !== writing.savedText;
+
+function writingPanel(name) {
+  for (const id of ["writing-levels-panel", "writing-list-panel", "writing-exercise-panel"]) {
+    $(id).hidden = id !== `writing-${name}-panel`;
+  }
+  showError($("writing-error"), "");
+  window.scrollTo({ top: 0 });
+}
+
+async function openWriting() {
+  clearTimeout(state.pollTimer);
+  show("writing-view");
+  writingPanel("levels");
+  writing.exercise = null;
+  rememberWriting(null);
+  const list = $("writing-levels");
+  list.replaceChildren(el("li", { class: "muted" }, "Cargando niveles…"));
+  try {
+    const data = await api("/api/writing/levels");
+    list.replaceChildren();
+    for (const level of data.levels) {
+      const count = level.exercise_count === 1 ? "1 ejercicio" : `${level.exercise_count} ejercicios`;
+      const button = el("button", { type: "button", class: "level-choice", "data-level": level.code },
+        el("span", { class: "level-label" }, level.label_es),
+        el("span", { class: "level-text" }, level.description_es),
+        el("span", { class: "meta-line" }, count + (level.handwritten ? " · se escribe a mano" : "")));
+      button.addEventListener("click", () => openWritingLevel(level));
+      list.append(el("li", {}, button));
+    }
+  } catch (error) {
+    list.replaceChildren();
+    showError($("writing-error"), error.message);
+  }
+}
+
+async function openWritingLevel(level) {
+  writing.level = level;
+  writingPanel("list");
+  $("writing-list-title").textContent = level.label_es;
+  const list = $("writing-exercises");
+  list.replaceChildren();
+  $("writing-empty").hidden = true;
+  try {
+    const data = await api(`/api/writing/levels/${encodeURIComponent(level.code)}/exercises`);
+    $("writing-empty").hidden = data.exercises.length > 0;
+    const states = { new: "Sin empezar", draft: "Borrador guardado", submitted: "Pendiente de revisión del tutor" };
+    for (const exercise of data.exercises) {
+      const button = el("button", { type: "button", class: "exercise-choice", "data-exercise": exercise.exercise_id },
+        el("span", { class: "level-label" }, exercise.topic_es),
+        el("span", { class: "meta-line" },
+          `${difficultyLabel(exercise.difficulty)} · ${states[exercise.state]}` +
+          (exercise.evidence_mode === "handwritten" ? " · a mano" : "")));
+      button.addEventListener("click", () => openWritingExercise(exercise.exercise_id));
+      list.append(el("li", {}, button));
+    }
+  } catch (error) {
+    showError($("writing-error"), error.message);
+  }
+}
+
+async function openWritingExercise(exerciseId) {
+  let data;
+  try {
+    data = await api(`/api/writing/exercises/${encodeURIComponent(exerciseId)}`);
+  } catch (error) {
+    rememberWriting(null);
+    showError($("writing-error"), error.message);
+    return;
+  }
+  show("writing-view");
+  writingPanel("exercise");
+  writing.exercise = data;
+  writing.requestId = null;
+  if (!writing.level || writing.level.code !== data.level) {
+    writing.level = { code: data.level, label_es: data.level_label_es }; // after a reload
+  }
+  rememberWriting(exerciseId);
+  $("writing-ex-level").textContent = `${data.level_label_es} · ${difficultyLabel(data.difficulty)}`;
+  $("writing-ex-topic").textContent = data.topic_es;
+  $("writing-ex-situation").textContent = data.communicative_situation_es;
+  $("writing-ex-ideas").replaceChildren(...data.suggested_ideas_es.map((idea) => el("li", {}, idea)));
+  $("writing-ex-ideas-title").hidden = data.suggested_ideas_es.length === 0;
+  $("writing-ex-instructions").replaceChildren(...data.instructions_es.map((text) => el("li", {}, text)));
+  $("writing-ex-deliverable").textContent = data.deliverable.description_es;
+  $("writing-ex-requirements").replaceChildren(...data.deliverable.requirements_es.map((r) => el("li", {}, r)));
+  $("writing-handwritten").textContent = data.handwritten_es || "";
+  $("writing-handwritten").hidden = !data.handwritten;
+  renderWritingState();
+}
+
+function renderWritingState() {
+  const data = writing.exercise;
+  const submitted = Boolean(data.submission);
+  $("writing-editor").hidden = data.handwritten || submitted;
+  $("writing-submitted").hidden = !submitted;
+  if (submitted) {
+    $("writing-pending").textContent = `${data.submission.status_es}. Entregado el ` +
+      `${new Date(data.submission.submitted_at).toLocaleString("es-CR")} (${data.submission.word_count} palabras).`;
+    $("writing-submitted-text").textContent = data.draft ? data.draft.text : "";
+    return;
+  }
+  if (data.handwritten) return;
+  const text = data.draft ? data.draft.text : "";
+  $("writing-text").value = text;
+  writing.savedText = text;
+  $("writing-saved").textContent = data.draft
+    ? ` · Borrador guardado ${new Date(data.draft.saved_at).toLocaleString("es-CR")}` : "";
+  updateWordCount();
+}
+
+function updateWordCount() {
+  const words = countWords($("writing-text").value);
+  $("writing-words").textContent = words === 1 ? "1 palabra" : `${words} palabras`;
+  $("writing-submit").disabled = words === 0 || writing.busy;
+  if (writingDirty()) $("writing-saved").textContent = " · Cambios sin guardar";
+}
+
+async function saveWritingDraft() {
+  if (!writing.exercise || writing.busy) return true;
+  const text = $("writing-text").value;
+  writing.busy = true;
+  $("writing-save").disabled = true;
+  try {
+    const saved = await api(`/api/writing/exercises/${encodeURIComponent(writing.exercise.exercise_id)}/draft`,
+      { method: "PUT", body: JSON.stringify({ text }) });
+    writing.savedText = text;
+    writing.exercise.draft = { text, word_count: saved.word_count, saved_at: saved.saved_at };
+    $("writing-saved").textContent = ` · Borrador guardado ${new Date(saved.saved_at).toLocaleString("es-CR")}`;
+    return true;
+  } catch (error) {
+    showError($("writing-error"), error.message);
+    return false;
+  } finally {
+    writing.busy = false;
+    $("writing-save").disabled = false;
+    updateWordCount();
+  }
+}
+
+// Leaving keeps the work: unsaved changes are saved as a draft first.
+async function leaveWriting(target) {
+  if (writingDirty() && !(await saveWritingDraft())) return;
+  if (target === "list" && writing.level) {
+    rememberWriting(null);
+    writing.exercise = null;
+    openWritingLevel(writing.level);
+  } else if (target === "levels" || target === "list") {
+    openWriting();
+  } else {
+    rememberWriting(null);
+    writing.exercise = null;
+    backToMenu();
+  }
+}
+
+const writingDialog = $("writing-dialog");
+$("form-writing").addEventListener("click", openWriting);
+$("writing-text").addEventListener("input", updateWordCount);
+$("writing-save").addEventListener("click", saveWritingDraft);
+$("writing-back-levels").addEventListener("click", () => leaveWriting("levels"));
+$("writing-back-list").addEventListener("click", () => leaveWriting("list"));
+$("writing-menu").addEventListener("click", () => leaveWriting("menu"));
+$("writing-submit").addEventListener("click", () => {
+  if (countWords($("writing-text").value) === 0) return;
+  showError($("writing-dialog-error"), "");
+  $("writing-dialog-confirm").disabled = false;
+  writingDialog.showModal();
+});
+$("writing-dialog-stay").addEventListener("click", () => writingDialog.close());
+$("writing-dialog-confirm").addEventListener("click", async () => {
+  const button = $("writing-dialog-confirm");
+  if (button.disabled) return;
+  button.disabled = true; // one submission; the server also keeps only the first
+  writing.busy = true;
+  writing.requestId = writing.requestId || newRequestId();
+  const text = $("writing-text").value;
+  try {
+    const submission = await api(`/api/writing/exercises/${encodeURIComponent(writing.exercise.exercise_id)}/submit`,
+      { method: "POST", body: JSON.stringify({ text, client_request_id: writing.requestId }) });
+    writing.exercise.submission = submission;
+    writing.exercise.draft = { text, word_count: submission.word_count, saved_at: submission.submitted_at };
+    writing.savedText = text;
+    writingDialog.close();
+    renderWritingState();
+  } catch (error) {
+    showError($("writing-dialog-error"), error.message);
+    button.disabled = false;
+  } finally {
+    writing.busy = false;
+  }
+});
+window.addEventListener("beforeunload", (event) => {
+  if (writingDirty()) event.preventDefault();
+});
+
 // ------------------------------------------------------------------ start
 
 async function resume() {
   const sessionId = storedSession();
+  const writingId = rememberedWriting();
+  if (!sessionId && writingId) {
+    openWritingExercise(writingId);
+    return;
+  }
   if (!sessionId) return;
   try {
     handleSession(await api(`/api/practice/sessions/${sessionId}`));

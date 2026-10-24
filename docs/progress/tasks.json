@@ -676,6 +676,40 @@
       "result_file": "docs/progress/task_T021_result.md",
       "failures": [],
       "notes": "Live L2 EE03+EE04 accepted on request 3/3; 4 calls, 3558/5337 tokens, USD 0. Suite 427."
+    },
+    {
+      "id": "T022",
+      "name": "Student writing practice interface (PO task T022)",
+      "objective": "Producción escrita screen: levels, stored exercises, typed editor with drafts and one submission, pending tutor review; L5 handwritten conditions only.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-021-student-writing-practice.md",
+          "app/writing/routes.py",
+          "scripts/dev/fixtures/writing-exercise-T021.json",
+          "tests/app/test_writing_api.py",
+          "docs/progress/task_T022_result.md",
+          "docs/progress/screenshots/T022/"
+        ],
+        "modify": [
+          "app/writing/store.py",
+          "app/main.py",
+          "app/static/index.html",
+          "app/static/app.js",
+          "app/static/styles.css",
+          "scripts/dev/practice_e2e.py"
+        ]
+      },
+      "depends_on": [
+        "T021"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T022_result.md",
+      "failures": [],
+      "notes": "Suite 435; browser 295/295 (desktop, mobile)."
     }
   ]
 }

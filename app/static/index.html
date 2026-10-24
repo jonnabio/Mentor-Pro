@@ -27,6 +27,12 @@
         </div>
       </fieldset>
 
+      <section class="card writing-entry" aria-labelledby="writing-entry-title">
+        <h2 id="writing-entry-title">Producción escrita <span class="muted small">· Español</span></h2>
+        <p class="muted">Practicá la escritura de textos expositivos. Tu tutor revisa cada texto.</p>
+        <button type="button" id="form-writing" class="secondary">Abrir Producción escrita</button>
+      </section>
+
       <fieldset class="card" id="objectives-card" disabled>
         <legend><span class="step">2</span> Objetivos</legend>
         <div class="segmented" role="radiogroup" aria-label="Alcance de la práctica">
@@ -151,6 +157,69 @@
       <ul id="dashboard-objectives" class="plain-list objective-status"></ul>
       <button type="button" id="dashboard-menu" class="primary">Volver al menú principal</button>
     </section>
+
+    <section id="writing-view" class="card" hidden>
+      <h2>Producción escrita</h2>
+      <p class="muted small">Español · Textos expositivos. Tu tutor revisa cada texto; no hay calificación
+        automática.</p>
+      <p id="writing-error" class="alert" role="alert" hidden></p>
+
+      <div id="writing-levels-panel">
+        <h3>Elegí un nivel</h3>
+        <ul id="writing-levels" class="plain-list writing-levels"></ul>
+      </div>
+
+      <div id="writing-list-panel" hidden>
+        <h3 id="writing-list-title"></h3>
+        <p id="writing-empty" class="muted" hidden>Todavía no hay ejercicios en este nivel. Probá con otro nivel.</p>
+        <ul id="writing-exercises" class="plain-list writing-exercises"></ul>
+        <button type="button" id="writing-back-levels" class="secondary">Volver a los niveles</button>
+      </div>
+
+      <div id="writing-exercise-panel" hidden>
+        <p id="writing-ex-level" class="muted small"></p>
+        <h3 id="writing-ex-topic"></h3>
+        <h4>Situación comunicativa</h4>
+        <p id="writing-ex-situation"></p>
+        <h4 id="writing-ex-ideas-title">Ideas que podés considerar</h4>
+        <ul id="writing-ex-ideas"></ul>
+        <h4>Instrucciones</h4>
+        <ol id="writing-ex-instructions"></ol>
+        <h4>Qué tenés que entregar</h4>
+        <p id="writing-ex-deliverable"></p>
+        <ul id="writing-ex-requirements"></ul>
+        <p id="writing-handwritten" class="choice-notice" hidden></p>
+        <div id="writing-editor" hidden>
+          <label for="writing-text" class="field-label">Tu texto</label>
+          <textarea id="writing-text" rows="12" spellcheck="false" autocorrect="off" autocapitalize="off"
+            autocomplete="off" lang="es-CR"></textarea>
+          <p class="muted small" aria-live="polite"><span id="writing-words">0 palabras</span>
+            <span id="writing-saved"></span></p>
+          <div class="actions">
+            <button type="button" id="writing-save" class="secondary">Guardar borrador</button>
+            <button type="button" id="writing-submit" class="primary">Entregar texto</button>
+          </div>
+        </div>
+        <div id="writing-submitted" hidden>
+          <p id="writing-pending" class="choice-notice" role="status"></p>
+          <h4>Tu texto entregado</h4>
+          <p id="writing-submitted-text" class="submitted-text"></p>
+        </div>
+        <button type="button" id="writing-back-list" class="secondary">Volver a los ejercicios</button>
+      </div>
+
+      <button type="button" id="writing-menu" class="primary">Volver al menú principal</button>
+    </section>
+
+    <dialog id="writing-dialog" aria-labelledby="writing-dialog-title" aria-describedby="writing-dialog-message">
+      <h2 id="writing-dialog-title">¿Entregar tu texto?</h2>
+      <p id="writing-dialog-message">Después de entregarlo no podrás cambiarlo. Tu tutor lo revisará.</p>
+      <p id="writing-dialog-error" class="alert" role="alert" hidden></p>
+      <div class="actions">
+        <button type="button" id="writing-dialog-stay" class="secondary">Seguir escribiendo</button>
+        <button type="button" id="writing-dialog-confirm" class="primary">Entregar</button>
+      </div>
+    </dialog>
 
     <p id="notice" class="notice"></p>
   </main>

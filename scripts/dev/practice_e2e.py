@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import psycopg
 import json
 import os
 import sys
@@ -38,6 +39,7 @@ from app.generation.validation import CHECKER_VERSION  # noqa: E402
 from app.main import BASELINE_VERSION, create_app  # noqa: E402
 from app.practice.bank import QuestionBank  # noqa: E402
 from app.practice.mastery import RECOMMENDATIONS_ES  # noqa: E402
+from app.writing.store import WritingStore  # noqa: E402
 from curriculum import db, importer  # noqa: E402
 from curriculum.catalog import list_objectives  # noqa: E402
 
@@ -60,6 +62,25 @@ BANK_OBJECTIVES = ("M02", "M04", "M05")  # scenario_bank_only, "Intermedia"
 WORDS = ("río", "mesa", "nube", "faro", "trigo", "lápiz", "volcán", "puente", "cacao", "brújula", "ciprés",
          "tambor", "arena", "colmena", "linterna", "marea", "piedra", "sendero", "tucán", "vasija", "yuca",
          "zafiro", "bosque", "carreta", "delfín", "espiga", "flauta", "girasol", "hamaca", "iglesia")
+
+
+WRITING_FIXTURES = (db.REPO_ROOT / "scripts" / "dev" / "fixtures" / "writing-exercise-T021.json",
+                    db.REPO_ROOT / ".ace" / "schemas" / "writing" / "examples" / "exercises.json")
+HEALTHY = "PE-L2-alimentacion-saludable-rendimiento-19a72a"  # generated in T021
+WRITING_TEXT = ("La alimentación saludable es muy importante para los estudiantes. Cuando comemos frutas, verduras "
+                "y granos tenemos más energía para aprender. Además, una buena alimentación ayuda a concentrarse en "
+                "clase y a convivir mejor con los compañeros.")
+
+
+def prepare_writing(url: str) -> None:
+    """Reset the test database's writing schema and load the T021 exercise and the T020 examples (ADR-016)."""
+    with psycopg.connect(db.require_test_database(url), autocommit=True) as conn:
+        conn.execute("DROP SCHEMA IF EXISTS writing CASCADE")
+    store = WritingStore(url)
+    for path in WRITING_FIXTURES:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for exercise in data if isinstance(data, list) else [data]:
+            store.add_exercise(exercise)
 
 
 def test_database() -> str:
@@ -540,6 +561,110 @@ def scenario_dashboard_practice(page: Page, runner: ScriptedRunner, report: Repo
     report.check(page.locator("#dashboard-choice").is_hidden(), f"[{name}] notice cleared on the main menu")
 
 
+def writing_rows(url: str, sql: str, *args) -> list[tuple]:
+    with psycopg.connect(url) as conn:
+        return conn.execute(sql, args or None).fetchall()
+
+
+def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: str) -> None:
+    """T022 acceptance: Producción escrita from the main menu to "Pendiente de revisión del tutor"."""
+    name = f"{viewport}-writing"
+    prepare_writing(url)
+    errors: list[str] = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    page.goto(BASE)
+    page.evaluate("sessionStorage.clear()")
+    page.get_by_role("button", name="Abrir Producción escrita").click()
+    expect(page.locator("#writing-levels .level-choice").first).to_be_visible()
+    labels = page.locator("#writing-levels .level-label").all_inner_texts()
+    report.check(labels == ["Nivel 1: Convenciones de escritura", "Nivel 2: Desarrollo de ideas",
+                            "Nivel 3: Redacción de párrafos", "Nivel 4: Composición guiada",
+                            "Nivel 5: Composición expositiva completa"], f"[{name}] five levels: {labels}")
+    report.check(no_overflow(page), f"[{name}] levels: no horizontal overflow")
+    page.screenshot(path=str(out / f"{name}-levels.png"), full_page=True)
+
+    page.locator('.level-choice[data-level="paragraph_writing"]').click()
+    expect(page.locator("#writing-empty")).to_be_visible()
+    report.check("Todavía no hay ejercicios" in page.locator("#writing-empty").inner_text(),
+                 f"[{name}] empty state for a level without exercises")
+    page.get_by_role("button", name="Volver a los niveles").click()
+
+    page.locator('.level-choice[data-level="full_composition"]').click()
+    page.locator(".exercise-choice").first.click()
+    expect(page.locator("#writing-handwritten")).to_be_visible()
+    hand = page.locator("#writing-handwritten").inner_text()
+    report.check("a mano" in hand and "bolígrafo" in hand and page.locator("#writing-editor").is_hidden()
+                 and "90 minutos" in page.locator("#writing-ex-requirements").inner_text(),
+                 f"[{name}] L5 shows handwritten conditions and no typed editor")
+    page.screenshot(path=str(out / f"{name}-l5.png"), full_page=True)
+    page.get_by_role("button", name="Volver a los ejercicios").click()
+    page.get_by_role("button", name="Volver a los niveles").click()
+
+    page.locator('.level-choice[data-level="idea_development"]').click()
+    page.locator(f'.exercise-choice[data-exercise="{HEALTHY}"]').click()
+    expect(page.locator("#writing-editor")).to_be_visible()
+    body = page.locator("#writing-exercise-panel").inner_text()
+    report.check(page.locator("#writing-ex-topic").inner_text() == "La alimentación saludable y el rendimiento escolar"
+                 and "Situación comunicativa" in body and page.locator("#writing-ex-instructions li").count() == 5
+                 and "Un solo párrafo de introducción" in body, f"[{name}] generated exercise shown in full")
+    leaked = [w for w in ("EE03", "EE04", "El texto evidencia", "puntos", "rúbrica") if w in body]
+    report.check(not leaked, f"[{name}] no rubric descriptors or criteria while composing ({leaked})")
+    attrs = page.evaluate("""() => { const t = document.getElementById('writing-text');
+        return [t.getAttribute('spellcheck'), t.getAttribute('autocorrect'), t.getAttribute('autocapitalize'),
+                t.spellcheck]; }""")
+    report.check(attrs == ["false", "off", "off", False], f"[{name}] spell checking and autocorrection off {attrs}")
+    page.locator("#writing-text").fill(WRITING_TEXT)
+    words = len(WRITING_TEXT.split())
+    report.check(page.locator("#writing-words").inner_text() == f"{words} palabras",
+                 f"[{name}] word counter {page.locator('#writing-words').inner_text()}")
+    page.get_by_role("button", name="Guardar borrador").click()
+    expect(page.locator("#writing-saved")).to_contain_text("Borrador guardado")
+    page.screenshot(path=str(out / f"{name}-draft.png"), full_page=True)
+
+    page.reload()
+    expect(page.locator("#writing-editor")).to_be_visible()
+    report.check(page.locator("#writing-text").input_value() == WRITING_TEXT,
+                 f"[{name}] draft recovered after reload")
+
+    page.get_by_role("button", name="Entregar texto").click()
+    expect(page.locator("#writing-dialog")).to_be_visible()
+    page.get_by_role("button", name="Seguir escribiendo").click()
+    report.check(page.locator("#writing-dialog").is_hidden() and page.locator("#writing-editor").is_visible(),
+                 f"[{name}] 'Seguir escribiendo' keeps the editor")
+    page.get_by_role("button", name="Entregar texto").click()
+    expect(page.locator("#writing-dialog-confirm")).to_be_visible()
+    posts: list[str] = []
+    page.on("request", lambda r: r.method == "POST" and "/api/writing/" in r.url and posts.append(r.url))
+    page.evaluate("() => { const b = document.getElementById('writing-dialog-confirm'); b.click(); b.click(); }")
+    expect(page.locator("#writing-pending")).to_be_visible()
+    report.check(len(posts) == 1, f"[{name}] a double click sends one submission ({len(posts)})")
+    pending = page.locator("#writing-pending").inner_text()
+    report.check(pending.startswith("Pendiente de revisión del tutor") and page.locator("#writing-editor").is_hidden(),
+                 f"[{name}] after submission: '{pending}'")
+    page.screenshot(path=str(out / f"{name}-submitted.png"), full_page=True)
+    stored = writing_rows(url, "SELECT evidence_mode, text_es, word_count FROM writing.submission "
+                               "WHERE exercise_id = %s", HEALTHY)
+    report.check(stored == [("typed", WRITING_TEXT, words)], f"[{name}] one submission stored: {stored}")
+    report.check(writing_rows(url, "SELECT COUNT(*) FROM writing.evaluation")[0][0] == 0,
+                 f"[{name}] no automatic evaluation")
+    page.reload()
+    expect(page.locator("#writing-pending")).to_be_visible()
+    report.check(page.locator("#writing-editor").is_hidden(), f"[{name}] reload keeps the submitted state")
+
+    page.get_by_role("button", name="Volver a los ejercicios").click()
+    other = page.locator(".exercise-choice").filter(has_not_text="alimentación").first
+    other.click()
+    expect(page.locator("#writing-editor")).to_be_visible()
+    page.locator("#writing-text").fill("Borrador sin guardar sobre el ambiente.")
+    page.get_by_role("button", name="Volver al menú principal").click()
+    expect(page.locator("#practice-form")).to_be_visible()
+    report.check(page.locator("#subjects input").count() == 4, f"[{name}] main menu with the four subjects")
+    kept = writing_rows(url, "SELECT text_es FROM writing.draft WHERE exercise_id <> %s", HEALTHY)
+    report.check(kept == [("Borrador sin guardar sobre el ambiente.",)],
+                 f"[{name}] leaving to the main menu kept the draft {kept}")
+    report.check(no_overflow(page) and not errors, f"[{name}] no overflow, no JavaScript errors {errors}")
+
+
 def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None:
     """T014: learning dashboard from the main menu; every subject, objective and status is shown."""
     page.goto(BASE)
@@ -597,6 +722,7 @@ def run_mock(out: Path, url: str) -> Report:
             scenario_exit(page, runner, report, viewport, out)
             scenario_dashboard(page, report, viewport, out)
             scenario_dashboard_practice(page, runner, report, viewport, out)
+            scenario_writing(page, report, viewport, out, url)
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()

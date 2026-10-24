@@ -27,6 +27,7 @@ from app.dev_routes import LlmFactory, build_dev_router
 from app.practice.jobs import SetRunner, live_set_runner
 from app.practice.mastery import NOTICE_ES, STATUS_LABELS_ES, STATUSES, Thresholds, subject_dashboard
 from app.practice.routes import PracticeService, build_practice_router
+from app.writing.routes import WritingService, build_writing_router
 from curriculum import db
 from curriculum.catalog import PracticeScope, SelectionError, list_objectives, open_catalog, select_objectives
 
@@ -158,6 +159,9 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
 
     app.state.practice = PracticeService(lambda: database_url or db.database_url(), runner_factory)
     app.include_router(build_practice_router(catalog, baseline, app.state.practice, ApiError, _selection_message))
+    # T022: Producción escrita (Español) reads stored exercises only; it never generates.
+    app.state.writing = WritingService(lambda: database_url or db.database_url())
+    app.include_router(build_writing_router(app.state.writing, ApiError))
 
     if dev_endpoints is None:
         dev_endpoints = os.environ.get("MENTOR_PRO_DEV_ENDPOINTS", "").lower() in ("1", "true", "yes")

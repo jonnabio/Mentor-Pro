@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T021)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T022)
 
 ## Current Objective
 
@@ -74,6 +74,10 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - **T021** — first generated writing exercise (L2, EE03+EE04) through
   OpenRouter; checks W01–W08, review, `writing.generation_attempt`
   ([ADR-020](../adr/ADR-020-writing-exercise-generation.md)).
+- **T022** — Producción escrita screen: levels, stored exercises, typed
+  editor (no autocorrect) with drafts and one submission ("Pendiente de
+  revisión del tutor"); L5 shows handwritten conditions only
+  ([ADR-021](../adr/ADR-021-student-writing-practice.md)).
 
 ### Current State
 
@@ -89,7 +93,7 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 427 passing; browser (mocked) 259/259 and live 14/14 on
+- Tests: 435 passing; browser (mocked) 295/295 and live 14/14 on
   `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
@@ -155,5 +159,5 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-020](../adr/ADR-020-writing-exercise-generation.md)
+  [ADR-021](../adr/ADR-021-student-writing-practice.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-003)
