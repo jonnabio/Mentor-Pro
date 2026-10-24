@@ -55,6 +55,12 @@ rejected, and the key must not reach students before they answer.
   `select: min|max` proves a key only when the stem asks for that extreme
   without further conditions (entre, pero, segundo, mayor que…). Unproven
   items need an agreeing blind solve; without one they are not accepted.
+- T011: generation output limit configurable
+  (`OPENROUTER_GENERATION_MAX_TOKENS`, default 6000, 1000–16000); blind solve
+  2000 and review 3000 unchanged. A reply is truncated when `finish_reason`
+  is `length`, `native_finish_reason` is a length reason, or no reason is
+  given and output tokens reach the limit; empty content is invalid output.
+  Truncation stays recorded as `invalid_output` / `truncated`.
 
 ### Live hardening (2026-10-22)
 

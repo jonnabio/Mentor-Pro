@@ -334,6 +334,36 @@
       "result_file": "docs/progress/task_T010_result.md",
       "failures": [],
       "notes": "Browser mocked 71/71; live run 1 partial 4/5 (truncation), run 2 complete 5/5 in 366 s, 22 calls, $0.00."
+    },
+    {
+      "id": "T011",
+      "name": "Reduce OpenRouter generation truncation (PO T011)",
+      "objective": "Configurable generation output limit (default 6000), explicit truncation detection, comparison against 4000.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T011_result.md"
+        ],
+        "modify": [
+          "app/llm/settings.py",
+          "app/llm/client.py",
+          "app/generation/pipeline.py",
+          "tests/app/test_openrouter.py",
+          "tests/app/test_generation.py",
+          ".env.example",
+          "docs/adr/ADR-010-single-question-generation.md"
+        ]
+      },
+      "depends_on": [
+        "T010"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T011_result.md",
+      "failures": [],
+      "notes": "Probe at 6000: truncation 7/19 (36.8%) vs 21/104 (20.2%) at 4000, p=0.14; median latency 61 s vs 39 s. No measured improvement."
     }
   ]
 }

@@ -8,7 +8,7 @@
 
 ## Current Objective
 
-T010 (student practice in the web page) is complete. Next: the next Product
+T011 (generation truncation) is complete. Next: the next Product
 Owner task after approval (not 10–30 question sets, answering or frontend
 without it).
 
@@ -56,6 +56,9 @@ without it).
   polling, server-side evaluation, one question at a time, feedback, summary;
   `scripts/dev/practice_e2e.py` (Playwright + Chrome). Live: 5/5 in 366 s,
   $0.00 (`docs/progress/task_T010_result.md`).
+- T011 — `OPENROUTER_GENERATION_MAX_TOKENS` (default 6000), explicit
+  truncation detection. Live probe: no measured reliability gain, higher
+  latency (`docs/progress/task_T011_result.md`).
 
 ### Current State
 
@@ -66,12 +69,13 @@ without it).
   `MENTOR_PRO_DEV_ENDPOINTS=true`.
 - Tables: `curriculum.*`, `llm.usage_record`, `generation.question_attempt`,
   `generation.practice_set`, `generation.practice_set_item`.
-- Tests: 312 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tests: 328 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Plan the next PO task with an ADR first. Generation truncation at 4 000
-   tokens causes partial sets; raising it needs approval.
+1. Plan the next PO task with an ADR first. Truncation persists at 6000
+   (runaway reasoning); candidate levers: OpenRouter `reasoning` limits,
+   dropping Nemotron 3.5 Super VL from generation fallback (needs approval).
 2. Property cues are keyword heuristics (T009 limitations); a typed
    property check (divisibility, parity) would make such keys provable.
 3. Human spot checks of rubric scores (`question-evaluation`).
