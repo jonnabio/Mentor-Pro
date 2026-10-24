@@ -35,9 +35,10 @@ protection, and prefer questions a browser has not seen, without accounts.
 
 - At session creation, each allocation slot takes a random eligible item,
   never one already in the set and never a D01 near duplicate of one.
-- Items this browser received in the last 14 days are avoided when an
-  alternative exists. The browser sends a random per-tab token
-  (`sessionStorage`); only its SHA-256 hash is stored on the session.
+- Items already served are avoided when an alternative exists. Since T014
+  ([ADR-015](ADR-015-repeat-aware-learning-status.md)) exposure comes from
+  PostgreSQL history across all sessions; the per-tab token hash is still
+  stored but no longer decides freshness.
 - Slots never borrow items from other objectives or evidencias.
 - All slots filled → the session is `complete` at once; no job, no
   OpenRouter call. Otherwise the job generates only the missing slots

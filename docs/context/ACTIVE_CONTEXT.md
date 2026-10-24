@@ -8,7 +8,7 @@
 
 ## Current Objective
 
-T013 (validated question bank) is complete. Next: the next Product
+T014 (learning dashboard, repeat-aware mastery) is complete. Next: the next Product
 Owner task after approval (not 10–30 question sets, answering or frontend
 without it).
 
@@ -68,6 +68,10 @@ without it).
   recorded revalidation in `generation.bank_revalidation`); only missing slots
   are generated. Live: bank-only practice in 1.9 s with 0 calls
   (`docs/progress/task_T013_result.md`).
+- T014 — learning dashboard ([ADR-015](../adr/ADR-015-repeat-aware-learning-status.md)):
+  six configurable statuses from first attempts on distinct questions,
+  `GET /api/dashboard`, "Ver mi progreso"; bank freshness from global history
+  (`docs/progress/task_T014_result.md`).
 
 ### Current State
 
@@ -80,7 +84,7 @@ without it).
   `generation.practice_set`, `generation.practice_set_item`,
   `generation.bank_revalidation`, `practice.session`, `practice.item`,
   `practice.answer`.
-- Tests: 337 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
+- Tests: 359 passing; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
@@ -93,6 +97,9 @@ without it).
 4. `scripts/pubs/check_lane.py` (session start prompt) does not exist here.
 
 ### Blockers/Issues
+
+- Mocked browser tests write to the same database as the single student:
+  275 of 343 stored answers are test data (`Q-mock-…`); decision pending.
 
 - Free models: Gemma 429 (upstream), Nemotron Super 404, Inkling 403 for this
   account; only Nemotron 3 Ultra, MiniMax M3.1 Flash, Nemotron 3.5 Super VL
@@ -122,4 +129,4 @@ without it).
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-014](../adr/ADR-014-validated-question-bank.md)
+  [ADR-015](../adr/ADR-015-repeat-aware-learning-status.md)

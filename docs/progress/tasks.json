@@ -429,6 +429,39 @@
       "result_file": "docs/progress/task_T013_result.md",
       "failures": [],
       "notes": "Live: bank-only 5/5 in 1.9 s with 0 calls; mixed 2 bank + 3 generated in 315 s, 16 calls, $0.00. 13 of 18 older items revalidated eligible."
+    },
+    {
+      "id": "T014",
+      "name": "Learning dashboard with repeat-aware mastery (PO T014 amendments)",
+      "objective": "Six configurable learning statuses from first attempts on distinct questions per objective; subject summaries; global server-side exposure; dashboard view.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/mastery.py",
+          "tests/app/test_mastery.py",
+          "docs/adr/ADR-015-repeat-aware-learning-status.md",
+          "docs/progress/task_T014_result.md"
+        ],
+        "modify": [
+          "app/main.py",
+          "app/practice/bank.py",
+          "app/static/",
+          "scripts/dev/practice_e2e.py",
+          "tests/app/test_question_bank.py",
+          "tests/app/test_api_baseline.py",
+          "docs/adr/ADR-014-validated-question-bank.md"
+        ]
+      },
+      "depends_on": [
+        "T013"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T014_result.md",
+      "failures": [],
+      "notes": "No base T014 document existed; implemented the two amendments. 275 of 343 stored answers are from mocked browser tests (decision pending)."
     }
   ]
 }
