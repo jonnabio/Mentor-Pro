@@ -425,6 +425,27 @@ def scenario_exit(page: Page, runner: ScriptedRunner, report: Report, viewport: 
         runner.mode = "ok"
 
 
+def scenario_dashboard_before_subjects_load(page: Page, report: Report) -> None:
+    """T018 regression: "Ver mi progreso" clicked before /api/subjects answers must still open the dashboard."""
+    errors: list[str] = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+
+    def slow(route):
+        time.sleep(1.0)
+        route.continue_()
+
+    page.route("**/api/subjects", slow)
+    page.goto(BASE, wait_until="domcontentloaded")
+    loaded = page.evaluate("document.querySelectorAll('input[name=\"subject\"]').length")
+    page.get_by_role("button", name="Ver mi progreso").click()
+    expect(page.locator("#dashboard-view")).to_be_visible()
+    page.unroute("**/api/subjects")
+    report.check(loaded == 0 and not errors, f"[dashboard-early] opens before subjects load ({loaded} loaded, "
+                                             f"errors {errors})")
+    page.get_by_role("button", name="Volver al menú principal").click()
+    expect(page.locator("#practice-form")).to_be_visible()
+
+
 def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None:
     """T014: learning dashboard from the main menu; every subject, objective and status is shown."""
     page.goto(BASE)
@@ -478,6 +499,7 @@ def run_mock(out: Path, url: str) -> Report:
                 scenario_refresh_and_resubmit(page, runner, report, out)
                 scenario_failures(page, runner, report, out)
                 scenario_bank_only(page, runner, report, out)
+                scenario_dashboard_before_subjects_load(page, report)
             scenario_exit(page, runner, report, viewport, out)
             scenario_dashboard(page, report, viewport, out)
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")

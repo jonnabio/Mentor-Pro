@@ -560,6 +560,35 @@
       "result_file": "docs/progress/task_T017_result.md",
       "failures": [],
       "notes": "103 automated_test, 14 quarantined, 2 student; suite 382; browser mock 182/182."
+    },
+    {
+      "id": "T018",
+      "name": "Investigate intermittent ACE quality-gate failure (PO task T018)",
+      "objective": "Capture gate diagnostics, reproduce and fix intermittent failures with evidence; RCA.",
+      "status": "verified",
+      "role": "Incident Responder",
+      "files": {
+        "create": [
+          "docs/rca/RCA-003-intermittent-gate-and-browser-failures.md",
+          "tests/ace/test_verify_gate.py",
+          "docs/progress/task_T018_result.md"
+        ],
+        "modify": [
+          ".ace/scripts/verify.sh",
+          "app/static/app.js",
+          "scripts/dev/practice_e2e.py",
+          "docs/rca/regression-guards.yaml"
+        ]
+      },
+      "depends_on": [
+        "T017"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T018_result.md",
+      "failures": [],
+      "notes": "Browser flake fixed (app.js); T016 gate failure not reproduced in 20 runs; suite 386; browser 183/183."
     }
   ]
 }

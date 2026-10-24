@@ -538,7 +538,8 @@ function renderDashboardSubject(code) {
   }
 }
 
-$("form-progress").addEventListener("click", () => openDashboard(form.elements.subject.value || null));
+// The subject radios exist only once /api/subjects has answered; the dashboard must open before that too.
+$("form-progress").addEventListener("click", () => openDashboard(form.elements.subject?.value || null));
 $("result-progress").addEventListener("click", () => openDashboard(state.session && state.session.subject));
 $("dashboard-menu").addEventListener("click", () => backToMenu());
 

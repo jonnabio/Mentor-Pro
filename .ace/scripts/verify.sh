@@ -75,23 +75,50 @@ if [ -z "$TEST_CMD" ] && [ -z "$LINT_CMD" ] && [ -z "$TYPECHECK_CMD" ]; then
     fail "unconfigured" "An unconfigured gate must not pass."
 fi
 
+# Every run keeps its diagnostics: per gate, stdout and stderr in separate
+# files plus a summary line (exit code, duration, signal). Directory:
+# $VERIFY_LOG_DIR, default .ace/logs/verify (git-ignored via logs/).
+RUN_ID="$(date +%Y%m%d-%H%M%S)-$$"
+LOG_DIR="${VERIFY_LOG_DIR:-.ace/logs/verify}/$RUN_ID"
+mkdir -p "$LOG_DIR" || { echo "[!] Cannot create log directory $LOG_DIR"; echo "VERIFY_RESULT=fail gate=logs"; exit 1; }
+SUMMARY="$LOG_DIR/summary.txt"
+
+now_ms() {
+    date +%s%3N
+}
+
 run_gate() {
     # $1 = gate name, $2 = command
     [ -z "$2" ] && return 0
 
     echo "[*] Gate '$1': $2"
-    OUTPUT_FILE="$(mktemp)"
-    if bash -c "$2" > "$OUTPUT_FILE" 2>&1; then
-        echo "[ok] Gate '$1' passed."
-        rm -f "$OUTPUT_FILE"
-        return 0
-    else
-        STATUS=$?
-        echo "[!] Gate '$1' FAILED (exit $STATUS). Last $TAIL_LINES lines:"
-        tail -n "$TAIL_LINES" "$OUTPUT_FILE" | sed 's/^/    /'
-        rm -f "$OUTPUT_FILE"
-        fail "$1" "Gate '$1' failed."
+    OUT="$LOG_DIR/$1.stdout.log"
+    ERR="$LOG_DIR/$1.stderr.log"
+    START="$(now_ms)"
+    bash -c "$2" > "$OUT" 2> "$ERR"
+    STATUS=$?
+    DURATION="$(( $(now_ms) - START ))"
+    NOTE=""
+    if [ "$STATUS" -gt 128 ]; then
+        NOTE=" terminated_by_signal=$(( STATUS - 128 ))"
     fi
+    # A gate that exits 0 without printing anything has not shown that it ran:
+    # missing output must never count as a pass.
+    if [ "$STATUS" -eq 0 ] && [ ! -s "$OUT" ] && [ ! -s "$ERR" ]; then
+        STATUS=125
+        NOTE=" no_output=1"
+    fi
+    echo "gate=$1 exit=$STATUS duration_ms=$DURATION$NOTE stdout=$OUT stderr=$ERR" >> "$SUMMARY"
+    if [ "$STATUS" -eq 0 ]; then
+        echo "[ok] Gate '$1' passed (${DURATION} ms)."
+        return 0
+    fi
+    echo "[!] Gate '$1' FAILED (exit $STATUS$NOTE, ${DURATION} ms). Logs: $LOG_DIR"
+    echo "    --- last $TAIL_LINES stdout lines ---"
+    tail -n "$TAIL_LINES" "$OUT" | sed 's/^/    /'
+    echo "    --- last $TAIL_LINES stderr lines ---"
+    tail -n "$TAIL_LINES" "$ERR" | sed 's/^/    /'
+    fail "$1" "Gate '$1' failed."
 }
 
 echo "Running ACE verification gate (profile: $PROFILE, config: $CONFIG)..."
@@ -109,7 +136,7 @@ run_gate "test" "$TEST_CMD"
 run_gate "lint" "$LINT_CMD"
 run_gate "typecheck" "$TYPECHECK_CMD"
 
-echo "All configured gates passed."
+echo "All configured gates passed. Logs: $LOG_DIR"
 if [ "$PROFILE" = "fast" ]; then
     echo "VERIFY_RESULT=pass gate=fast"
 else

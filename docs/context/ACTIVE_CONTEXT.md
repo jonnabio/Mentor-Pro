@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T017)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T018)
 
 ## Current Objective
 
@@ -61,6 +61,9 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `automated_test`, 14 `quarantined`, 2 `student` (audit `T017-2026-10-24`);
   dashboard and exposure history use student sessions only; nothing deleted
   ([ADR-017](../adr/ADR-017-session-classification.md)).
+- **T018** — intermittent browser failure fixed ("Ver mi progreso" before
+  subjects load); `verify.sh` keeps per-gate logs; T016 gate failure not
+  reproduced ([RCA-003](../rca/RCA-003-intermittent-gate-and-browser-failures.md)).
 
 ### Current State
 
@@ -76,7 +79,7 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 382 passing; browser (mocked) 182/182 and live 14/14 on
+- Tests: 386 passing; browser (mocked) 183/183 and live 14/14 on
   `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
@@ -122,7 +125,8 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - Live helpers: `scripts/dev/generate_examples.py`,
   `scripts/dev/generate_practice_set.py`; connectivity
   `.venv/Scripts/python.exe -m app.llm.connectivity`.
-- Gate: `bash .ace/scripts/verify.sh` (tests need `mentor_pro_test`). Check
+- Gate: `bash .ace/scripts/verify.sh` (tests need `mentor_pro_test`); logs per
+  run in `.ace/logs/verify/<run>/`. Check
   the `VERIFY_RESULT` line exactly before committing.
 - Key settings: `OPENROUTER_GENERATION_MAX_TOKENS`,
   `OPENROUTER_GENERATION_EXCLUDED_MODELS`,
@@ -138,4 +142,4 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
   [ADR-017](../adr/ADR-017-session-classification.md)
-- Regression guards: `docs/rca/regression-guards.yaml` (RCA-001, RCA-002)
+- Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-003)

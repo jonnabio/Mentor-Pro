@@ -102,3 +102,29 @@ guards:
     review_triggers:
       - "Changes to check_math, _unproven_reason or the cue lists"
       - "New proof types in subject_checks.math"
+
+  - id: RCA-003
+    title: "Dashboard button ignored before subjects load; gate failures without evidence"
+    severity: medium
+    created: 2026-10-24
+    rca_file: docs/rca/RCA-003-intermittent-gate-and-browser-failures.md
+
+    guarded_files:
+      - app/static/app.js
+      - .ace/scripts/verify.sh
+
+    invariants:
+      - "Main-menu handlers work before asynchronous content (subjects) has loaded"
+      - "verify.sh keeps stdout, stderr, exit code and duration of every gate in a log directory"
+      - "A gate that exits 0 without output, or is killed by a signal, is a failure"
+      - "The last line is always VERIFY_RESULT=pass|fail gate=<name>"
+
+    tests:
+      - tests/ace/test_verify_gate.py
+      - scripts/dev/practice_e2e.py (scenario_dashboard_before_subjects_load)
+
+    standard_rule: "RCA-003 Lessons Learned"
+
+    review_triggers:
+      - "New UI handlers reading form controls created after a fetch"
+      - "Changes to run_gate or the verify output contract"
