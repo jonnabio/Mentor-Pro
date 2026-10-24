@@ -191,6 +191,18 @@ h3 { font-size: 1.05rem; margin: 16px 0 4px; }
 .objective-status .meta-line { display: block; color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
 .recommendation { margin: 6px 0 0; color: var(--accent); font-weight: 650; }
 
+/* ------------------------------------------------------------------ dashboard actions (T019) */
+.objective-status li.dash-needs_reinforcement { border-color: var(--danger); border-left-width: 5px; background: var(--danger-soft); }
+.dash-needs_reinforcement .recommendation { color: var(--danger); }
+.objective-status li.dash-in_progress { border-left: 5px solid #d9a400; }
+.dash-in_progress .recommendation { color: #7a5300; }
+@media (prefers-color-scheme: dark) { .dash-in_progress .recommendation { color: #f5d27a; } }
+.priority-tag { margin-left: auto; font-size: 0.8rem; font-weight: 800; color: var(--danger); text-transform: uppercase; }
+.dash-practice { margin-top: 8px; width: 100%; }
+@media (min-width: 640px) { .dash-practice { width: auto; } }
+.choice-notice { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 8px;
+  padding: 10px 12px; overflow-wrap: anywhere; }
+
 /* ------------------------------------------------------------------ exit confirmation */
 #quiz-exit { margin-top: 12px; }
 dialog#exit-dialog {

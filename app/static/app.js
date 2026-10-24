@@ -182,6 +182,7 @@ function updateState() {
 
 form.addEventListener("change", (event) => {
   state.requestId = null; // a changed configuration is a new request
+  if (event.target.name === "subject") $("dashboard-choice").hidden = true;
   if (event.target.name === "scope") renderObjectives();
   else updateState();
 });
@@ -427,6 +428,7 @@ function resetToForm(message) {
 // "Volver al menú principal": the initial screen, with no subject or objectives selected.
 function backToMenu() {
   resetToForm("");
+  $("dashboard-choice").hidden = true;
   form.reset();
   state.objectives = [];
   $("objectives").replaceChildren();
@@ -528,14 +530,46 @@ function renderDashboardSubject(code) {
         `${objective.total_answers} respuestas · precisión en la práctica ${pct(objective.practice_accuracy)}`;
       if (objective.repeat_answers) detail += ` · ${objective.repeat_answers} repetidas`;
     }
-    const item = el("li", {},
-      el("div", { class: "objective-head" }, el("span", { class: "code" }, objective.code),
-        el("span", { class: `status status-${objective.status}` }, objective.status_es)),
+    const head = el("div", { class: "objective-head" }, el("span", { class: "code" }, objective.code));
+    if (objective.status === "needs_reinforcement") head.append(el("span", { class: "priority-tag" }, "Prioridad"));
+    head.append(el("span", { class: `status status-${objective.status}` }, objective.status_es));
+    const item = el("li", { class: `dash-objective dash-${objective.status}`, "data-code": objective.code },
+      head,
       el("span", { class: "objective-text" }, objective.text_es),
       el("span", { class: "meta-line" }, detail));
     if (objective.recommendation_es) item.append(el("p", { class: "recommendation" }, objective.recommendation_es));
+    // T019: the action only fills the practice form; the student starts the practice explicitly.
+    const label = objective.status === "consolidated_mastery" ? "Repasar este objetivo" : "Practicar este objetivo";
+    const action = el("button", { type: "button", class: "secondary dash-practice",
+      "aria-label": `${label} ${objective.code}` }, label);
+    action.addEventListener("click", () => practiceObjective(code, objective.code));
+    item.append(action);
     list.append(item);
   }
+}
+
+// Dashboard → practice form (T019): subject, "Un objetivo", only this objective, Intermedia, 5 questions.
+// Nothing is sent to the server here; "Generar práctica" starts the usual bank-then-generation flow.
+async function practiceObjective(subjectCode, objectiveCode) {
+  backToMenu();
+  await subjectsReady;
+  const subject = form.querySelector(`input[name="subject"][value="${subjectCode}"]`);
+  if (!subject) return;
+  subject.checked = true;
+  form.querySelector('input[name="scope"][value="single_objective"]').checked = true;
+  form.querySelector('input[name="difficulty"][value="medium"]').checked = true;
+  form.querySelector('input[name="question_count"][value="5"]').checked = true;
+  await loadObjectives(subjectCode);
+  const objective = form.querySelector(`input[name="objective"][value="${objectiveCode}"]`);
+  if (!objective) return;
+  objective.checked = true;
+  updateState();
+  const chosen = state.objectives.find((o) => o.code === objectiveCode);
+  const notice = $("dashboard-choice");
+  notice.textContent = `Objetivo elegido desde «Mi progreso»: ${objectiveCode} · ${chosen.text_es} ` +
+    "Podés ajustar la dificultad y luego presioná «Generar práctica».";
+  notice.hidden = false;
+  objective.closest("label").scrollIntoView({ block: "center" });
 }
 
 // The subject radios exist only once /api/subjects has answered; the dashboard must open before that too.
@@ -556,4 +590,5 @@ async function resume() {
   }
 }
 
-loadSubjects().then(resume);
+const subjectsReady = loadSubjects();
+subjectsReady.then(resume);

@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T018)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T019)
 
 ## Current Objective
 
@@ -64,6 +64,9 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - **T018** — intermittent browser failure fixed ("Ver mi progreso" before
   subjects load); `verify.sh` keeps per-gate logs; T016 gate failure not
   reproduced ([RCA-003](../rca/RCA-003-intermittent-gate-and-browser-failures.md)).
+- **T019** — dashboard "Practicar / Repasar este objetivo" presets the
+  practice form (one objective, Intermedia, 5); explicit start; "Necesita
+  refuerzo" highlighted ([ADR-018](../adr/ADR-018-dashboard-driven-practice.md)).
 
 ### Current State
 
@@ -79,7 +82,7 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 386 passing; browser (mocked) 183/183 and live 14/14 on
+- Tests: 386 passing; browser (mocked) 259/259 and live 14/14 on
   `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
@@ -144,5 +147,5 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-017](../adr/ADR-017-session-classification.md)
+  [ADR-018](../adr/ADR-018-dashboard-driven-practice.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-003)

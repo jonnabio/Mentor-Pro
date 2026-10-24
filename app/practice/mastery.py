@@ -34,6 +34,8 @@ STATUS_LABELS_ES = {
 }
 STATUSES = tuple(STATUS_LABELS_ES)
 RECOMMENDATIONS_ES = {
+    "needs_reinforcement": "Prioridad de repaso: practicá este objetivo con preguntas nuevas.",
+    "in_progress": "Vas por buen camino: seguí practicando para consolidar este objetivo.",
     "consolidated_mastery": "¡Excelente dominio! Practicá de vez en cuando para mantener lo aprendido.",
 }
 NOTICE_ES = ("Estos estados son indicadores de aprendizaje de Mentor Pro calculados con sus primeras respuestas; "

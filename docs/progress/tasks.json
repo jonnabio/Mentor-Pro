@@ -589,6 +589,36 @@
       "result_file": "docs/progress/task_T018_result.md",
       "failures": [],
       "notes": "Browser flake fixed (app.js); T016 gate failure not reproduced in 20 runs; suite 386; browser 183/183."
+    },
+    {
+      "id": "T019",
+      "name": "Dashboard-driven objective practice (PO task T019)",
+      "objective": "Dashboard action per objective presets the existing practice form (single objective, Intermedia, 5); explicit start; actionable status display.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-018-dashboard-driven-practice.md",
+          "docs/progress/task_T019_result.md"
+        ],
+        "modify": [
+          "app/static/app.js",
+          "app/static/index.html",
+          "app/static/styles.css",
+          "app/practice/mastery.py",
+          "scripts/dev/practice_e2e.py",
+          "tests/app/test_mastery.py"
+        ]
+      },
+      "depends_on": [
+        "T018"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T019_result.md",
+      "failures": [],
+      "notes": "Suite 386; browser 259/259 (3 runs); T015 partial-exit test race fixed."
     }
   ]
 }

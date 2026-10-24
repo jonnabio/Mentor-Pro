@@ -37,6 +37,7 @@ from app.generation.store import GenerationStore  # noqa: E402
 from app.generation.validation import CHECKER_VERSION  # noqa: E402
 from app.main import BASELINE_VERSION, create_app  # noqa: E402
 from app.practice.bank import QuestionBank  # noqa: E402
+from app.practice.mastery import RECOMMENDATIONS_ES  # noqa: E402
 from curriculum import db, importer  # noqa: E402
 from curriculum.catalog import list_objectives  # noqa: E402
 
@@ -419,9 +420,11 @@ def scenario_exit(page: Page, runner: ScriptedRunner, report: Report, viewport: 
         expect(page.locator("#quiz-notice")).to_be_visible(timeout=20000)
         page.locator('.option[data-label="B"]').click()
         page.get_by_role("button", name="Responder").click()
+        expect(page.locator("#feedback")).to_be_visible()  # the answer is stored before leaving (T019 race fix)
         stored = exit_practice(page, runner, report, "desktop-exit-partial", None)
         report.check(stored["status"] == "partial" and [q["answered"] for q in stored["questions"]] == [True, False],
-                     "[desktop-exit-partial] partial practice cancelled; 1 of 2 answered")
+                     f"[desktop-exit-partial] partial practice cancelled; 1 of 2 answered ({stored['status']}, "
+                     f"{[q['answered'] for q in stored['questions']]})")
         runner.mode = "ok"
 
 
@@ -444,6 +447,97 @@ def scenario_dashboard_before_subjects_load(page: Page, report: Report) -> None:
                                              f"errors {errors})")
     page.get_by_role("button", name="Volver al menú principal").click()
     expect(page.locator("#practice-form")).to_be_visible()
+
+
+SIX = {"M01": "unpracticed", "M02": "insufficient_evidence", "M03": "needs_reinforcement", "M04": "in_progress",
+       "M05": "good_proficiency", "M06": "consolidated_mastery"}
+
+
+def form_state(page: Page) -> dict:
+    return page.evaluate("""() => ({
+        subject: document.querySelector('input[name="subject"]:checked')?.value,
+        scope: document.querySelector('input[name="scope"]:checked')?.value,
+        objectives: [...document.querySelectorAll('input[name="objective"]:checked')].map(i => i.value),
+        difficulty: document.querySelector('input[name="difficulty"]:checked')?.value,
+        count: document.querySelector('input[name="question_count"]:checked')?.value,
+        submit: !document.getElementById('submit').disabled,
+        notice: document.getElementById('dashboard-choice').hidden ? '' :
+                document.getElementById('dashboard-choice').textContent})""")
+
+
+def scenario_dashboard_practice(page: Page, runner: ScriptedRunner, report: Report, viewport: str, out: Path) -> None:
+    """T019: every status offers an action that only fills the form; the practice starts on explicit confirmation."""
+    name = f"{viewport}-dash-practice"
+    posts: list[str] = []
+    page.on("request", lambda r: r.method == "POST" and "/api/practice/sessions" in r.url and posts.append(r.url))
+
+    def six_statuses(route):  # assign one status to each of six objectives to exercise every label
+        data = route.fetch().json()
+        labels = {s["code"]: s["label_es"] for s in data["statuses"]}
+        for subject in data["subjects"]:
+            for objective in subject["objectives"]:
+                if objective["code"] in SIX:
+                    objective["status"] = SIX[objective["code"]]
+                    objective["status_es"] = labels[objective["status"]]
+                    objective["recommendation_es"] = RECOMMENDATIONS_ES.get(objective["status"])
+        route.fulfill(json=data)
+
+    page.route("**/api/dashboard", six_statuses)
+    calls = runner.calls
+    for code, status in SIX.items():
+        page.goto(BASE)
+        page.get_by_role("button", name="Ver mi progreso").click()
+        page.locator('input[name="dashboard-subject"][value="matematicas"]').check()
+        item = page.locator(f'#dashboard-objectives li[data-code="{code}"]')
+        expected = "Repasar este objetivo" if status == "consolidated_mastery" else "Practicar este objetivo"
+        button = item.locator("button.dash-practice")
+        report.check(button.inner_text() == expected, f"[{name}] {status}: action '{button.inner_text()}'")
+        if status == "needs_reinforcement":
+            report.check(item.locator(".priority-tag").inner_text().lower() == "prioridad"
+                         and "Prioridad de repaso" in item.inner_text(), f"[{name}] needs_reinforcement highlighted")
+        if status == "in_progress":
+            report.check("Vas por buen camino" in item.inner_text(), f"[{name}] in_progress identified")
+        if status == "consolidated_mastery":
+            report.check("¡Excelente dominio!" in item.inner_text(), f"[{name}] maintenance recommendation shown")
+        text = page.evaluate("(c) => document.querySelector(`#dashboard-objectives li[data-code='${c}'] "
+                             ".objective-text`).textContent", code)
+        button.click()
+        expect(page.locator("#practice-form")).to_be_visible()
+        expect(page.locator(f'input[name="objective"][value="{code}"]')).to_be_checked()
+        state = form_state(page)
+        label = page.locator(f'#obj-{code}').inner_text()
+        report.check(state["subject"] == "matematicas" and state["scope"] == "single_objective"
+                     and state["objectives"] == [code] and state["difficulty"] == "medium" and state["count"] == "5"
+                     and state["submit"], f"[{name}] {status}: form preset {state}")
+        report.check(text in label and code in state["notice"], f"[{name}] {code} keeps its code and text")
+        report.check(no_overflow(page), f"[{name}] {code}: no horizontal overflow")
+    page.unroute("**/api/dashboard")
+    report.check(runner.calls == calls and not posts, f"[{name}] navigation started no job and sent no session")
+
+    runner.mode, runner.delay = "ok", 0.05
+    page.goto(BASE)
+    page.get_by_role("button", name="Ver mi progreso").click()
+    page.locator('input[name="dashboard-subject"][value="matematicas"]').check()
+    before = {o["code"]: o["total_answers"] for o in page.evaluate(
+        "async () => (await fetch('/api/dashboard')).json()")["subjects"][1]["objectives"]}
+    page.locator('#dashboard-objectives li[data-code="M10"] button.dash-practice').click()
+    expect(page.locator('input[name="objective"][value="M10"]')).to_be_checked()
+    page.locator('input[name="difficulty"][value="hard"]').check()  # the student may adjust settings
+    report.check(form_state(page)["difficulty"] == "hard" and runner.calls == calls, f"[{name}] difficulty adjustable")
+    page.screenshot(path=str(out / f"{name}-form.png"), full_page=True)
+    page.get_by_role("button", name="Generar práctica").click()
+    expect(page.locator("#quiz-view")).to_be_visible(timeout=20000)
+    report.check(runner.calls == calls + 1 and len(posts) == 1, f"[{name}] practice starts after confirmation")
+    answer_all(page, report, name, ["B", "C", "D", "A", "B"], KEYS)
+    page.get_by_role("button", name="Ver mi progreso").click()
+    expect(page.locator("#dashboard-objectives li").first).to_be_visible()
+    after = {o["code"]: o["total_answers"] for o in page.evaluate(
+        "async () => (await fetch('/api/dashboard')).json()")["subjects"][1]["objectives"]}
+    changed = {c: after[c] - before[c] for c in after if after[c] != before[c]}
+    report.check(changed == {"M10": 5}, f"[{name}] results update only M10: {changed}")
+    page.get_by_role("button", name="Volver al menú principal").click()
+    expect(page.locator("#practice-form")).to_be_visible()
+    report.check(page.locator("#dashboard-choice").is_hidden(), f"[{name}] notice cleared on the main menu")
 
 
 def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None:
@@ -502,6 +596,7 @@ def run_mock(out: Path, url: str) -> Report:
                 scenario_dashboard_before_subjects_load(page, report)
             scenario_exit(page, runner, report, viewport, out)
             scenario_dashboard(page, report, viewport, out)
+            scenario_dashboard_practice(page, runner, report, viewport, out)
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()

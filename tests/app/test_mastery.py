@@ -41,6 +41,9 @@ def test_labels_and_recommendation_are_spanish():
                                                "En progreso", "Buen dominio", "Dominio consolidado"]
     assert RECOMMENDATIONS_ES["consolidated_mastery"] == (
         "¡Excelente dominio! Practicá de vez en cuando para mantener lo aprendido.")
+    assert RECOMMENDATIONS_ES["needs_reinforcement"].startswith("Prioridad de repaso")  # T019
+    assert RECOMMENDATIONS_ES["in_progress"].startswith("Vas por buen camino")
+    assert set(RECOMMENDATIONS_ES) <= set(STATUS_LABELS_ES)
 
 
 def test_thresholds_are_configurable():
