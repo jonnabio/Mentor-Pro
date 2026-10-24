@@ -170,3 +170,23 @@ button.secondary {
 .feedback-result.ok { color: var(--accent); }
 .feedback-result.bad { color: var(--danger); }
 h3 { font-size: 1.05rem; margin: 16px 0 4px; }
+
+/* ------------------------------------------------------------------ learning dashboard (T014) */
+#form-progress, #result-progress { margin-top: 8px; }
+.status-counts { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.status-counts li { display: flex; justify-content: space-between; gap: 8px; }
+.status { border-radius: 999px; padding: 2px 10px; font-size: 0.85rem; font-weight: 650;
+  border: 1px solid var(--border); background: var(--bg); white-space: nowrap; }
+.status-counts .status { border-radius: 8px; padding: 6px 10px; }
+.status-needs_reinforcement { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+.status-in_progress { color: #7a5300; border-color: #d9a400; background: #fff6db; }
+.status-good_proficiency, .status-consolidated_mastery { color: var(--accent); border-color: var(--accent);
+  background: var(--accent-soft); }
+.status-consolidated_mastery { font-weight: 800; }
+@media (prefers-color-scheme: dark) { .status-in_progress { color: #f5d27a; background: #3a2f12; } }
+.objective-status li { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.objective-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+.objective-status .objective-text { display: block; }
+.objective-status .meta-line { display: block; color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+.recommendation { margin: 6px 0 0; color: var(--accent); font-weight: 650; }

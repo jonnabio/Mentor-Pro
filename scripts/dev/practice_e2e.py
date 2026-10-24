@@ -279,6 +279,38 @@ def scenario_failures(page: Page, runner: ScriptedRunner, report: Report, shots:
     page.evaluate("sessionStorage.clear()")
 
 
+def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None:
+    """T014: learning dashboard from the main menu; every subject, objective and status is shown."""
+    page.goto(BASE)
+    page.get_by_role("button", name="Ver mi progreso").click()
+    expect(page.locator("#dashboard-view")).to_be_visible()
+    expect(page.locator("#dashboard-objectives li").first).to_be_visible()
+    report.check("no son niveles oficiales" in page.locator("#dashboard-notice").inner_text(),
+                 f"[{name}] notice: indicators are not official MEP levels")
+    tabs = page.locator('input[name="dashboard-subject"]')
+    report.check(tabs.count() == 4, f"[{name}] four subjects")
+    counts = {}
+    for code, expected in (("espanol", 8), ("matematicas", 22), ("ciencias", 19), ("estudios_sociales", 29)):
+        page.locator(f'input[name="dashboard-subject"][value="{code}"]').check()
+        counts[code] = page.locator("#dashboard-objectives > li").count()
+        chips = page.locator("#dashboard-counts li").all_inner_texts()
+        labels_ok = [c.split("\n")[0] for c in chips] == ["Sin practicar", "Evidencia insuficiente",
+                                                          "Necesita refuerzo", "En progreso", "Buen dominio",
+                                                          "Dominio consolidado"]
+        total = sum(int(c.split("\n")[-1]) for c in chips)
+        report.check(counts[code] == expected and labels_ok and total == expected,
+                     f"[{name}] {code}: {counts[code]} objectives, six status counts summing to {total}")
+    page.locator('input[name="dashboard-subject"][value="matematicas"]').check()
+    report.check(page.locator("#dash-mastery").inner_text() != "" and page.locator("#dash-practice").is_visible(),
+                 f"[{name}] practice accuracy '{page.locator('#dash-practice').inner_text()}' and mastery "
+                 f"'{page.locator('#dash-mastery').inner_text()}' shown")
+    report.check(no_overflow(page), f"[{name}] dashboard has no horizontal overflow")
+    page.screenshot(path=str(out / f"{name}-dashboard.png"), full_page=True)
+    page.get_by_role("button", name="Volver al menú principal").click()
+    expect(page.locator("#practice-form")).to_be_visible()
+    report.check(True, f"[{name}] dashboard returns to the main menu")
+
+
 def run_mock(out: Path) -> Report:
     runner = ScriptedRunner()
     report = Report()
@@ -299,6 +331,7 @@ def run_mock(out: Path) -> Report:
                 scenario_refresh_and_resubmit(page, runner, report, out)
                 scenario_failures(page, runner, report, out)
                 scenario_bank_only(page, runner, report, out)
+            scenario_dashboard(page, report, viewport, out)
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()

@@ -162,15 +162,22 @@ def test_near_duplicates_never_share_a_practice(synthetic_client, db_url, catalo
     assert len({r[4]["stem"] for r in rows}) == len(rows)
 
 
-def test_unseen_questions_are_preferred_for_the_same_browser(synthetic_client, db_url, catalog_conn):
+def test_unseen_questions_are_preferred_across_tabs_from_server_history(synthetic_client, db_url, catalog_conn):
+    """T014: exposure comes from PostgreSQL, so a new tab (new token, or none) still avoids served items."""
     for index in range(3):  # three M01-E2 items for the two M01-E2 slots (2 and 4) of a single-objective set
         seed(db_url, catalog_conn, "M01", 2, math_item(index))
+    with psycopg.connect(db_url, autocommit=True) as conn:  # start from no recorded exposure for these items
+        conn.execute("DELETE FROM practice.answer WHERE session_id IN (SELECT session_id FROM practice.session "
+                     "WHERE baseline_version = %s)", (SYNTHETIC,))
+        conn.execute("DELETE FROM practice.item WHERE session_id IN (SELECT session_id FROM practice.session "
+                     "WHERE baseline_version = %s)", (SYNTHETIC,))
     client = practice_client(synthetic_client, RecordingRunner())
-    token = "browser-" + uuid.uuid4().hex
-    body = request_body(scope="single_objective", objective_codes=["M01"], browser_token=token)
+    body = request_body(scope="single_objective", objective_codes=["M01"])
     served = []
-    for _ in range(2):
-        data = wait_ready(client, client.post("/api/practice/sessions",
-                                              json={**body, "client_request_id": str(uuid.uuid4())}).json()["session_id"])
+    for token in ("tab-one-" + uuid.uuid4().hex, None):
+        payload = {**body, "client_request_id": str(uuid.uuid4())}
+        if token:
+            payload["browser_token"] = token
+        data = wait_ready(client, client.post("/api/practice/sessions", json=payload).json()["session_id"])
         served.append({r[4]["item_id"] for r in session_items(db_url, data["session_id"]) if r[2].endswith("E2")})
-    assert len(served[0]) == 2 and served[1] - served[0]  # the unseen third item is used the second time
+    assert len(served[0]) == 2 and served[1] - served[0]  # the unseen third item is used by the other tab

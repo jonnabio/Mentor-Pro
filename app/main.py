@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from app.allocation import allocate
 from app.dev_routes import LlmFactory, build_dev_router
 from app.practice.jobs import SetRunner, live_set_runner
+from app.practice.mastery import NOTICE_ES, STATUS_LABELS_ES, STATUSES, Thresholds, subject_dashboard
 from app.practice.routes import PracticeService, build_practice_router
 from curriculum import db
 from curriculum.catalog import PracticeScope, SelectionError, list_objectives, open_catalog, select_objectives
@@ -135,6 +136,18 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
             "notice_es": GROUNDING_NOTICE_ES,
             **result,
         }
+
+    @app.get("/api/dashboard")
+    def dashboard(conn: psycopg.Connection = Depends(catalog)) -> dict:
+        """Learning status for every selectable objective, from recorded answers (T014)."""
+        thresholds = Thresholds.from_env()
+        subjects = []
+        for code, name in SUBJECTS:
+            summary = subject_dashboard(conn, baseline, code, list_objectives(conn, baseline, code), thresholds)
+            subjects.append({"name_es": name, **summary})
+        return {"baseline_version": baseline, "notice_es": NOTICE_ES,
+                "statuses": [{"code": s, "label_es": STATUS_LABELS_ES[s]} for s in STATUSES],
+                "min_distinct_questions": thresholds.min_distinct, "subjects": subjects}
 
     def runner_factory() -> SetRunner:
         if practice_runner is not None:

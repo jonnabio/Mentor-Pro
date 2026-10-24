@@ -74,3 +74,13 @@ def test_evidence_ids_belong_to_their_objective(client):
     for row in data["allocation"]:
         catalog_id_prefix = row["slots"][0]["evidence_id"].rsplit("-E", 1)[0]
         assert all(s["evidence_id"].startswith(catalog_id_prefix + "-E") for s in row["slots"])
+
+
+def test_dashboard_covers_all_78_objectives_with_six_statuses(client):
+    data = client.get("/api/dashboard").json()
+    assert {s["subject"]: s["objective_count"] for s in data["subjects"]} == EXPECTED
+    assert [s["code"] for s in data["statuses"]] == ["unpracticed", "insufficient_evidence", "needs_reinforcement",
+                                                       "in_progress", "good_proficiency", "consolidated_mastery"]
+    for subject in data["subjects"]:
+        assert set(subject["status_counts"]) == {s["code"] for s in data["statuses"]}
+        assert sum(subject["status_counts"].values()) == subject["objective_count"]

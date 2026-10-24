@@ -24,8 +24,6 @@ from psycopg.types.json import Jsonb
 from app.generation.grounding import GroundingError, build_grounding
 from app.generation.validation import CHECKER_VERSION, deterministic_check, duplicate_reason
 
-RECENT_DAYS = 14
-
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS generation.bank_revalidation (
     request_id       TEXT NOT NULL REFERENCES generation.question_attempt (request_id),
@@ -98,16 +96,13 @@ class QuestionBank:
                     eligible.append(row)
         return eligible
 
-    def recently_served(self, browser_hash: str | None) -> set[str]:
-        """Item IDs this anonymous browser received in the last RECENT_DAYS days."""
-        if not browser_hash:
-            return set()
+    def seen_questions(self) -> set[str]:
+        """Canonical item IDs ever served to the (single, anonymous) student, from server history (T014).
+
+        PostgreSQL is the source of truth for exposure across practices, tabs and browser sessions.
+        """
         with self._connect() as conn:
-            rows = conn.execute(
-                """SELECT i.item->>'item_id' AS item_id FROM practice.item i
-                   JOIN practice.session s USING (session_id)
-                   WHERE s.browser_hash = %s AND s.created_at > now() - make_interval(days => %s)""",
-                (browser_hash, RECENT_DAYS)).fetchall()
+            rows = conn.execute("SELECT DISTINCT item->>'item_id' AS item_id FROM practice.item").fetchall()
         return {r["item_id"] for r in rows}
 
     def compose(self, catalog: psycopg.Connection, baseline: str, subject: str, allocation: list[dict[str, Any]],
@@ -115,9 +110,10 @@ class QuestionBank:
         """Pick bank items for as many allocation slots as possible; slot -> pick.
 
         Each slot keeps its allocated objective, evidencia and difficulty. No item (or near duplicate)
-        appears twice in the set; items not recently served to this browser are preferred.
+        appears twice in the set; items never served before are preferred (global server history; the
+        browser hash is kept on the session but no longer decides freshness).
         """
-        seen = self.recently_served(browser_hash)
+        seen = self.seen_questions()
         picks: dict[int, dict[str, Any]] = {}
         chosen: list[dict[str, Any]] = []
         for row in allocation:

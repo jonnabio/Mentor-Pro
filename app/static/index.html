@@ -65,6 +65,7 @@
 
       <p id="form-error" class="alert" role="alert" hidden></p>
       <button type="submit" id="submit" class="primary" disabled>Generar práctica</button>
+      <button type="button" id="form-progress" class="secondary">Ver mi progreso</button>
     </form>
 
     <section id="progress-view" class="card" aria-live="polite" hidden>
@@ -119,6 +120,23 @@
         <button type="button" id="result-new" class="primary">Nueva práctica</button>
         <button type="button" id="result-menu" class="secondary">Volver al menú principal</button>
       </div>
+      <button type="button" id="result-progress" class="secondary">Ver mi progreso</button>
+    </section>
+
+    <section id="dashboard-view" class="card" hidden>
+      <h2>Mi progreso</h2>
+      <p id="dashboard-notice" class="muted small"></p>
+      <p id="dashboard-error" class="alert" role="alert" hidden></p>
+      <div id="dashboard-subjects" class="segmented" role="radiogroup" aria-label="Materia"></div>
+      <dl class="meta">
+        <div><dt>Precisión en la práctica</dt><dd id="dash-practice"></dd></div>
+        <div><dt>Dominio (primeros intentos)</dt><dd id="dash-mastery"></dd></div>
+        <div><dt>Preguntas distintas</dt><dd id="dash-distinct"></dd></div>
+      </dl>
+      <ul id="dashboard-counts" class="status-counts"></ul>
+      <p id="dashboard-rule" class="muted small"></p>
+      <ul id="dashboard-objectives" class="plain-list objective-status"></ul>
+      <button type="button" id="dashboard-menu" class="primary">Volver al menú principal</button>
     </section>
 
     <p id="notice" class="notice"></p>

@@ -91,7 +91,9 @@ function storedSession() {
 }
 
 function show(view) {
-  for (const id of ["practice-form", "progress-view", "quiz-view", "result-view"]) $(id).hidden = id !== view;
+  for (const id of ["practice-form", "progress-view", "quiz-view", "result-view", "dashboard-view"]) {
+    $(id).hidden = id !== view;
+  }
   window.scrollTo({ top: 0 });
 }
 
@@ -433,6 +435,76 @@ $("progress-new").addEventListener("click", () => resetToForm(""));
 $("result-new").addEventListener("click", () => resetToForm(""));
 $("progress-menu").addEventListener("click", backToMenu);
 $("result-menu").addEventListener("click", backToMenu);
+
+// ------------------------------------------------------------------ learning dashboard (T014)
+// Statuses come from the server, computed from first attempts on distinct questions; percentages are
+// rounded here only for display.
+
+const pct = (value) => (value === null || value === undefined ? "—" : `${Math.round(value * 100)} %`);
+
+async function openDashboard(subjectCode) {
+  clearTimeout(state.pollTimer);
+  show("dashboard-view");
+  showError($("dashboard-error"), "");
+  try {
+    state.dashboard = await api("/api/dashboard");
+  } catch (error) {
+    showError($("dashboard-error"), error.message);
+    return;
+  }
+  const data = state.dashboard;
+  $("dashboard-notice").textContent = data.notice_es;
+  $("dashboard-rule").textContent =
+    "El estado de cada objetivo se calcula con el primer intento en preguntas distintas; se necesitan al menos " +
+    `${data.min_distinct_questions} preguntas distintas. Las preguntas repetidas cuentan en la precisión de ` +
+    "práctica, pero no en el dominio.";
+  const tabs = $("dashboard-subjects");
+  tabs.replaceChildren();
+  const practiced = data.subjects.find((s) => s.total_answers > 0);
+  const initial = subjectCode || (practiced || data.subjects[0]).subject;
+  for (const subject of data.subjects) {
+    const input = el("input", { type: "radio", name: "dashboard-subject", value: subject.subject });
+    input.checked = subject.subject === initial;
+    input.addEventListener("change", () => renderDashboardSubject(subject.subject));
+    tabs.append(el("label", {}, input, subject.name_es));
+  }
+  renderDashboardSubject(initial);
+}
+
+function renderDashboardSubject(code) {
+  const data = state.dashboard;
+  const subject = data.subjects.find((s) => s.subject === code);
+  $("dash-practice").textContent = `${pct(subject.practice_accuracy)} (${subject.total_answers} respuestas)`;
+  $("dash-mastery").textContent = pct(subject.mastery_accuracy);
+  $("dash-distinct").textContent = String(subject.distinct_questions);
+  const counts = $("dashboard-counts");
+  counts.replaceChildren();
+  for (const status of data.statuses) {
+    counts.append(el("li", { class: `status status-${status.code}` }, status.label_es,
+      el("strong", {}, String(subject.status_counts[status.code]))));
+  }
+  const list = $("dashboard-objectives");
+  list.replaceChildren();
+  for (const objective of subject.objectives) {
+    let detail = "Todavía no hay respuestas.";
+    if (objective.total_answers) {
+      detail = `Dominio ${pct(objective.mastery_accuracy)} · ${objective.distinct_questions} preguntas distintas · ` +
+        `${objective.total_answers} respuestas · precisión en la práctica ${pct(objective.practice_accuracy)}`;
+      if (objective.repeat_answers) detail += ` · ${objective.repeat_answers} repetidas`;
+    }
+    const item = el("li", {},
+      el("div", { class: "objective-head" }, el("span", { class: "code" }, objective.code),
+        el("span", { class: `status status-${objective.status}` }, objective.status_es)),
+      el("span", { class: "objective-text" }, objective.text_es),
+      el("span", { class: "meta-line" }, detail));
+    if (objective.recommendation_es) item.append(el("p", { class: "recommendation" }, objective.recommendation_es));
+    list.append(item);
+  }
+}
+
+$("form-progress").addEventListener("click", () => openDashboard(form.elements.subject.value || null));
+$("result-progress").addEventListener("click", () => openDashboard(state.session && state.session.subject));
+$("dashboard-menu").addEventListener("click", () => backToMenu());
 
 // ------------------------------------------------------------------ start
 
