@@ -873,6 +873,96 @@ def scenario_tutor(tutor: Page, student: Page, report: Report, viewport: str, ou
     report.check(no_overflow(tutor) and not errors, f"[{name}] tutor page: no overflow, no JavaScript errors {errors}")
 
 
+LATEST_SCORES_SQL = """SELECT DISTINCT ON (c.criterion_code) c.criterion_code, c.points
+    FROM writing.criterion_score c JOIN writing.evaluation v USING (evaluation_id)
+    WHERE v.status = 'completed' AND c.status = 'scored'
+    ORDER BY c.criterion_code, v.evaluated_at DESC"""
+
+
+def scenario_writing_dashboard(page: Page, report: Report, viewport: str, out: Path, url: str) -> None:
+    """T027: Producción escrita in "Mi progreso", checked against the test database's evaluation rows."""
+    name = f"{viewport}-writing-dashboard"
+    from app.writing import contracts
+    errors: list[str] = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    # One more L1 submission that stays pending (after scenario_tutor completed L1, L2 and L3).
+    pending_id = writing_rows(url, "SELECT exercise_id FROM writing.exercise e WHERE level = 'writing_conventions' "
+                                   "AND NOT EXISTS (SELECT 1 FROM writing.submission s WHERE s.exercise_id = "
+                                   "e.exercise_id) ORDER BY exercise_id LIMIT 1")[0][0]
+    page.goto(BASE)
+    page.evaluate("async (id) => fetch(`/api/writing/exercises/${id}/submit`, {method: 'POST', headers: "
+                  "{'Content-Type': 'application/json'}, body: JSON.stringify({text: 'Texto pendiente de revisión.', "
+                  "client_request_id: 'e2e-dash-' + Date.now()})})", pending_id)
+    latest = dict(writing_rows(url, LATEST_SCORES_SQL))
+    counts = writing_rows(url, "SELECT COUNT(*), COUNT(v.evaluation_id) FILTER (WHERE v.status = 'completed') "
+                               "FROM writing.submission s LEFT JOIN writing.evaluation v USING (submission_id)")[0]
+    pending_codes = {r[0] for r in writing_rows(url, "SELECT unnest(target_criteria) FROM writing.exercise "
+                                                     "WHERE exercise_id = %s", pending_id)} - set(latest)
+    l1 = writing_rows(url, "SELECT COUNT(*), COUNT(v.evaluation_id) FILTER (WHERE v.status = 'completed') "
+                           "FROM writing.submission s JOIN writing.exercise e USING (exercise_id) "
+                           "LEFT JOIN writing.evaluation v USING (submission_id) "
+                           "WHERE e.level = 'writing_conventions'")[0]
+
+    def open_writing_tab() -> None:
+        page.evaluate("sessionStorage.clear()")  # scenario_tutor left an exercise open; start at the main menu
+        page.goto(BASE)
+        page.get_by_role("button", name="Ver mi progreso").click()
+        expect(page.locator("#dashboard-view")).to_be_visible()
+        page.locator("#dashboard-subjects label", has_text="Producción escrita").click()
+        expect(page.locator("#dashboard-writing li.dw-criterion")).to_have_count(20)
+
+    open_writing_tab()
+    report.check(page.locator("#dashboard-mc").is_hidden() and page.locator("#dashboard-notice").is_hidden(),
+                 f"[{name}] writing tab hides the multiple-choice metrics and statuses")
+    codes = page.locator("li.dw-criterion").evaluate_all("(n) => n.map((x) => x.dataset.code)")
+    texts = {c: page.locator(f'li.dw-criterion[data-code="{c}"]').inner_text() for c in codes}
+    criteria = contracts.criteria()
+    report.check(codes == [f"EE{n:02d}" for n in range(1, 21)]
+                 and all(criteria[c]["statement_es"] in texts[c] for c in codes),
+                 f"[{name}] all 20 EE criteria with their official wording")
+    total, completed = counts
+    shown = [page.locator(f"#dw-{k}").inner_text() for k in ("submitted", "completed", "pending")]
+    report.check(shown == [str(total), str(completed), str(total - completed)],
+                 f"[{name}] submitted / completed / pending {shown} match the database ({total}, {completed})")
+    report.check(page.locator("#dw-last").inner_text() not in ("", "Todavía no hay práctica"),
+                 f"[{name}] last practice date '{page.locator('#dw-last').inner_text()}'")
+    wrong = [c for c in codes if (c in latest) != (f"Última calificación: {latest.get(c)} de 4" in texts[c])
+             or (c not in latest and "Última calificación" in texts[c])]
+    report.check(latest and not wrong, f"[{name}] latest score shown exactly for the {len(latest)} evaluated "
+                                       f"criteria {sorted(latest)} {wrong}")
+    report.check(all("Evaluación pendiente" in texts[c] and "calificación" not in texts[c] for c in pending_codes)
+                 and pending_codes, f"[{name}] pending submission marks {sorted(pending_codes)} without a score")
+    report.check("Sin evaluar" in texts["EE19"] and "de 4" not in texts["EE19"],
+                 f"[{name}] EE19 (handwriting) stays without a score")
+    for dim in contracts.rubric()["dimensions"]:
+        scored = [latest[c] for c, v in criteria.items() if v["dimension"] == dim["ordinal"] and c in latest]
+        summary = page.locator(f'.dw-dimension[data-dimension="{dim["ordinal"]}"] .dw-dimension-summary').inner_text()
+        expected = (f"Promedio {('%g' % round(sum(scored) / len(scored), 1)).replace('.', ',')} de 4 · {len(scored)} de"
+                    if scored else "Sin evaluar")
+        report.check(summary.startswith(expected), f"[{name}] dimension {dim['ordinal']}: '{summary}' "
+                                                   f"(SQL: {scored})")
+    levels = page.locator("#dw-levels li").all_inner_texts()
+    report.check(len(levels) == 5 and f"{l1[1]} evaluado" in levels[0] and f"{l1[0]} entregado" in levels[0],
+                 f"[{name}] per level L1–L5: {[lv.replace(chr(10), ' ') for lv in levels]}")
+    report.check(no_overflow(page), f"[{name}] no horizontal overflow")
+    page.screenshot(path=str(out / f"{name}.png"), full_page=True)
+
+    page.reload()
+    open_writing_tab()
+    report.check(f"Última calificación: {latest['EE07']} de 4"
+                 in page.locator('li.dw-criterion[data-code="EE07"]').inner_text(),
+                 f"[{name}] completed evaluation still shown after reload")
+    page.locator('input[name="dashboard-subject"][value="matematicas"]').check()
+    report.check(page.locator("#dashboard-mc").is_visible() and page.locator("#dashboard-writing").is_hidden()
+                 and page.locator("#dashboard-objectives > li").count() == 22,
+                 f"[{name}] Matemáticas tab still shows the multiple-choice progress")
+    page.locator("#dashboard-subjects label", has_text="Producción escrita").click()
+    page.get_by_role("button", name="Ir a Producción escrita").click()
+    expect(page.locator("#writing-levels .level-choice").first).to_be_visible()
+    report.check(page.locator("#writing-view").is_visible(), f"[{name}] button opens the writing exercise list")
+    report.check(not errors, f"[{name}] no JavaScript errors {errors}")
+
+
 def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None:
     """T014: learning dashboard from the main menu; every subject, objective and status is shown."""
     page.goto(BASE)
@@ -882,7 +972,7 @@ def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None
     report.check("no son niveles oficiales" in page.locator("#dashboard-notice").inner_text(),
                  f"[{name}] notice: indicators are not official MEP levels")
     tabs = page.locator('input[name="dashboard-subject"]')
-    report.check(tabs.count() == 4, f"[{name}] four subjects")
+    report.check(tabs.count() == 5, f"[{name}] four subjects and Producción escrita")
     counts = {}
     for code, expected in (("espanol", 8), ("matematicas", 22), ("ciencias", 19), ("estudios_sociales", 29)):
         page.locator(f'input[name="dashboard-subject"][value="{code}"]').check()
@@ -935,6 +1025,7 @@ def run_mock(out: Path, url: str) -> Report:
                                                 has_touch=viewport == "mobile")
             scenario_tutor(tutor_context.new_page(), page, report, viewport, out, url)
             tutor_context.close()
+            scenario_writing_dashboard(page, report, viewport, out, url)
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()

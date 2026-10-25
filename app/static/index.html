@@ -147,14 +147,39 @@
       <p id="dashboard-notice" class="muted small"></p>
       <p id="dashboard-error" class="alert" role="alert" hidden></p>
       <div id="dashboard-subjects" class="segmented" role="radiogroup" aria-label="Materia"></div>
-      <dl class="meta">
-        <div><dt>Precisión en la práctica</dt><dd id="dash-practice"></dd></div>
-        <div><dt>Dominio (primeros intentos)</dt><dd id="dash-mastery"></dd></div>
-        <div><dt>Preguntas distintas</dt><dd id="dash-distinct"></dd></div>
-      </dl>
-      <ul id="dashboard-counts" class="status-counts"></ul>
-      <p id="dashboard-rule" class="muted small"></p>
-      <ul id="dashboard-objectives" class="plain-list objective-status"></ul>
+      <div id="dashboard-mc">
+        <dl class="meta">
+          <div><dt>Precisión en la práctica</dt><dd id="dash-practice"></dd></div>
+          <div><dt>Dominio (primeros intentos)</dt><dd id="dash-mastery"></dd></div>
+          <div><dt>Preguntas distintas</dt><dd id="dash-distinct"></dd></div>
+        </dl>
+        <ul id="dashboard-counts" class="status-counts"></ul>
+        <p id="dashboard-rule" class="muted small"></p>
+        <ul id="dashboard-objectives" class="plain-list objective-status"></ul>
+      </div>
+      <!-- T027 (ADR-025): Producción escrita, from completed tutor evaluations only; no mastery statuses. -->
+      <div id="dashboard-writing" hidden>
+        <p id="dw-notice" class="muted small"></p>
+        <p id="dw-error" class="alert" role="alert" hidden></p>
+        <dl class="meta">
+          <div><dt>Ejercicios entregados</dt><dd id="dw-submitted"></dd></div>
+          <div><dt>Evaluaciones completadas</dt><dd id="dw-completed"></dd></div>
+          <div><dt>Evaluaciones pendientes</dt><dd id="dw-pending"></dd></div>
+          <div><dt>Última práctica de escritura</dt><dd id="dw-last"></dd></div>
+        </dl>
+        <h3>Ejercicios por nivel</h3>
+        <ul id="dw-levels" class="plain-list dw-levels"></ul>
+        <h3>Criterios con evaluación</h3>
+        <ul id="dw-coverage" class="status-counts"></ul>
+        <p class="muted small">La cobertura indica qué criterios ya tienen evaluación; no es una calificación.
+          Un criterio sin evaluar no tiene puntaje y no cuenta en los promedios.</p>
+        <h3>Desempeño por dimensión y criterio</h3>
+        <p class="muted small">Cada promedio usa solo la última calificación (de 0 a 4) de los criterios evaluados
+          por el tutor. Los criterios «No evaluable» (letra a mano en un texto escrito en la computadora) no
+          cuentan.</p>
+        <div id="dw-dimensions"></div>
+        <button type="button" id="dw-open-writing" class="secondary">Ir a Producción escrita</button>
+      </div>
       <button type="button" id="dashboard-menu" class="primary">Volver al menú principal</button>
     </section>
 

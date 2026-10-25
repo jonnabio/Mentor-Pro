@@ -388,6 +388,29 @@ class WritingStore:
                      f"{evaluation['rubric_id']}#{score['criterion']}@{score['points']}"
                      if score.get("points") is not None else None))
 
+    # ------------------------------------------------------------ student progress (T027)
+
+    PROGRESS_SQL = """
+        SELECT s.submission_id, s.submitted_at, e.level, v.status AS evaluation_status, v.record AS evaluation,
+               COALESCE((SELECT r.record FROM writing.exercise_revision r WHERE r.exercise_id = s.exercise_id
+                         AND r.revision = s.exercise_revision), e.record)->'evaluation'->'parameters' AS parameters
+        FROM writing.submission s JOIN writing.exercise e USING (exercise_id)
+        LEFT JOIN writing.evaluation v USING (submission_id)
+        ORDER BY s.submitted_at"""
+
+    def progress_inputs(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
+        """Read-only: completed evaluation records, every submission with its evaluation status and scorable
+        criteria (from the exercise revision answered), and the last draft save."""
+        with self._connect() as conn:
+            rows = conn.execute(self.PROGRESS_SQL).fetchall()
+            last_draft = conn.execute("SELECT MAX(updated_at) AS at FROM writing.draft").fetchone()["at"]
+        submissions = [{"submission_id": r["submission_id"], "submitted_at": r["submitted_at"].isoformat(),
+                        "level": r["level"], "evaluation_status": r["evaluation_status"],
+                        "scorable_criteria": [p["criterion"] for p in r["parameters"] if p["applicability"] == "scored"]}
+                       for r in rows]
+        evaluations = [r["evaluation"] for r in rows if r["evaluation_status"] == "completed"]
+        return evaluations, submissions, last_draft.isoformat() if last_draft else None
+
     def generation_attempts(self) -> list[dict[str, Any]]:
         with self._connect() as conn:
             return conn.execute("SELECT * FROM writing.generation_attempt ORDER BY created_at").fetchall()

@@ -508,10 +508,22 @@ async function openDashboard(subjectCode) {
     input.addEventListener("change", () => renderDashboardSubject(subject.subject));
     tabs.append(el("label", {}, input, subject.name_es));
   }
+  // T027: Producción escrita is the fifth component, with its own data and no multiple-choice metrics.
+  const input = el("input", { type: "radio", name: "dashboard-subject", value: WRITING_TAB });
+  input.checked = initial === WRITING_TAB;
+  input.addEventListener("change", () => renderDashboardSubject(WRITING_TAB));
+  tabs.append(el("label", {}, input, "Producción escrita"));
   renderDashboardSubject(initial);
 }
 
 function renderDashboardSubject(code) {
+  $("dashboard-mc").hidden = code === WRITING_TAB;
+  $("dashboard-writing").hidden = code !== WRITING_TAB;
+  $("dashboard-notice").hidden = code === WRITING_TAB;
+  if (code === WRITING_TAB) {
+    renderWritingProgress();
+    return;
+  }
   const data = state.dashboard;
   const subject = data.subjects.find((s) => s.subject === code);
   $("dash-practice").textContent = `${pct(subject.practice_accuracy)} (${subject.total_answers} respuestas)`;
@@ -550,6 +562,73 @@ function renderDashboardSubject(code) {
   }
 }
 
+// ------------------------------------------------------------------ writing progress (T027, ADR-025)
+// Scores come only from completed tutor evaluations (0–4, official criterion wording). Coverage is shown apart
+// from performance; an unassessed criterion shows no number. No mastery statuses, weights or grade.
+
+const WRITING_TAB = "produccion_escrita";
+const shortDate = (iso) => new Date(iso).toLocaleDateString("es-CR", { day: "numeric", month: "long", year: "numeric" });
+const points = (value) => value.toLocaleString("es-CR", { maximumFractionDigits: 1 });
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+async function renderWritingProgress() {
+  showError($("dw-error"), "");
+  let data;
+  try {
+    data = await api("/api/writing/progress");
+  } catch (error) {
+    showError($("dw-error"), error.message);
+    return;
+  }
+  const activity = data.activity;
+  $("dw-notice").textContent = data.notice_es;
+  $("dw-submitted").textContent = String(activity.submitted);
+  $("dw-completed").textContent = String(activity.evaluations_completed);
+  $("dw-pending").textContent = String(activity.evaluations_pending);
+  $("dw-last").textContent = activity.last_practice_at ? shortDate(activity.last_practice_at) : "Todavía no hay práctica";
+  $("dw-levels").replaceChildren(...activity.levels.map((level) => el("li", { "data-level": level.code },
+    el("span", {}, level.label_es),
+    el("span", { class: "meta-line" },
+      `${plural(level.evaluated, "evaluado", "evaluados")} · ${plural(level.submitted, "entregado", "entregados")}`))));
+  const coverage = data.coverage;
+  $("dw-coverage").replaceChildren(...[["evaluated", "Evaluado"], ["pending", "Evaluación pendiente"],
+    ["unassessed", "Sin evaluar"]].map(([status, label]) => el("li", { class: `status crit-${status}` }, label,
+    el("strong", {}, `${coverage[status]} de ${coverage.total}`))));
+
+  const byDimension = {};
+  for (const criterion of data.criteria) (byDimension[criterion.dimension] ||= []).push(criterion);
+  $("dw-dimensions").replaceChildren(...data.dimensions.map((dim) => {
+    const summary = dim.average_latest_points === null
+      ? `Sin evaluar · 0 de ${dim.criteria} criterios evaluados`
+      : `Promedio ${points(dim.average_latest_points)} de 4 · ` +
+        `${dim.criteria_with_evidence} de ${dim.criteria} criterios evaluados`;
+    return el("section", { class: "dw-dimension", "data-dimension": String(dim.ordinal) },
+      el("h4", {}, dim.name_es), el("p", { class: "dw-dimension-summary" }, summary),
+      el("ul", { class: "plain-list objective-status" }, ...byDimension[dim.ordinal].map(criterionItem)));
+  }));
+}
+
+function criterionItem(c) {
+  const head = el("div", { class: "objective-head" }, el("span", { class: "code" }, c.code),
+    el("span", { class: `status crit-${c.status}` }, c.status_es));
+  const item = el("li", { class: `dw-criterion dw-${c.status}`, "data-code": c.code }, head,
+    el("span", { class: "objective-text" }, c.statement_es));
+  let detail = c.status === "pending" ? "Entregado; el tutor todavía no lo ha revisado." : "Todavía no hay evaluación.";
+  if (c.evaluations) {
+    detail = `Última calificación: ${c.latest_points} de 4 · Mejor: ${c.best_points} de 4 · ` +
+      `${plural(c.evaluations, "evaluación", "evaluaciones")} · Última evaluación: ${shortDate(c.latest_at)}`;
+    if (c.pending) detail += ` · ${plural(c.pending, "entrega pendiente", "entregas pendientes")}`;
+  }
+  item.append(el("span", { class: "meta-line" }, detail));
+  if (c.not_evaluable) {
+    item.append(el("span", { class: "meta-line" }, `No evaluable en ${plural(c.not_evaluable, "texto escrito",
+      "textos escritos")} en la computadora (se revisa la letra a mano).`));
+  }
+  return item;
+}
+
+$("dw-open-writing").addEventListener("click", () => openWriting());
+
 // Dashboard → practice form (T019): subject, "Un objetivo", only this objective, Intermedia, 5 questions.
 // Nothing is sent to the server here; "Generar práctica" starts the usual bank-then-generation flow.
 async function practiceObjective(subjectCode, objectiveCode) {
@@ -584,7 +663,7 @@ $("dashboard-menu").addEventListener("click", () => backToMenu());
 // submitted once, then "Pendiente de revisión del tutor". Handwritten (L5) work shows its conditions only.
 // The editor disables spell checking and autocorrection so spelling errors stay visible to the tutor.
 
-const writing = { level: null, exercise: null, savedText: "", requestId: null, busy: false };
+const writing = { level: null, exercise: null, savedText: "", requestId: null, busy: false, view: 0 };
 
 function rememberWriting(exerciseId) {
   try {
@@ -625,8 +704,10 @@ async function openWriting() {
   rememberWriting(null);
   const list = $("writing-levels");
   list.replaceChildren(el("li", { class: "muted" }, "Cargando niveles…"));
+  const view = ++writing.view;
   try {
     const data = await api("/api/writing/levels");
+    if (view !== writing.view) return; // the student moved on before the answer arrived
     list.replaceChildren();
     for (const level of data.levels) {
       const count = level.exercise_count === 1 ? "1 ejercicio" : `${level.exercise_count} ejercicios`;
@@ -650,8 +731,11 @@ async function openWritingLevel(level) {
   const list = $("writing-exercises");
   list.replaceChildren();
   $("writing-empty").hidden = true;
+  const view = ++writing.view;
   try {
     const data = await api(`/api/writing/levels/${encodeURIComponent(level.code)}/exercises`);
+    // A late answer for a level the student already left must not fill the current list (T027).
+    if (view !== writing.view) return;
     $("writing-empty").hidden = data.exercises.length > 0;
     const states = { new: "Sin empezar", draft: "Borrador guardado", submitted: "Pendiente de revisión del tutor" };
     for (const exercise of data.exercises) {

@@ -15,7 +15,7 @@ from typing import Any, Callable
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.writing import contracts
+from app.writing import contracts, progress
 from app.writing.store import WritingStore, word_count
 
 MAX_TEXT = 20000
@@ -132,6 +132,11 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
              "description_es": LEVEL_TEXT_ES[lv["code"]], "exercise_count": counts.get(lv["code"], 0),
              "handwritten": lv["deliverable"]["evidence_modes"][0] == "handwritten"}
             for lv in contracts.levels()["levels"]]}
+
+    @router.get("/progress")
+    def writing_progress() -> dict[str, Any]:
+        """T027 (ADR-025): Producción escrita in "Mi progreso"; scores only from completed tutor evaluations."""
+        return progress.summary(*service.get().progress_inputs())
 
     @router.get("/levels/{level}/exercises")
     def exercises(level: str) -> dict[str, Any]:

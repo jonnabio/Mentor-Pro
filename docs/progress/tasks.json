@@ -855,6 +855,40 @@
       "result_file": "docs/progress/task_T026_result.md",
       "failures": [],
       "notes": "Suite 489; browser 363/363; live boundary checked read-only."
+    },
+    {
+      "id": "T027",
+      "name": "Writing learning dashboard (PO task T027)",
+      "objective": "Producción escrita as the fifth component of Mi progreso: activity, per-criterion EE01-EE20 latest/best, dimension averages from evaluated criteria only, coverage apart from performance.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-025-writing-learning-dashboard.md",
+          "tests/app/test_writing_progress.py",
+          "docs/progress/task_T027_result.md",
+          "docs/progress/screenshots/T027/"
+        ],
+        "modify": [
+          "app/writing/progress.py",
+          "app/writing/store.py",
+          "app/writing/routes.py",
+          "app/static/app.js",
+          "app/static/index.html",
+          "app/static/styles.css",
+          "scripts/dev/practice_e2e.py",
+          "tests/app/test_writing.py"
+        ]
+      },
+      "depends_on": [
+        "T026"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T027_result.md",
+      "failures": [],
+      "notes": "Suite 495; browser 399/399; stale writing-list answers ignored (app.js, RCA-003 class)."
     }
   ]
 }

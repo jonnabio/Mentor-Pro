@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-25
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T026)
+- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T027)
 
 ## Current Objective
 
@@ -69,6 +69,10 @@ Producción escrita (Español, written rubric EE01–EE20)
 - **T026** — tutor review at `/tutor` with official descriptors, partial
   save, single completion; student feedback
   ([ADR-024](../adr/ADR-024-tutor-writing-evaluation.md)).
+- **T027** — Producción escrita as the fifth tab of "Mi progreso":
+  activity, coverage, per-criterion latest/best, dimension averages from
+  evaluated criteria only
+  ([ADR-025](../adr/ADR-025-writing-learning-dashboard.md)).
 
 ### Current State
 
@@ -94,14 +98,14 @@ Producción escrita (Español, written rubric EE01–EE20)
   (`session_classification`), `writing` (`exercise`, `exercise_revision`,
   `reference_correction`, `generation_attempt`, `draft`, `submission`,
   `evaluation`, `criterion_score`).
-- Tests: 489 passing; browser (mocked, `mentor_pro_test`) 363/363; ACE gate
+- Tests: 495 passing; browser (mocked, `mentor_pro_test`) 399/399; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
 1. Receive and plan the next Product Owner task (ADR first). Candidates
    named so far: L4/L5 exercises, reopening or correcting a completed
-   evaluation, writing progress on the dashboard (not yet requested).
+   evaluation.
 2. Restore a generation fallback model: only
    `nvidia/nemotron-3-ultra-550b-a55b:free` generates and it often truncates
    (writing L1 needed several seeding runs). Add another free text model to
@@ -129,7 +133,6 @@ Producción escrita (Español, written rubric EE01–EE20)
   `%USERPROFILE%\mentor-pro-backups\mentor_pro_pre_T017_2026-10-24.dump`;
   rollback `scripts/dev/classify_sessions.py --rollback T017-2026-10-24`.
 - Property detection (T009) is keyword-based.
-- `scripts/pubs/check_lane.py` from the session-start prompt does not exist.
 - Local `pg_hba.conf` uses `trust`; `mentor_pro_admin` has no password.
 - Edge cannot start under automation; browser tests use installed Chrome.
 - Docker not installed; `docker-compose.yml` untested.
@@ -173,5 +176,5 @@ Producción escrita (Español, written rubric EE01–EE20)
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-024](../adr/ADR-024-tutor-writing-evaluation.md)
+  [ADR-025](../adr/ADR-025-writing-learning-dashboard.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-003)

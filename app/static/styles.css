@@ -258,3 +258,15 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
   border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: inherit; }
 .tutor-reference { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px dashed var(--danger);
   border-radius: 8px; padding: 10px 12px; }
+
+/* ------------------------------------------------------------------ writing progress (T027) */
+.dw-levels li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px;
+  border-bottom: 1px solid var(--border); padding: 6px 0; }
+.dw-dimension { margin: 14px 0; }
+.dw-dimension h4 { margin: 0 0 2px; font-size: 1rem; }
+.dw-dimension-summary { margin: 0 0 6px; font-weight: 650; }
+.crit-evaluated { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.crit-pending { color: #7a5300; border-color: #d9a400; background: #fff6db; }
+@media (prefers-color-scheme: dark) { .crit-pending { color: #f5d27a; background: #3a2f12; } }
+.objective-status li.dw-unassessed { border-style: dashed; }
+#dw-open-writing { margin: 8px 0 12px; }
