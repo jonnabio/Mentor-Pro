@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T024)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T025)
 
 ## Current Objective
 
@@ -86,6 +86,9 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   confirmation); versioned editorial revisions (`writing.exercise_revision`)
   of the three L1 exercises; checks W13–W15
   ([ADR-023](../adr/ADR-023-l1-editor-and-editorial-revisions.md)).
+- **T025** — L2 (3 introductions) and L3 (2 development, 1 conclusion)
+  inventory; checks W13–W18 for composed paragraphs; seeding command
+  `seed_writing_l2_l3.py`; two editorial revisions.
 
 ### Current State
 
@@ -101,7 +104,7 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 472 passing; browser (mocked) 319/319 and live 14/14 on
+- Tests: 481 passing; browser (mocked) 335/335 and live 14/14 on
   `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 

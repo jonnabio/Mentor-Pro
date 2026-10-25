@@ -1,4 +1,6 @@
-"""Apply the T024 editorial revisions to the Nivel 1 exercises (ADR-023). Repeatable; never overwrites.
+"""Apply editorial revisions to stored writing exercises (ADR-023). Repeatable; never overwrites.
+
+Default spec: the T024 Nivel 1 revisions; --specs names another file (for example the T025 L2 revision).
 
 Each revision is validated (W02-W07, W09-W15) before it is appended to writing.exercise_revision; the
 original record, the original tutor-only reference, generation histories, drafts and submissions are kept.
@@ -7,6 +9,7 @@ original record, the original tutor-only reference, generation histories, drafts
 Usage:
     .venv/Scripts/python.exe scripts/dev/revise_writing_l1.py --dry-run
     .venv/Scripts/python.exe scripts/dev/revise_writing_l1.py
+    .venv/Scripts/python.exe scripts/dev/revise_writing_l1.py --specs scripts/dev/fixtures/writing-revisions-T025.json
 """
 
 from __future__ import annotations
@@ -29,16 +32,22 @@ SPECS = ROOT / "scripts" / "dev" / "fixtures" / "writing-revisions-T024.json"
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--specs", type=Path, default=SPECS)
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     url = db.database_url()
     store = WritingStore(url)
-    specs = json.loads(SPECS.read_text(encoding="utf-8"))
+    specs = json.loads(args.specs.read_text(encoding="utf-8"))
     with open_catalog(url) as catalog:
         if args.dry_run:
             for spec in specs:
-                record, reference = revisions.revise(spec, store.record(spec["exercise_id"]),
-                                                     store.reference_correction(spec["exercise_id"]))
+                if any(r["reason"] == spec["reason"] for r in store.revisions(spec["exercise_id"])):
+                    print(spec["exercise_id"], "present")
+                    continue
+                current = store.record(spec["exercise_id"])
+                ref = store.reference_correction(spec["exercise_id"])
+                ref = {k: ref[k] for k in ("corrected_text_es", "corrections", "ambiguities_es")} if ref else None
+                record, reference = revisions.revise(spec, current, ref)
                 checks = revisions.checks_for(catalog, store, record, reference, "PNE2026-SUM-v1.0")
                 failed = [f"{c['id']}: {c['message']}" for c in checks if c["status"] == "fail"]
                 print(spec["exercise_id"], "valid" if not failed else failed)

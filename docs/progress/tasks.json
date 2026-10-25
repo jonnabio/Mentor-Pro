@@ -782,6 +782,41 @@
       "result_file": "docs/progress/task_T024_result.md",
       "failures": [],
       "notes": "Three revisions stored as revision 2; suite 472; browser 319/319."
+    },
+    {
+      "id": "T025",
+      "name": "Populate L2 and L3 writing exercises (PO task T025)",
+      "objective": "Three L2 introductions and three L3 exercises (development and conclusion), validated and visible; idempotent seeding.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "scripts/dev/seed_writing_l2_l3.py",
+          "scripts/dev/fixtures/writing-revisions-T025.json",
+          "scripts/dev/fixtures/writing-exercises-L2L3-T025.json",
+          "docs/progress/task_T025_result.md",
+          "docs/progress/screenshots/T025/"
+        ],
+        "modify": [
+          "app/writing/generation.py",
+          "app/writing/contracts.py",
+          "app/writing/seeding.py",
+          "app/writing/revisions.py",
+          "app/writing/editing.py",
+          "scripts/dev/revise_writing_l1.py",
+          "scripts/dev/practice_e2e.py",
+          "tests/app/test_writing_generation.py"
+        ]
+      },
+      "depends_on": [
+        "T024"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T025_result.md",
+      "failures": [],
+      "notes": "15 requests, 5 accepted, USD 0; two revisions; live 27/27; browser 335/335; suite 481."
     }
   ]
 }

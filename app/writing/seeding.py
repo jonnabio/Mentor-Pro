@@ -60,3 +60,57 @@ def seed(client: OpenRouterClient, usage_store: Store, catalog: psycopg.Connecti
                    "cost_usd": round(sum(a["cost_usd"] for a in attempts), 8),
                    "cost_complete": all(a["cost_complete"] for a in attempts)},
     }
+
+
+# ---------------------------------------------------------------- T025: composed paragraphs (L2, L3)
+
+COMPOSE_PLAN = (  # (level, exercise type, criteria, approved exercises wanted)
+    ("L2", "introduction_paragraph", ["EE03", "EE04"], 3),
+    ("L3", "development_paragraphs", ["EE03", "EE05"], 2),
+    ("L3", "conclusion_paragraph", ["EE03", "EE06"], 1),
+)
+
+
+def compose_inventory(writing_store: Any) -> dict[str, list[str]]:
+    """Exercise type -> approved exercise IDs (latest revision), for the types in COMPOSE_PLAN."""
+    found: dict[str, list[str]] = {kind: [] for _, kind, _, _ in COMPOSE_PLAN}
+    for row in writing_store.exercises():
+        kind = row["record"]["exercise_type"]
+        if kind in found:
+            found[kind].append(row["exercise_id"])
+    return found
+
+
+def seed_compose(client: OpenRouterClient, usage_store: Store, catalog: psycopg.Connection, writing_store: Any,
+                 difficulty: str = "medium") -> dict[str, Any]:
+    """Generate only the missing L2/L3 exercises; stop at a budget or provider stop and report the gap."""
+    from app.writing import generation
+
+    before = compose_inventory(writing_store)
+    results, stopped = [], False
+    for level, kind, criteria, wanted in COMPOSE_PLAN:
+        missing = max(0, wanted - len(before[kind]))
+        for _ in range(missing):
+            if stopped:
+                break
+            outcome = generation.generate_exercise(client, usage_store, catalog, writing_store, level, difficulty,
+                                                   criteria)
+            results.append({
+                "level": level, "exercise_type": kind, "status": outcome.status, "stop_reason": outcome.stop_reason,
+                "exercise_id": outcome.exercise["exercise_id"] if outcome.exercise else None,
+                "topic_es": outcome.exercise["topic_es"] if outcome.exercise else None,
+                "attempts": [{"request_id": a.request_id, "status": a.status, "reasons": a.reasons,
+                              "review": a.review, **a.summary()} for a in outcome.attempts]})
+            stopped = outcome.status == "unavailable"
+    after = compose_inventory(writing_store)
+    attempts = [a for r in results for a in r["attempts"]]
+    return {
+        "results": results, "inventory": after,
+        "gap": {kind: wanted - len(after[kind]) for _, kind, _, wanted in COMPOSE_PLAN if len(after[kind]) < wanted},
+        "totals": {"attempts": len(attempts), "accepted": sum(a["status"] == "accepted" for a in attempts),
+                   "rejected": sum(a["status"] == "rejected" for a in attempts),
+                   "calls": sum(a["calls"] for a in attempts), "tokens_in": sum(a["tokens_in"] for a in attempts),
+                   "tokens_out": sum(a["tokens_out"] for a in attempts),
+                   "cost_usd": round(sum(a["cost_usd"] for a in attempts), 8),
+                   "cost_complete": all(a["cost_complete"] for a in attempts)},
+    }

@@ -26,12 +26,20 @@ from app.llm.router import RouteResult, Store, route
 from app.writing import contracts
 from curriculum.catalog import list_rubric_criteria
 
-PROMPT_VERSION = "writing-1.0"
+PROMPT_VERSION = "writing-1.2"  # 1.1 (T025): paragraph scope, no model text, voseo; 1.2: short sentences
 MAX_REQUESTS = 3
 MAX_CALLS = 12  # generation and review calls per exercise, including route() retries
 LEVEL_ALIASES = {f"L{lv['ordinal']}": lv["code"] for lv in contracts.levels()["levels"]}
 DIFFICULTY_ES = {"easy": "Fácil", "medium": "Intermedia", "hard": "Difícil"}
 REVIEW_KEYS = ("clarity", "age_appropriate", "completeness", "alignment", "language")
+COMPOSE_REVIEW_KEYS = REVIEW_KEYS + ("paragraph_scope", "no_model_text")  # T025, composed paragraphs (L2-L5)
+# W16 (T025): ideas that belong to another paragraph type. Introductions present the topic; development
+# explains causes and consequences; conclusions propose actions or solutions.
+OUT_OF_SCOPE = {
+    "introduction_paragraph": ("consecuencia", "solucion", "accion", "acciones", "causa", "provoca"),
+    "development_paragraphs": ("solucion", "acciones", "accion", "que podes hacer", "recomend"),
+    "conclusion_paragraph": ("causa", "provoca", "consecuencia"),
+}
 GUIDE_SHA = "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
 TEST_SHA = "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
 # Topics of the MEP model test and the preparation guide: style models, never reused (W06).
@@ -128,6 +136,8 @@ def deliverable_for(level: dict[str, Any], exercise_type: str, difficulty: str) 
         low, high = {"easy": (3, 4), "medium": (4, 6), "hard": (6, 8)}[difficulty]
     elif exercise_type == "development_paragraphs":
         low = high = 2
+    elif exercise_type in ("conclusion_paragraph", "introduction_paragraph"):
+        low = high = 1  # EE04 and EE06 assess a single paragraph (T025 fix: conclusions got the L3 range 1-2)
     else:
         low, high = spec["min"], spec["max"]
     deliverable = {"unit": spec["unit"], "min": low, "max": high,
@@ -198,6 +208,17 @@ CONTENT_ES = {
 }
 
 
+SCOPE_ES = {
+    "conventions_production": "oraciones sobre el tema.",
+    "conventions_editing": "corrección del texto.",
+    "introduction_paragraph": "presentar el tema y por qué importa; no causas, consecuencias ni soluciones.",
+    "development_paragraphs": "causas (primer párrafo) y consecuencias (segundo párrafo); no soluciones.",
+    "conclusion_paragraph": "acciones o soluciones y un cierre; no causas ni consecuencias nuevas.",
+    "guided_composition": "introducción, causas, consecuencias y soluciones.",
+    "full_composition": "introducción, causas, consecuencias y soluciones.",
+}
+
+
 def generation_messages(g: Grounding, avoid_topics: list[str]) -> list[dict[str, str]]:
     criteria = "\n".join(
         f"- {c['code']}: {c['statement_es']}\n  Desempeño esperado (4 puntos): {c['descriptors_es'][4]}\n"
@@ -218,13 +239,18 @@ Criterios que se evaluarán (no los cite en el ejercicio; úselos para que el ej
 
 Reglas:
 - Tema original, cercano a la vida de estudiantes de sexto grado en Costa Rica, distinto de: {avoid}.
-- La situación comunicativa dice quién escribe, para qué y para quién (por ejemplo, una campaña o feria escolar).
+- La situación comunicativa dice quién escribe, para qué y para quién (por ejemplo, una campaña o feria escolar),
+  en 2 o 3 oraciones cortas de máximo 25 palabras cada una. Ninguna oración del ejercicio supera 25 palabras.
 - De 3 a 7 instrucciones numeradas implícitamente (una por elemento), cortas y claras, en segunda persona con voseo
   costarricense (por ejemplo «Escribí», «Agregá»), sin palabras difíciles.
 - Las instrucciones deben decir exactamente qué entregar ({_deliverable_es(g)}) y qué debe contener:
   {CONTENT_ES[g.exercise_type]}. Use esas mismas palabras clave.
 - 2 a 4 ideas sugeridas, relacionadas con la situación comunicativa.
 - No mencione códigos de criterios, puntos, rúbricas ni calificación.
+- Las ideas sugeridas son temas breves (máximo 15 palabras), no oraciones listas para copiar; no escriba un
+  párrafo modelo ni un ejemplo completo.
+- Las ideas sugeridas corresponden solo a este tipo de párrafo: {SCOPE_ES[g.exercise_type]}
+- Instrucciones sin repetir la misma idea, en voseo también en negativo («No copiés»; nunca «No copies»).
 
 Responda solo con este JSON:
 {{"topic_es": "...", "communicative_situation_es": "...", "suggested_ideas_es": ["..."],
@@ -249,9 +275,11 @@ Califique de 0 a 2 (2 = cumple por completo, 1 = cumple con fallas, 0 = no cumpl
 - age_appropriate: vocabulario, tema y extensión adecuados para 11-12 años.
 - completeness: contiene toda la información necesaria para escribir sin ayuda.
 - alignment: el producto pedido permite evaluar cada criterio indicado.
-- language: español correcto de Costa Rica.
+- language: español correcto de Costa Rica, instrucciones en voseo y sin repetir ideas.
+- paragraph_scope: las ideas sugeridas corresponden solo al tipo de párrafo pedido ({SCOPE_ES[g.exercise_type]})
+- no_model_text: el ejercicio no da un párrafo modelo ni oraciones listas para copiar.
 Responda solo con JSON: {{"clarity": 0, "age_appropriate": 0, "completeness": 0, "alignment": 0,
-"language": 0, "notes": "..."}}"""
+"language": 0, "paragraph_scope": 0, "no_model_text": 0, "notes": "..."}}"""
     return [{"role": "system", "content": REVIEW_SYSTEM}, {"role": "user", "content": user}]
 
 
@@ -381,10 +409,44 @@ def deterministic_checks(g: Grounding, exercise: dict[str, Any], avoid_topics: l
     return checks
 
 
-def parse_review(text: str) -> dict[str, Any]:
-    raw = extract_json(text, required=REVIEW_KEYS)
+def compose_checks(g: Grounding, exercise: dict[str, Any], stored: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """W13, W14, W16-W18 for composed paragraphs (T025); `stored` are the other stored exercise records."""
+    from app.writing.editing import TU_FORMS, _content_words  # editing imports this module
+
+    checks: list[dict[str, str]] = []
+
+    def check(check_id: str, ok: bool, message: str) -> None:
+        checks.append({"id": check_id, "status": "pass" if ok else "fail", "message": "ok" if ok else message})
+
+    tu = [i for i in exercise["instructions_es"] if TU_FORMS.search(i.strip())]
+    check("W13", not tu, f"tú forms instead of voseo: {tu}")
+    sets = [set(_content_words(i)) for i in exercise["instructions_es"]]
+    similar = [(a + 1, b + 1) for a in range(len(sets)) for b in range(a + 1, len(sets))
+               if sets[a] and sets[b] and len(sets[a] & sets[b]) / min(len(sets[a]), len(sets[b])) >= 0.75]
+    check("W14", not similar, f"instructions repeat each other: {similar}")
+    words = OUT_OF_SCOPE.get(g.exercise_type, ())
+    off = [i for i in exercise["suggested_ideas_es"] if any(w in _plain(i) for w in words)]
+    check("W16", not off, f"ideas outside the {g.exercise_type} scope: {off}")
+    long_ideas = [i for i in exercise["suggested_ideas_es"] if len(i.split()) > 15]
+    situation_sentences = len([x for x in re.split(r"(?<=[.!?])\s+", exercise["communicative_situation_es"]) if x])
+    check("W17", not long_ideas and situation_sentences <= 3,
+          f"model text: {len(long_ideas)} ideas over 15 words, situation of {situation_sentences} sentences")
+
+    def bag(record: dict[str, Any]) -> set[str]:
+        return set(_content_words(" ".join([record["topic_es"], record["communicative_situation_es"]])))
+
+    own_topic, own = set(_content_words(exercise["topic_es"])), bag(exercise)
+    near = [r["topic_es"] for r in stored
+            if (own_topic and len(own_topic & set(_content_words(r["topic_es"]))) / len(own_topic) >= 0.6)
+            or (own and len(own & bag(r)) / len(own | bag(r)) >= 0.4)]
+    check("W18", not near, f"near-duplicate topic or situation: {near}")
+    return checks
+
+
+def parse_review(text: str, keys: tuple[str, ...] = REVIEW_KEYS) -> dict[str, Any]:
+    raw = extract_json(text, required=keys)
     scores = {}
-    for key in REVIEW_KEYS:
+    for key in keys:
         value = raw[key]
         if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 2:
             raise OutputError(f"review {key} must be 0, 1 or 2")
@@ -401,6 +463,7 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
     g = build_grounding(catalog, baseline, level, difficulty, criteria)
     gate = gate or BudgetGate(usage_store, client.settings, max_calls=MAX_CALLS)
     avoid = writing_store.topics() if writing_store is not None else []
+    stored = [r["record"] for r in writing_store.exercises()] if writing_store is not None else []
     attempts: list[Attempt] = []
     stop: str | None = None
     for _ in range(MAX_REQUESTS):
@@ -424,7 +487,7 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
             continue
         exercise = assemble(g, fields)
         attempt.exercise = exercise
-        attempt.checks += deterministic_checks(g, exercise, avoid)
+        attempt.checks += deterministic_checks(g, exercise, avoid) + compose_checks(g, exercise, stored)
         failed = [c for c in attempt.checks if c["status"] == "fail"]
         if failed:
             attempt.reasons += [f"{c['id']}: {c['message']}" for c in failed]
@@ -441,13 +504,13 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
             _record(writing_store, g, attempt)
             break
         try:
-            attempt.review = parse_review(reviewed.content or "")
+            attempt.review = parse_review(reviewed.content or "", COMPOSE_REVIEW_KEYS)
         except OutputError as exc:
             attempt.checks.append({"id": "W08", "status": "fail", "message": f"review output: {exc}"})
             attempt.reasons.append(f"W08: review output: {exc}")
             _record(writing_store, g, attempt)
             continue
-        low = {k: v for k, v in attempt.review.items() if k in REVIEW_KEYS and v < 2}
+        low = {k: v for k, v in attempt.review.items() if k in COMPOSE_REVIEW_KEYS and v < 2}
         attempt.checks.append({"id": "W08", "status": "fail" if low else "pass",
                                "message": f"review below 2: {low}; {attempt.review['notes']}" if low else "ok"})
         if low:

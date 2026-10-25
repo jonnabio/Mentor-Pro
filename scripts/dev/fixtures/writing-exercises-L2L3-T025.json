@@ -1,0 +1,527 @@
+[
+  {
+    "level": "idea_development",
+    "language": "es-CR",
+    "topic_es": "La alimentación saludable y el rendimiento escolar",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE03",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE04",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE04",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3",
+          "workbook_code": "EE03"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A4",
+          "workbook_code": "EE04"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 1,
+      "min": 1,
+      "unit": "paragraphs",
+      "evidence_mode": "typed",
+      "description_es": "Un solo párrafo de introducción que contenga una idea principal y al menos dos ideas complementarias, relacionado con la situación comunicativa."
+    },
+    "exercise_id": "PE-L2-alimentacion-saludable-rendimiento-19a72a",
+    "exercise_type": "introduction_paragraph",
+    "schema_version": "1.0",
+    "instructions_es": [
+      "Leé la situación comunicativa y el tema.",
+      "Escribí un solo párrafo de introducción.",
+      "Empezá con una idea principal que presente el tema.",
+      "Agregá al menos dos ideas complementarias relacionadas con la situación.",
+      "Revisá que el párrafo sea coherente y use conectores."
+    ],
+    "target_criteria": [
+      "EE03",
+      "EE04"
+    ],
+    "suggested_ideas_es": [
+      "Beneficios de una alimentación balanceada para la concentración y la memoria",
+      "El papel de la familia y la escuela para promover hábitos alimentarios saludables"
+    ],
+    "communicative_situation_es": "Vos formás parte del comité de salud de tu escuela y debés redactar la introducción de un folleto que se entregará en la feria de la salud escolar. El folleto va dirigido a estudiantes, docentes y familias para informar y explicar por qué una buena alimentación ayuda a aprender mejor y convivir sanamente."
+  },
+  {
+    "level": "paragraph_writing",
+    "language": "es-CR",
+    "topic_es": "El uso seguro de la bicicleta para ir a la escuela",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE03",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE05",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE05",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3",
+          "workbook_code": "EE03"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A5",
+          "workbook_code": "EE05"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 2,
+      "min": 2,
+      "unit": "paragraphs",
+      "evidence_mode": "typed",
+      "description_es": "Dos párrafos de desarrollo: el primero explica causas y el segundo consecuencias; cada uno con una idea principal y al menos dos ideas complementarias."
+    },
+    "exercise_id": "PE-L3-uso-seguro-bicicleta-3526f8",
+    "exercise_type": "development_paragraphs",
+    "schema_version": "1.0",
+    "instructions_es": [
+      "Escribí dos párrafos de desarrollo: el primero sobre causas y el segundo sobre consecuencias.",
+      "En cada párrafo incluí una idea principal y al menos dos ideas complementarias.",
+      "Usá conectores de causa y efecto para dar cohesión.",
+      "No copiés las ideas sugeridas; redactá con tus propias palabras.",
+      "Entregá solo los dos párrafos solicitados."
+    ],
+    "target_criteria": [
+      "EE03",
+      "EE05"
+    ],
+    "suggested_ideas_es": [
+      "Falta de casco y protección",
+      "No respetar las señales de tránsito",
+      "Lesiones que impiden ir a la escuela",
+      "Miedo a volver a usar la bicicleta"
+    ],
+    "communicative_situation_es": "Participás en la campaña escolar “Rodando Seguro”. Tu texto será leído por compañeros, familias y docentes para informar sobre por qué ocurren los accidentes en bici y qué consecuencias tienen."
+  },
+  {
+    "level": "paragraph_writing",
+    "language": "es-CR",
+    "topic_es": "La importancia de dormir bien para el rendimiento escolar",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE03",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE05",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE05",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3",
+          "workbook_code": "EE03"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A5",
+          "workbook_code": "EE05"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 2,
+      "min": 2,
+      "unit": "paragraphs",
+      "evidence_mode": "typed",
+      "description_es": "Dos párrafos de desarrollo: el primero explica causas y el segundo consecuencias; cada uno con una idea principal y al menos dos ideas complementarias."
+    },
+    "exercise_id": "PE-L3-importancia-dormir-bien-767c6c",
+    "exercise_type": "development_paragraphs",
+    "schema_version": "1.0",
+    "instructions_es": [
+      "Escribí dos párrafos de desarrollo sobre el tema.",
+      "En el primer párrafo explicá las causas de la falta de sueño.",
+      "En el segundo párrafo describí las consecuencias de dormir poco.",
+      "Cada párrafo debe tener una idea principal y al menos dos ideas complementarias.",
+      "Usá conectores de causa y efecto (porque, por eso, como resultado).",
+      "No copiés textos de internet ni de otros compañeros."
+    ],
+    "target_criteria": [
+      "EE03",
+      "EE05"
+    ],
+    "suggested_ideas_es": [
+      "Uso de celular antes de dormir",
+      "Horarios de sueño irregulares",
+      "Cansancio y sueño en clase",
+      "Dificultad para concentrarse y aprender"
+    ],
+    "communicative_situation_es": "Vos sos parte del comité de bienestar de la escuela y vas a escribir un artículo para el boletín mensual que leerán tus compañeros, maestros y familias."
+  },
+  {
+    "level": "paragraph_writing",
+    "language": "es-CR",
+    "topic_es": "El uso adecuado de los baños escolares",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE03",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE06",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE06",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3",
+          "workbook_code": "EE03"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A6",
+          "workbook_code": "EE06"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 1,
+      "min": 1,
+      "unit": "paragraphs",
+      "evidence_mode": "typed",
+      "description_es": "Un solo párrafo de conclusión con acciones o soluciones."
+    },
+    "exercise_id": "PE-L3-uso-adecuado-banos-f1da0d",
+    "exercise_type": "conclusion_paragraph",
+    "schema_version": "1.0",
+    "instructions_es": [
+      "Escribí un solo párrafo de conclusión sobre el uso adecuado de los baños escolares.",
+      "Incluí una idea principal y al menos dos ideas complementarias que propongan acciones o soluciones concretas.",
+      "Usá conectores de cierre como «por tanto» o «en conclusión» para unir las ideas.",
+      "No copiés las ideas sugeridas; redactá con tus propias palabras.",
+      "Revisá que el párrafo cierre el tema sin agregar causas ni consecuencias nuevas."
+    ],
+    "target_criteria": [
+      "EE03",
+      "EE06"
+    ],
+    "suggested_ideas_es": [
+      "Colocar recordatorios visuales en los baños",
+      "Crear turnos de limpieza entre estudiantes",
+      "Enseñar el lavado de manos correcto",
+      "Instalar dispensadores de jabón y papel"
+    ],
+    "communicative_situation_es": "Vos sos parte de una campaña escolar para mejorar los hábitos en los baños. Escribí la conclusión de un texto expositivo que será publicado en el boletín de la escuela para que toda la comunidad educativa conozca las acciones a seguir."
+  },
+  {
+    "level": "idea_development",
+    "language": "es-CR",
+    "topic_es": "La puntualidad en la escuela y su efecto en el aprendizaje",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE03",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE04",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE04",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3",
+          "workbook_code": "EE03"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A4",
+          "workbook_code": "EE04"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 1,
+      "min": 1,
+      "unit": "paragraphs",
+      "evidence_mode": "typed",
+      "description_es": "Un párrafo de introducción con idea principal y al menos dos ideas complementarias."
+    },
+    "exercise_id": "PE-L2-puntualidad-escuela-su-6aa679",
+    "exercise_type": "introduction_paragraph",
+    "schema_version": "1.0",
+    "instructions_es": [
+      "Escribí un solo párrafo de introducción.",
+      "Incluí una idea principal que presente el tema.",
+      "Agregá al menos dos ideas complementarias vinculadas a la situación comunicativa.",
+      "Usá conectores para unir las ideas con cohesión.",
+      "No copiés las ideas sugeridas tal cual."
+    ],
+    "target_criteria": [
+      "EE03",
+      "EE04"
+    ],
+    "suggested_ideas_es": [
+      "Respeto al tiempo compartido",
+      "Mejora del rendimiento académico",
+      "Clima de confianza en el aula"
+    ],
+    "communicative_situation_es": "Vos sos parte del comité de convivencia de tu escuela. Escribís un texto para la revista escolar. El público son tus compañeros y docentes."
+  },
+  {
+    "level": "idea_development",
+    "language": "es-CR",
+    "topic_es": "La importancia de la empatía en la convivencia escolar",
+    "text_type": "expositivo",
+    "difficulty": "medium",
+    "evaluation": {
+      "scale": {
+        "max": 4,
+        "min": 0
+      },
+      "evaluator": "human",
+      "rubric_id": "MEP-RUBRICA-PE-2026",
+      "parameters": [
+        {
+          "criterion": "EE03",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+          "applicability": "scored"
+        },
+        {
+          "criterion": "EE04",
+          "rubric_ref": "MEP-RUBRICA-PE-2026#EE04",
+          "applicability": "scored"
+        }
+      ],
+      "counting_rule": "identical_repetition_counts_once",
+      "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+    },
+    "provenance": {
+      "sources": [
+        {
+          "role": "rubric",
+          "document_id": "MEP-RUBRICA-PE-2026",
+          "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+        },
+        {
+          "role": "task_model",
+          "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+          "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+        },
+        {
+          "role": "topic_model",
+          "document_id": "GUIA-PE-2026",
+          "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+        }
+      ],
+      "authored_by": "llm_draft_human_reviewed",
+      "baseline_version": "PNE2026-SUM-v1.0",
+      "curriculum_records": [
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3",
+          "workbook_code": "EE03"
+        },
+        {
+          "assertion_id": "PNE2026-PRI-ESP-PE-B3-A4",
+          "workbook_code": "EE04"
+        }
+      ]
+    },
+    "deliverable": {
+      "max": 1,
+      "min": 1,
+      "unit": "paragraphs",
+      "evidence_mode": "typed",
+      "description_es": "Un párrafo de introducción con idea principal y al menos dos ideas complementarias."
+    },
+    "exercise_id": "PE-L2-importancia-empatia-convivencia-ad2d8c",
+    "exercise_type": "introduction_paragraph",
+    "schema_version": "1.0",
+    "instructions_es": [
+      "Escribí un solo párrafo de introducción.",
+      "Incluí una idea principal que presente el tema.",
+      "Agregá al menos dos ideas complementarias relacionadas con la situación comunicativa.",
+      "Usá conectores para dar cohesión al párrafo.",
+      "No copiés las ideas sugeridas tal cual."
+    ],
+    "target_criteria": [
+      "EE03",
+      "EE04"
+    ],
+    "suggested_ideas_es": [
+      "Definición de empatía y su rol en la escuela",
+      "Beneficios de la empatía para el clima escolar",
+      "Ejemplos cotidianos de empatía entre compañeros"
+    ],
+    "communicative_situation_es": "Vos sos estudiante de sexto grado. Escribís un texto para la revista escolar. El objetivo es explicar por qué la empatía mejora la convivencia."
+  }
+]

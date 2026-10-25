@@ -91,6 +91,8 @@ def validate_exercise(exercise: dict[str, Any]) -> list[str]:
         errors.append(f"deliverable outside the range of level {lv['code']}")
     if exercise["exercise_type"] == "development_paragraphs" and (deliverable["min"], deliverable["max"]) != (2, 2):
         errors.append("development_paragraphs requires exactly two paragraphs (EE05)")
+    if exercise["exercise_type"] in ("introduction_paragraph", "conclusion_paragraph")             and (deliverable["min"], deliverable["max"]) != (1, 1):
+        errors.append(f"{exercise['exercise_type']} requires exactly one paragraph (EE04/EE06)")
     if exercise["exercise_type"] == "conventions_editing" and not (exercise.get("source_text_es") or "").strip():
         errors.append("conventions_editing requires source_text_es (the text to correct)")
     if any(k in exercise for k in ("reference_text_es", "reference_correction", "corrections")):

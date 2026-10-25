@@ -1,0 +1,30 @@
+[
+  {
+    "exercise_id": "PE-L2-alimentacion-saludable-rendimiento-19a72a",
+    "reason": "T025 editorial revision: ideas limited to the introduction, concise instructions",
+    "ideas_remove": [
+      "Consecuencias de saltarse comidas o comer mucha comida chatarra",
+      "Acciones sencillas que podés hacer en la escuela y en casa para comer mejor"
+    ],
+    "set_instructions": [
+      "Leé la situación comunicativa y el tema.",
+      "Escribí un solo párrafo de introducción.",
+      "Empezá con una idea principal que presente el tema.",
+      "Agregá al menos dos ideas complementarias relacionadas con la situación.",
+      "Revisá que el párrafo sea coherente y use conectores."
+    ]
+  },
+  {
+    "exercise_id": "PE-L3-uso-adecuado-banos-f1da0d",
+    "reason": "T025 editorial revision: exactly one conclusion paragraph (EE06), escuela instead of colegio",
+    "set_instructions": [
+      "Escribí un solo párrafo de conclusión sobre el uso adecuado de los baños escolares.",
+      "Incluí una idea principal y al menos dos ideas complementarias que propongan acciones o soluciones concretas.",
+      "Usá conectores de cierre como «por tanto» o «en conclusión» para unir las ideas.",
+      "No copiés las ideas sugeridas; redactá con tus propias palabras.",
+      "Revisá que el párrafo cierre el tema sin agregar causas ni consecuencias nuevas."
+    ],
+    "situation": [["en el boletín del colegio", "en el boletín de la escuela"]],
+    "deliverable": {"description_es": "Un solo párrafo de conclusión con acciones o soluciones.", "min": 1, "max": 1}
+  }
+]

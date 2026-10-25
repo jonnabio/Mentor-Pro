@@ -64,7 +64,7 @@ WORDS = ("río", "mesa", "nube", "faro", "trigo", "lápiz", "volcán", "puente",
          "zafiro", "bosque", "carreta", "delfín", "espiga", "flauta", "girasol", "hamaca", "iglesia")
 
 
-WRITING_FIXTURES = (db.REPO_ROOT / "scripts" / "dev" / "fixtures" / "writing-exercise-T021.json",
+WRITING_FIXTURES = (db.REPO_ROOT / "scripts" / "dev" / "fixtures" / "writing-exercises-L2L3-T025.json",
                     db.REPO_ROOT / "scripts" / "dev" / "fixtures" / "writing-exercises-L1-T023.json",
                     db.REPO_ROOT / ".ace" / "schemas" / "writing" / "examples" / "exercises.json")
 HEALTHY = "PE-L2-alimentacion-saludable-rendimiento-19a72a"  # generated in T021
@@ -648,11 +648,46 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
         page.get_by_role("button", name="Volver a los ejercicios").click()
     page.get_by_role("button", name="Volver a los niveles").click()
 
+    usage_before = writing_rows(url, "SELECT COUNT(*) FROM llm.usage_record")[0][0] \
+        if writing_rows(url, "SELECT to_regclass('llm.usage_record') IS NOT NULL")[0][0] else 0
+    # T025: Nivel 2 and 3 lists; L3 has development and conclusion exercises; editors start empty.
+    page.locator('.level-choice[data-level="idea_development"]').click()
+    expect(page.locator(".exercise-choice").first).to_be_visible()
+    report.check(page.locator(".exercise-choice").count() >= 3, f"[{name}] Nivel 2 lists at least 3 exercises")
+    page.get_by_role("button", name="Volver a los niveles").click()
     page.locator('.level-choice[data-level="paragraph_writing"]').click()
+    expect(page.locator(".exercise-choice").first).to_be_visible()
+    l3 = page.locator(".exercise-choice .level-label").all_inner_texts()
+    report.check(len(l3) == 3, f"[{name}] Nivel 3 lists 3 exercises {l3}")
+    kinds = []
+    for index in range(len(l3)):
+        page.locator(".exercise-choice").nth(index).click()
+        expect(page.locator("#writing-editor")).to_be_visible()
+        deliverable = page.locator("#writing-ex-deliverable").inner_text()
+        kinds.append("conclusión" if "conclusión" in deliverable else "desarrollo" if "desarrollo" in deliverable else "?")
+        report.check(page.locator("#writing-text").input_value() == "" and page.locator("#writing-restore").is_hidden()
+                     and page.locator("#writing-source").is_hidden(),
+                     f"[{name}] L3 #{index + 1} ({kinds[-1]}): empty editor, no text to correct")
+        if index == 0:
+            page.locator("#writing-text").fill("Primer párrafo sobre las causas.\n\nSegundo párrafo sobre las consecuencias.")
+            page.get_by_role("button", name="Guardar borrador").click()
+            expect(page.locator("#writing-saved")).to_contain_text("Borrador guardado")
+            page.reload()
+            expect(page.locator("#writing-editor")).to_be_visible()
+            report.check("Segundo párrafo" in page.locator("#writing-text").input_value(),
+                         f"[{name}] L3 draft resumed after reload")
+        page.get_by_role("button", name="Volver a los ejercicios").click()
+    report.check(sorted(set(kinds)) == ["conclusión", "desarrollo"], f"[{name}] L3 has development and conclusion "
+                                                                     f"exercises {kinds}")
+    page.get_by_role("button", name="Volver a los niveles").click()
+    page.locator('.level-choice[data-level="guided_composition"]').click()
     expect(page.locator("#writing-empty")).to_be_visible()
     report.check("Todavía no hay ejercicios" in page.locator("#writing-empty").inner_text(),
                  f"[{name}] empty state for a level without exercises")
     page.get_by_role("button", name="Volver a los niveles").click()
+    usage_after = writing_rows(url, "SELECT COUNT(*) FROM llm.usage_record")[0][0] \
+        if writing_rows(url, "SELECT to_regclass('llm.usage_record') IS NOT NULL")[0][0] else 0
+    report.check(usage_after == usage_before, f"[{name}] opening levels and exercises made no OpenRouter call")
 
     page.locator('.level-choice[data-level="full_composition"]').click()
     page.locator(".exercise-choice").first.click()
@@ -727,8 +762,8 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
     page.get_by_role("button", name="Volver al menú principal").click()
     expect(page.locator("#practice-form")).to_be_visible()
     report.check(page.locator("#subjects input").count() == 4, f"[{name}] main menu with the four subjects")
-    kept = writing_rows(url, "SELECT text_es FROM writing.draft WHERE exercise_id NOT IN (%s, %s)", HEALTHY,
-                        REFERENCE_TUTOR_ID)
+    kept = writing_rows(url, "SELECT text_es FROM writing.draft WHERE text_es = %s",
+                        "Borrador sin guardar sobre el ambiente.")
     report.check(kept == [("Borrador sin guardar sobre el ambiente.",)],
                  f"[{name}] leaving to the main menu kept the draft {kept}")
     report.check(no_overflow(page) and not errors, f"[{name}] no overflow, no JavaScript errors {errors}")

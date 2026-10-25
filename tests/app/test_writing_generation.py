@@ -43,7 +43,7 @@ GOOD = {
                         "No contés una historia: informá y explicá."],
     "deliverable_description_es": "Un párrafo de introducción con una idea principal y dos ideas complementarias.",
 }
-REVIEW_OK = {"clarity": 2, "age_appropriate": 2, "completeness": 2, "alignment": 2, "language": 2, "notes": ""}
+REVIEW_OK = {k: 2 for k in generation.COMPOSE_REVIEW_KEYS} | {"notes": ""}
 
 
 class FakeLlm:
@@ -157,8 +157,9 @@ def test_valid_exercise_is_accepted_and_stored_with_metadata(catalog, store):
     [row] = store.generation_attempts()
     assert (row["status"], row["exercise_id"], row["calls"], row["tokens_in"], row["tokens_out"]) == (
         "accepted", exercise["exercise_id"], 2, 3000, 800)
-    assert float(row["cost_usd"]) == 0.0 and row["cost_complete"] and row["prompt_version"] == "writing-1.0"
-    assert [c["id"] for c in row["checks"]] == ["W01", "W02", "W03", "W04", "W05", "W06", "W07", "W08"]
+    assert float(row["cost_usd"]) == 0.0 and row["cost_complete"] and row["prompt_version"] == "writing-1.2"
+    assert [c["id"] for c in row["checks"]] == ["W01", "W02", "W03", "W04", "W05", "W06", "W07",
+                                               "W13", "W14", "W16", "W17", "W18", "W08"]
     assert {r["purpose"] for r in usage.records} == {"generation", "review"}
     with psycopg.connect(TEST_DATABASE_URL) as conn:
         assert conn.execute("SELECT generation_request_id FROM writing.exercise").fetchone()[0] == row["request_id"]
@@ -210,7 +211,10 @@ def test_budget_exhaustion_stops_without_storing_an_exercise(catalog, store):
 
 def test_stored_topics_are_not_repeated(catalog, store):
     run(catalog, store, FakeLlm([GOOD]))
-    outcome, _ = run(catalog, store, FakeLlm([GOOD, {**GOOD, "topic_es": "Las mascotas en la escuela"}]))
+    pets = {**GOOD, "topic_es": "Las mascotas en la escuela",
+            "communicative_situation_es": ("Tu grado prepara una charla sobre el cuidado responsable de perros y "
+                                           "gatos. Escribí la introducción de un texto expositivo para el mural.")}
+    outcome, _ = run(catalog, store, FakeLlm([GOOD, pets]))
     assert outcome.status == "accepted" and outcome.exercise["topic_es"] == "Las mascotas en la escuela"
     assert outcome.attempts[0].reasons[0].startswith("W06")
 
@@ -228,3 +232,75 @@ def test_typed_guided_composition_marks_handwriting_not_evaluable(catalog):
     param = next(p for p in exercise["evaluation"]["parameters"] if p["criterion"] == "EE19")
     assert param["applicability"] == "not_evaluable"
     assert contracts.validate_exercise(copy.deepcopy(exercise)) == []
+
+
+# ---------------------------------------------------------------- T025: composed-paragraph checks
+
+@pytest.mark.parametrize("bad,check", [
+    ({"instructions_es": GOOD["instructions_es"][:4] + ["No cuentes una historia: informá y explicá."]}, "W13"),
+    ({"instructions_es": GOOD["instructions_es"] + ["Escribí un solo párrafo de introducción para el texto."]}, "W14"),
+    ({"suggested_ideas_es": GOOD["suggested_ideas_es"] + ["Consecuencias de no tener huerto."]}, "W16"),
+    ({"suggested_ideas_es": ["Un huerto escolar es un espacio donde los estudiantes siembran, riegan y cosechan "
+                             "verduras, y así aprenden ciencias, trabajo en equipo y alimentación sana."]}, "W17"),
+])
+def test_compose_quality_rejects_then_retries(catalog, store, bad, check):
+    outcome, _ = run(catalog, store, FakeLlm([{**GOOD, **bad}, GOOD]))
+    assert outcome.status == "accepted" and len(outcome.attempts) == 2
+    assert any(r.startswith(check) for r in outcome.attempts[0].reasons), outcome.attempts[0].reasons
+
+
+def test_near_duplicate_situation_is_rejected(catalog, store):
+    run(catalog, store, FakeLlm([GOOD]))
+    outcome, _ = run(catalog, store, FakeLlm([{**GOOD, "topic_es": "La huerta de la escuela"}]))
+    assert outcome.status == "rejected" and all(any(r.startswith("W18") for r in a.reasons) for a in outcome.attempts)
+
+
+def test_review_scope_and_model_text_reject(catalog, store):
+    low = REVIEW_OK | {"paragraph_scope": 1, "notes": "La idea 3 corresponde a la conclusión."}
+    outcome, _ = run(catalog, store, FakeLlm([GOOD], reviews=[low]))
+    assert outcome.status == "rejected" and "paragraph_scope" in outcome.attempts[0].reasons[0]
+
+
+def test_conclusion_exercise(catalog, store):
+    conclusion = {**GOOD, "topic_es": "El ahorro de electricidad en casa",
+                  "communicative_situation_es": ("Tu escuela publica un boletín sobre el uso de la electricidad. "
+                                                 "Escribí el párrafo de conclusión de un texto expositivo."),
+                  "suggested_ideas_es": ["Apagar luces que no se usan.", "Desconectar cargadores."],
+                  "instructions_es": ["Escribí un solo párrafo de conclusión para un texto expositivo.",
+                                      "Proponé una idea principal con una acción o solución.",
+                                      "Agregá al menos dos ideas complementarias sobre cómo ahorrar.",
+                                      "Usá conectores de cierre como «en conclusión»."],
+                  "deliverable_description_es": "Un párrafo de conclusión con acciones o soluciones."}
+    outcome, _ = run(catalog, store, FakeLlm([conclusion]), level="L3", criteria=("EE03", "EE06"))
+    assert outcome.status == "accepted" and outcome.exercise["exercise_type"] == "conclusion_paragraph"
+    assert outcome.exercise["target_criteria"] == ["EE03", "EE06"]
+
+
+def test_compose_seeding_generates_only_missing_and_is_idempotent(catalog, store, monkeypatch):
+    from app.writing import seeding
+
+    monkeypatch.setattr(seeding, "COMPOSE_PLAN", (("L2", "introduction_paragraph", ["EE03", "EE04"], 2),))
+    run(catalog, store, FakeLlm([GOOD]))  # one already approved
+    pets = {**GOOD, "topic_es": "Las mascotas en la escuela",
+            "communicative_situation_es": ("Tu grado prepara una charla sobre el cuidado responsable de perros y "
+                                           "gatos. Escribí la introducción de un texto expositivo para el mural.")}
+    report = seeding.seed_compose(client_for(FakeLlm([pets])), MemoryUsageStore(), catalog, store)
+    assert report["gap"] == {} and report["totals"]["accepted"] == 1 and len(report["results"]) == 1
+    again = seeding.seed_compose(client_for(FakeLlm([pets])), MemoryUsageStore(), catalog, store)
+    assert again["results"] == [] and len(seeding.compose_inventory(store)["introduction_paragraph"]) == 2
+
+
+def test_compose_revision_is_validated_and_versioned(catalog, store):
+    from app.writing import revisions
+
+    eid = run(catalog, store, FakeLlm([GOOD]))[0].exercise["exercise_id"]
+    spec = {"exercise_id": eid, "reason": "T025 test", "ideas_remove": ["Qué es un huerto escolar."],
+            "set_instructions": GOOD["instructions_es"][:4]}
+    [result] = revisions.apply_revisions(store, catalog, [spec])
+    assert result["status"] == "revised" and result["revision"] == 2 and "W16:pass" in result["checks"]
+    assert store.record(eid)["suggested_ideas_es"] == GOOD["suggested_ideas_es"][1:]
+    assert store.record(eid, 1)["suggested_ideas_es"] == GOOD["suggested_ideas_es"]
+    bad = {"exercise_id": eid, "reason": "bad",
+           "set_instructions": GOOD["instructions_es"][:3] + ["No cuentes una historia."]}
+    with pytest.raises(Exception, match="W13"):
+        revisions.apply_revisions(store, catalog, [bad])

@@ -14,7 +14,7 @@ from typing import Any
 
 import psycopg
 
-from app.writing import editing, generation
+from app.writing import contracts, editing, generation
 from app.writing.store import InvalidRecord, WritingStore
 
 
@@ -24,8 +24,17 @@ def _replace(text: str, old: str, new: str, where: str) -> str:
     return text.replace(old, new)
 
 
-def revise(spec: dict[str, Any], record: dict[str, Any], reference: dict[str, Any]) -> tuple[dict, dict]:
+def revise(spec: dict[str, Any], record: dict[str, Any], reference: dict[str, Any] | None) -> tuple[dict, dict]:
     record, reference = copy.deepcopy(record), copy.deepcopy(reference)
+    if "set_instructions" in spec:  # T025: composed exercises may get a whole new, shorter instruction list
+        record["instructions_es"] = list(spec["set_instructions"])
+    for old, new in spec.get("situation", []):
+        record["communicative_situation_es"] = _replace(record["communicative_situation_es"], old, new, "situation")
+    record["deliverable"].update(spec.get("deliverable", {}))
+    for idea in spec.get("ideas_remove", []):
+        if idea not in record.get("suggested_ideas_es", []):
+            raise InvalidRecord([f"idea {idea!r} not found"])
+        record["suggested_ideas_es"].remove(idea)
     for old, new in spec.get("instructions", []):
         matches = [i for i, line in enumerate(record["instructions_es"]) if line == old]
         if len(matches) != 1:
@@ -47,11 +56,16 @@ def revise(spec: dict[str, Any], record: dict[str, Any], reference: dict[str, An
     return record, reference
 
 
-def checks_for(catalog: psycopg.Connection, store: WritingStore, record: dict[str, Any], reference: dict[str, Any],
-               baseline: str) -> list[dict[str, str]]:
-    """W02-W07 and W09-W15 on a revised correction exercise (W12 against the other stored L1 texts)."""
-    g = generation.build_grounding(catalog, baseline, "L1", record["difficulty"], record["target_criteria"],
-                                   exercise_type=record["exercise_type"])
+def checks_for(catalog: psycopg.Connection, store: WritingStore, record: dict[str, Any],
+               reference: dict[str, Any] | None, baseline: str) -> list[dict[str, str]]:
+    """Correction exercises: W02-W07, W09-W15. Composed paragraphs (T025): W02-W07, W13, W14, W16-W18."""
+    level = contracts.level(record["level"])
+    g = generation.build_grounding(catalog, baseline, f"L{level['ordinal']}", record["difficulty"],
+                                   record["target_criteria"], exercise_type=record["exercise_type"])
+    if record["exercise_type"] != "conventions_editing":
+        stored = [r["record"] for r in store.exercises() if r["exercise_id"] != record["exercise_id"]]
+        return (generation.deterministic_checks(g, record, [r["topic_es"] for r in stored])
+                + generation.compose_checks(g, record, stored))
     others = [r["record"]["source_text_es"] for r in store.exercises("writing_conventions")
               if r["exercise_id"] != record["exercise_id"] and r["record"].get("source_text_es")]
     topics = [r["record"]["topic_es"] for r in store.exercises() if r["exercise_id"] != record["exercise_id"]]
@@ -70,12 +84,14 @@ def apply_revisions(store: WritingStore, catalog: psycopg.Connection, specs: lis
             continue
         current = store.record(eid)
         reference = store.reference_correction(eid)
-        if current is None or reference is None:
+        editing_type = current is not None and current["exercise_type"] == "conventions_editing"
+        if current is None or (editing_type and reference is None):
             results.append({"exercise_id": eid, "status": "missing"})
             continue
-        base_ref = {k: reference[k] for k in ("corrected_text_es", "corrections", "ambiguities_es")}
+        base_ref = {k: reference[k] for k in ("corrected_text_es", "corrections", "ambiguities_es")} \
+            if editing_type else None
         record, new_ref = revise(spec, current, base_ref)
-        checks = checks_for(catalog, store, record, {**new_ref, "exercise_id": eid}, baseline)
+        checks = checks_for(catalog, store, record, {**new_ref, "exercise_id": eid} if new_ref else None, baseline)
         revision = store.add_revision(eid, record, new_ref, spec["reason"], checks)
         results.append({"exercise_id": eid, "status": "revised", "revision": revision,
                         "checks": [f"{c['id']}:{c['status']}" for c in checks]})

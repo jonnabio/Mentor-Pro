@@ -72,6 +72,18 @@ check results, review scores and reasons. An accepted exercise is stored in
 
 ---
 
+## Amendment (T025)
+
+Composed paragraphs add checks W13 (voseo), W14 (repeated instructions),
+W16 (ideas outside the paragraph type), W17 (no model text: ideas of at most
+15 words, situation of at most 3 sentences) and W18 (topic word overlap ≥ 0.6
+or topic-and-situation overlap ≥ 0.4 with a stored exercise). The review adds
+`paragraph_scope` and `no_model_text`. Introduction and conclusion exercises
+are exactly one paragraph. Prompt versions `writing-1.1` and `writing-1.2`
+(sentences of at most 25 words).
+
+---
+
 ## Consequences
 
 - Exercises enter the store only after deterministic checks and an

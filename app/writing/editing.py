@@ -281,7 +281,7 @@ def editing_checks(g: gen.Grounding, exercise: dict[str, Any], reference: dict[s
 TU_FORMS = re.compile(
     r"^(lee|corrige|escribe|revisa|agrega|usa|piensa|recuerda|cambia|copia|borra|subraya|completa|presta)\b"
     r"|\bno\s+(cambies|agregues|quites|olvides|uses|escribas|copies|borres|dejes|pongas|cambies|repitas|"
-    r"inventes|modifiques|elimines|añadas)\b", re.IGNORECASE)
+    r"inventes|modifiques|elimines|añadas|cuentes|narres|digas|hagas|mezcles|salgas|copies|olvides|repitas|incluyas|menciones|expliques|tengas)\b", re.IGNORECASE)
 STOPWORDS = {"para", "como", "este", "esta", "estos", "estas", "pero", "porque", "cada", "todos", "todas", "también",
              "donde", "cuando", "desde", "entre", "sobre", "muy", "más", "sus", "son", "que", "los", "las", "del",
              "una", "uno", "unos", "unas", "con", "por", "sin", "hay", "ser", "está", "están", "tiene", "tienen"}
