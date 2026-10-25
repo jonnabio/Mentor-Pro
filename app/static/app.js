@@ -715,11 +715,14 @@ function renderWritingState() {
     return;
   }
   if (data.handwritten) return;
-  const text = data.draft ? data.draft.text : "";
+  // T024: L1 correction exercises start from a copy of the text with errors; a saved draft always wins.
+  // L2-L5 start empty. The copy is not "unsaved work" until the student changes it.
+  const text = data.draft ? data.draft.text : (data.editable_source ? data.source_text_es : "");
   $("writing-text").value = text;
   writing.savedText = text;
+  $("writing-restore").hidden = !data.editable_source;
   $("writing-text").placeholder = data.source_text_es
-    ? "Escribí aquí el texto completo, ya corregido." : "";
+    ? "Corregí aquí el texto completo." : "";
   $("writing-saved").textContent = data.draft
     ? ` · Borrador guardado ${new Date(data.draft.saved_at).toLocaleString("es-CR")}` : "";
   updateWordCount();
@@ -784,6 +787,16 @@ $("writing-submit").addEventListener("click", () => {
   writingDialog.showModal();
 });
 $("writing-dialog-stay").addEventListener("click", () => writingDialog.close());
+const restoreDialog = $("writing-restore-dialog");
+$("writing-restore").addEventListener("click", () => restoreDialog.showModal());
+$("writing-restore-stay").addEventListener("click", () => restoreDialog.close());
+$("writing-restore-confirm").addEventListener("click", () => {
+  // Only the editor changes; the original text above it is never editable and the saved draft stays
+  // until the student saves again.
+  $("writing-text").value = writing.exercise.source_text_es;
+  restoreDialog.close();
+  updateWordCount();
+});
 $("writing-dialog-confirm").addEventListener("click", async () => {
   const button = $("writing-dialog-confirm");
   if (button.disabled) return;

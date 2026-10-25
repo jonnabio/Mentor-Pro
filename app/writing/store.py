@@ -108,7 +108,27 @@ CREATE TABLE IF NOT EXISTS writing.reference_correction (
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE writing.generation_attempt ADD COLUMN IF NOT EXISTS reference JSONB;
+-- T024 (ADR-023): editorial revisions. writing.exercise.record and writing.reference_correction stay as
+-- revision 1; later revisions live here with their tutor-only reference and validation results. The student
+-- sees the latest revision, or the revision they submitted.
+CREATE TABLE IF NOT EXISTS writing.exercise_revision (
+    exercise_id   TEXT NOT NULL REFERENCES writing.exercise (exercise_id),
+    revision      INTEGER NOT NULL CHECK (revision >= 2),
+    record        JSONB NOT NULL,
+    reference     JSONB,
+    reason        TEXT NOT NULL,
+    author        TEXT NOT NULL CHECK (author IN ('human_editor', 'generator')),
+    checks        JSONB NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (exercise_id, revision)
+);
+ALTER TABLE writing.submission ADD COLUMN IF NOT EXISTS exercise_revision INTEGER NOT NULL DEFAULT 1;
 """
+
+CURRENT_RECORD_SQL = """COALESCE((SELECT r.record FROM writing.exercise_revision r WHERE r.exercise_id = e.exercise_id
+                             ORDER BY r.revision DESC LIMIT 1), e.record)"""
+CURRENT_REVISION_SQL = """COALESCE((SELECT MAX(r.revision) FROM writing.exercise_revision r
+                               WHERE r.exercise_id = e.exercise_id), 1)"""
 
 
 def word_count(text: str) -> int:
@@ -159,18 +179,63 @@ class WritingStore:
                     (exercise["exercise_id"], reference["corrected_text_es"], Jsonb(reference["corrections"]),
                      Jsonb(reference.get("ambiguities_es", []))))
 
-    def reference_correction(self, exercise_id: str) -> dict[str, Any] | None:
-        """Tutor-only; never used by the student API (app/writing/routes.py)."""
+    def reference_correction(self, exercise_id: str, revision: int | None = None) -> dict[str, Any] | None:
+        """Tutor-only (never used by the student API): the reference of `revision`, default the latest."""
         with self._connect() as conn:
-            return conn.execute("SELECT * FROM writing.reference_correction WHERE exercise_id = %s",
-                                (exercise_id,)).fetchone()
+            revised = conn.execute(
+                """SELECT revision, reference FROM writing.exercise_revision WHERE exercise_id = %s
+                   AND reference IS NOT NULL AND (%s::int IS NULL OR revision <= %s)
+                   ORDER BY revision DESC LIMIT 1""", (exercise_id, revision, revision)).fetchone()
+            if revised and (revision is None or revision >= revised["revision"]):
+                return {"exercise_id": exercise_id, "revision": revised["revision"], **revised["reference"]}
+            row = conn.execute("SELECT * FROM writing.reference_correction WHERE exercise_id = %s",
+                               (exercise_id,)).fetchone()
+            return {**row, "revision": 1} if row else None
+
+    def record(self, exercise_id: str, revision: int | None = None) -> dict[str, Any] | None:
+        """The exercise record of `revision` (1 = the original record), default the latest."""
+        with self._connect() as conn:
+            if revision is None:
+                row = conn.execute(f"SELECT {CURRENT_RECORD_SQL} AS record FROM writing.exercise e "
+                                   "WHERE e.exercise_id = %s", (exercise_id,)).fetchone()
+            elif revision == 1:
+                row = conn.execute("SELECT record FROM writing.exercise WHERE exercise_id = %s",
+                                   (exercise_id,)).fetchone()
+            else:
+                row = conn.execute("SELECT record FROM writing.exercise_revision WHERE exercise_id = %s "
+                                   "AND revision = %s", (exercise_id, revision)).fetchone()
+        return row["record"] if row else None
+
+    def revisions(self, exercise_id: str) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.exercise_revision WHERE exercise_id = %s ORDER BY revision",
+                                (exercise_id,)).fetchall()
+
+    def add_revision(self, exercise_id: str, record: dict[str, Any], reference: dict[str, Any] | None,
+                     reason: str, checks: list[dict[str, str]], author: str = "human_editor") -> int:
+        """Append an editorial revision; earlier records, references and submissions are never changed."""
+        problems = contracts.validate_exercise(record)
+        failed = [c for c in checks if c["status"] == "fail"]
+        if problems or failed or record["exercise_id"] != exercise_id:
+            raise InvalidRecord(problems + [f"{c['id']}: {c['message']}" for c in failed]
+                                or ["record is for another exercise"])
+        with self._connect() as conn, conn.transaction():
+            conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
+            current = conn.execute("SELECT COALESCE(MAX(revision), 1) AS n FROM writing.exercise_revision "
+                                   "WHERE exercise_id = %s", (exercise_id,)).fetchone()["n"]
+            conn.execute(
+                """INSERT INTO writing.exercise_revision (exercise_id, revision, record, reference, reason, author,
+                       checks) VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                (exercise_id, current + 1, Jsonb(record), Jsonb(reference) if reference else None, reason, author,
+                 Jsonb(checks)))
+        return current + 1
 
     def source_texts(self, level: str) -> list[str]:
         """Texts to correct already stored for a level (near-duplicate check, T023)."""
         with self._connect() as conn:
             return [r["text"] for r in conn.execute(
-                "SELECT record->>'source_text_es' AS text FROM writing.exercise WHERE level = %s "
-                "AND record ? 'source_text_es'", (level,))]
+                f"SELECT {CURRENT_RECORD_SQL}->>'source_text_es' AS text FROM writing.exercise e "
+                "WHERE e.level = %s AND e.record ? 'source_text_es'", (level,))]
 
     def topics(self) -> list[str]:
         """Topics already stored, so generation does not repeat them."""
@@ -202,7 +267,8 @@ class WritingStore:
         """Stored (validated) exercises, oldest first, with the student's draft and submission state."""
         with self._connect() as conn:
             return conn.execute(
-                """SELECT e.exercise_id, e.level, e.difficulty, e.evidence_mode, e.record, e.created_at,
+                f"""SELECT e.exercise_id, e.level, e.difficulty, e.evidence_mode, {CURRENT_RECORD_SQL} AS record,
+                          {CURRENT_REVISION_SQL} AS revision, e.created_at,
                           d.updated_at AS draft_saved_at, s.submission_id, s.submitted_at
                    FROM writing.exercise e
                    LEFT JOIN writing.draft d USING (exercise_id)
@@ -238,12 +304,14 @@ class WritingStore:
                                     (exercise_id,)).fetchone()
             if existing:
                 return existing, False
+            revision = conn.execute("SELECT COALESCE(MAX(revision), 1) AS n FROM writing.exercise_revision "
+                                    "WHERE exercise_id = %s", (exercise_id,)).fetchone()["n"]
             row = conn.execute(
                 """INSERT INTO writing.submission (submission_id, exercise_id, evidence_mode, text_es, word_count,
-                       paragraph_count, submitted_at, client_request_id)
-                   VALUES (%s, %s, 'typed', %s, %s, %s, now(), %s) RETURNING *""",
+                       paragraph_count, submitted_at, client_request_id, exercise_revision)
+                   VALUES (%s, %s, 'typed', %s, %s, %s, now(), %s, %s) RETURNING *""",
                 (f"SUB-{exercise_id[3:40]}-{secrets.token_hex(4)}", exercise_id, text_es, word_count(text_es),
-                 paragraph_count(text_es), client_request_id)).fetchone()
+                 paragraph_count(text_es), client_request_id, revision)).fetchone()
             conn.execute("""INSERT INTO writing.draft (exercise_id, text_es, word_count) VALUES (%s, %s, %s)
                             ON CONFLICT (exercise_id) DO UPDATE SET text_es = EXCLUDED.text_es,
                                 word_count = EXCLUDED.word_count, updated_at = now()""",

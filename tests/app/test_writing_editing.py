@@ -115,8 +115,8 @@ def test_correction_exercise_is_accepted_with_separate_reference(catalog, store)
     assert "botellas" not in json.dumps(stored, ensure_ascii=False)
     [row] = store.generation_attempts()
     assert [c["id"] for c in row["checks"]] == ["W01", "W02", "W03", "W04", "W05", "W06", "W07",
-                                               "W09", "W10", "W11", "W12", "W08"]
-    assert row["reference"]["corrected_text_es"] == REFERENCE and row["prompt_version"] == "writing-edit-1.0"
+                                               "W09", "W10", "W11", "W12", "W13", "W14", "W15", "W08"]
+    assert row["reference"]["corrected_text_es"] == REFERENCE and row["prompt_version"] == "writing-edit-1.1"
 
 
 @pytest.mark.parametrize("change,check", [
@@ -253,3 +253,90 @@ def test_truncated_generation_uses_one_bounded_request_and_the_editing_limit(cat
     assert outcome.attempts[0].reasons[0].startswith("generation exhausted")
     assert set(fake.max_tokens) == {editing.EDIT_MAX_TOKENS}
     assert [r["status"] for r in store.generation_attempts()] == ["rejected", "accepted"]
+
+
+# ---------------------------------------------------------------- T024: quality checks and editorial revisions
+
+from app.writing import revisions  # noqa: E402
+
+
+def quality(record_changes=None, reference_changes=None):
+    exercise = {"instructions_es": list(SPELLING["instructions_es"]), "source_text_es": SOURCE,
+                **(record_changes or {})}
+    reference = {"corrected_text_es": REFERENCE, "corrections": CORRECTIONS, "ambiguities_es": [],
+                 **(reference_changes or {})}
+    return {c["id"]: c["status"] for c in editing.quality_checks(exercise, reference)}
+
+
+def test_quality_checks_detect_tu_repetition_and_undocumented_questions():
+    assert quality() == {"W13": "pass", "W14": "pass", "W15": "pass"}
+    assert quality({"instructions_es": ["Lee el texto.", "Corregí los errores."]})["W13"] == "fail"
+    assert quality({"instructions_es": ["Leé el texto.", "No cambies las ideas."]})["W13"] == "fail"
+    assert quality({"instructions_es": ["Leé el texto.", "No cambiés las ideas."]})["W13"] == "pass"
+    assert quality(reference_changes={"corrected_text_es": REFERENCE + " Cada árbol es un árbol sano."})["W14"] == "fail"
+    assert quality({"instructions_es": ["Corregí los errores de tildes del texto.",
+                                        "Corregí los errores de tildes del texto completo."]})["W14"] == "fail"
+    question = {"error": "preguntan cuál", "correction": "preguntan ¿cuál", "criterion": "EE17"}
+    text = SOURCE + " Los niños preguntan cuál es el mejor material?"
+    assert quality({"source_text_es": text}, {"corrections": [question]})["W15"] == "fail"
+    assert quality({"source_text_es": text}, {"corrections": [question], "ambiguities_es": ["También «.»"]})["W15"] == \
+        "pass"
+    colon = {"error": "preguntan: cuál", "correction": "preguntan: ¿Cuál", "criterion": "EE17"}
+    assert quality({"source_text_es": SOURCE + " Los niños preguntan: cuál es el mejor?"},
+                   {"corrections": [colon]})["W15"] == "pass"
+
+
+def test_generation_rejects_tu_instructions(catalog, store):
+    tu = {**SPELLING, "instructions_es": SPELLING["instructions_es"][:3] + ["No cambies las ideas del texto."]}
+    outcome = generate(catalog, store, FakeLlm([tu, SPELLING]))
+    assert outcome.status == "accepted" and outcome.attempts[0].reasons[0].startswith("W13")
+
+
+SPEC = {"exercise_id": None, "reason": "T024 test revision",
+        "instructions": [["No cambiés las ideas del texto.", "No cambiés las ideas ni el orden del texto."]],
+        "text": [["Al final, todos aprenden", "Al terminar, todos aprenden"]],
+        "ambiguities_es": ["«hacer el esfuerzo» también admite «hacer un esfuerzo» (no es un error)."]}
+
+
+def test_revision_is_validated_versioned_and_served_without_reference(catalog, store, synthetic_client):
+    eid = generate(catalog, store, FakeLlm([SPELLING])).exercise["exercise_id"]
+    url, schema = synthetic_client.app.state.catalog_target
+    api = TestClient(create_app(url, schema, "TEST-v1"))
+    original = api.get(f"/api/writing/exercises/{eid}").json()
+    assert original["revision"] == 1 and original["editable_source"] is True
+    [result] = revisions.apply_revisions(store, catalog, [{**SPEC, "exercise_id": eid}])
+    assert result["status"] == "revised" and result["revision"] == 2 and "W15:pass" in result["checks"]
+    assert revisions.apply_revisions(store, catalog, [{**SPEC, "exercise_id": eid}])[0]["status"] == "present"
+    view = api.get(f"/api/writing/exercises/{eid}").json()
+    assert view["revision"] == 2 and view["source_text_es"].count("Al terminar") == 1
+    assert "No cambiés las ideas ni el orden del texto." in view["instructions_es"]
+    # history: the original record and reference are unchanged; revision 2 has its own reference
+    assert store.record(eid, 1)["source_text_es"] == SOURCE
+    assert store.reference_correction(eid, 1)["corrected_text_es"] == REFERENCE
+    latest = store.reference_correction(eid)
+    assert latest["revision"] == 2 and "Al terminar" in latest["corrected_text_es"] and latest["ambiguities_es"]
+    [row] = store.revisions(eid)
+    assert (row["reason"], row["author"]) == ("T024 test revision", "human_editor") and row["checks"]
+    for path in (f"/api/writing/exercises/{eid}", "/api/writing/levels/writing_conventions/exercises"):
+        body = api.get(path).text
+        assert latest["corrected_text_es"] not in body and REFERENCE not in body and "botellas" not in body
+
+
+def test_invalid_revision_is_refused(catalog, store):
+    eid = generate(catalog, store, FakeLlm([SPELLING])).exercise["exercise_id"]
+    bad = {**SPEC, "exercise_id": eid, "reason": "bad", "instructions": [["No cambiés las ideas del texto.",
+                                                                          "No cambies las ideas del texto."]]}
+    with pytest.raises(Exception, match="W13"):
+        revisions.apply_revisions(store, catalog, [bad])
+    assert store.revisions(eid) == []
+
+
+def test_submission_keeps_the_revision_it_answered(catalog, store, synthetic_client):
+    eid = generate(catalog, store, FakeLlm([SPELLING])).exercise["exercise_id"]
+    url, schema = synthetic_client.app.state.catalog_target
+    api = TestClient(create_app(url, schema, "TEST-v1"))
+    api.post(f"/api/writing/exercises/{eid}/submit", json={"text": SOURCE, "client_request_id": str(uuid.uuid4())})
+    revisions.apply_revisions(store, catalog, [{**SPEC, "exercise_id": eid}])
+    view = api.get(f"/api/writing/exercises/{eid}").json()
+    assert view["revision"] == 1 and view["source_text_es"] == SOURCE and view["draft"]["text"] == SOURCE
+    assert store.submission(eid)["exercise_revision"] == 1 and store.submission(eid)["text_es"] == SOURCE

@@ -1,0 +1,32 @@
+[
+  {
+    "exercise_id": "PE-L1-futbol-comunidad-f136a4",
+    "reason": "T024 editorial revision: voseo in the instructions",
+    "instructions": [["No cambies las ideas del texto.", "No cambiés las ideas del texto."]],
+    "text": []
+  },
+  {
+    "exercise_id": "PE-L1-manglares-terraba-cafb78",
+    "reason": "T024 editorial revision: redundant and non-expository sentences, voseo",
+    "instructions": [["No agregues ni quites información.", "No agregués ni quités información."]],
+    "text": [
+      ["Cada árbol es un árbol que sostiene la vida.", "Sus raíces también protegen la costa de las olas fuertes."],
+      ["La canción del viento entre las ramas recuerda la vida.", "Por eso, conservar el manglar beneficia a toda la comunidad."]
+    ]
+  },
+  {
+    "exercise_id": "PE-L1-feria-ciencia-escuela-c9576f",
+    "reason": "T024 editorial revision: unambiguous direct question, no anglicism, voseo",
+    "instructions": [["No agregues ni quites información.", "No agregués ni quités información."]],
+    "text": [
+      ["los padres visitan los stands y preguntan", "las familias visitan los puestos y preguntan:"]
+    ],
+    "corrections": [
+      {"error": "preguntan cuál", "new_error": "preguntan: cuál", "new_correction": "preguntan: ¿Cuál",
+       "reference_old": "preguntan: ¿cuál"}
+    ],
+    "ambiguities_es": [
+      "Tras los dos puntos que introducen la pregunta directa se acepta «¿Cuál» (recomendado) o «¿cuál». Ambas son correctas para EE17."
+    ]
+  }
+]

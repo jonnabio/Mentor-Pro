@@ -126,7 +126,10 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
     @router.get("/exercises/{exercise_id}")
     def exercise(exercise_id: str) -> dict[str, Any]:
         store, row = load(exercise_id)
-        record = row["record"]
+        submission = store.submission(exercise_id)
+        # T024: a submitted answer keeps the exercise revision it answered; otherwise the latest revision.
+        revision = submission["exercise_revision"] if submission else row["revision"]
+        record = store.record(exercise_id, revision) if submission else row["record"]
         draft = store.draft(exercise_id)
         level = contracts.level(record["level"])
         handwritten = record["deliverable"]["evidence_mode"] == "handwritten"
@@ -134,7 +137,9 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             "exercise_id": exercise_id, "level": level["code"],
             "level_label_es": f"Nivel {level['ordinal']}: {level['name_es']}",
             "difficulty": record["difficulty"], "topic_es": record["topic_es"],
-            "title_es": record.get("title_es"),
+            "title_es": record.get("title_es"), "revision": revision,
+            # L1 correction exercises start from a copy of the text; L2-L5 start empty (T024).
+            "editable_source": record["exercise_type"] == "conventions_editing",
             # T023: the text with deliberate errors; the tutor-only reference correction is never read here.
             "source_text_es": record.get("source_text_es"),
             "communicative_situation_es": record["communicative_situation_es"],
@@ -147,7 +152,7 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             "draft": None if handwritten or draft is None else {"text": draft["text_es"],
                                                                 "word_count": draft["word_count"],
                                                                 "saved_at": draft["updated_at"].isoformat()},
-            "submission": submission_view(store.submission(exercise_id)),
+            "submission": submission_view(submission),
         }
 
     def typed_only(row: dict[str, Any]) -> None:

@@ -613,14 +613,32 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
             report.check(editor.get_attribute("spellcheck") == "false"
                          and page.locator("#writing-source").bounding_box()["y"] < editor.bounding_box()["y"],
                          f"[{name}] original text stays above the editor, spell check off")
-            editor.fill(source.replace("las niños", "los niños"))
+            # T024: the editor starts with a copy of the text; viewing alone saves nothing.
+            report.check(editor.input_value() == source, f"[{name}] L1 editor starts with the text to correct")
+            page.get_by_role("button", name="Volver a los ejercicios").click()
+            page.locator(".exercise-choice").nth(index).click()
+            expect(page.locator("#writing-editor")).to_be_visible()
+            drafts = writing_rows(url, "SELECT COUNT(*) FROM writing.draft WHERE exercise_id = %s", REFERENCE_TUTOR_ID)
+            report.check(drafts[0][0] == 0, f"[{name}] opening and leaving an unchanged copy saves no draft")
+            edited = source.replace("las niños", "los niños")
+            editor.fill(edited)
             page.get_by_role("button", name="Guardar borrador").click()
             expect(page.locator("#writing-saved")).to_contain_text("Borrador guardado")
             page.screenshot(path=str(out / f"{name}-l1.png"), full_page=True)
             page.reload()
             expect(page.locator("#writing-editor")).to_be_visible()
-            report.check("los niños" in page.locator("#writing-text").input_value(),
-                         f"[{name}] L1 draft resumed after reload")
+            report.check(editor.input_value() == edited and page.locator("#writing-source-text").inner_text() == source,
+                         f"[{name}] L1 edits resumed after reload; the original text is unchanged")
+            page.get_by_role("button", name="Restaurar texto original").click()
+            expect(page.locator("#writing-restore-dialog")).to_be_visible()
+            page.get_by_role("button", name="Conservar mis correcciones").click()
+            report.check(editor.input_value() == edited, f"[{name}] restore asks first; 'Conservar' keeps the edits")
+            page.get_by_role("button", name="Restaurar texto original").click()
+            page.locator("#writing-restore-confirm").click()
+            stored = writing_rows(url, "SELECT text_es FROM writing.draft WHERE exercise_id = %s", REFERENCE_TUTOR_ID)
+            report.check(editor.input_value() == source and stored == [(edited,)],
+                         f"[{name}] restore resets the editor only; the saved draft stays until saved again")
+            editor.fill(edited)
             page.get_by_role("button", name="Entregar texto").click()
             page.get_by_role("button", name="Entregar", exact=True).click()
             expect(page.locator("#writing-pending")).to_be_visible()
@@ -660,6 +678,9 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
         return [t.getAttribute('spellcheck'), t.getAttribute('autocorrect'), t.getAttribute('autocapitalize'),
                 t.spellcheck]; }""")
     report.check(attrs == ["false", "off", "off", False], f"[{name}] spell checking and autocorrection off {attrs}")
+    report.check(page.locator("#writing-text").input_value() == ""
+                 and page.locator("#writing-restore").is_hidden(),
+                 f"[{name}] L2 editor starts empty, no restore action")
     page.locator("#writing-text").fill(WRITING_TEXT)
     words = len(WRITING_TEXT.split())
     report.check(page.locator("#writing-words").inner_text() == f"{words} palabras",

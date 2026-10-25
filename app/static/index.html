@@ -202,6 +202,7 @@
             <span id="writing-saved"></span></p>
           <div class="actions">
             <button type="button" id="writing-save" class="secondary">Guardar borrador</button>
+            <button type="button" id="writing-restore" class="secondary" hidden>Restaurar texto original</button>
             <button type="button" id="writing-submit" class="primary">Entregar texto</button>
           </div>
         </div>
@@ -215,6 +216,17 @@
 
       <button type="button" id="writing-menu" class="primary">Volver al menú principal</button>
     </section>
+
+    <dialog id="writing-restore-dialog" aria-labelledby="writing-restore-title"
+      aria-describedby="writing-restore-message">
+      <h2 id="writing-restore-title">¿Restaurar el texto original?</h2>
+      <p id="writing-restore-message">Se reemplazarán tus correcciones por el texto original con errores. Si ya
+        guardaste un borrador, seguirá guardado hasta que guardés de nuevo.</p>
+      <div class="actions">
+        <button type="button" id="writing-restore-stay" class="primary">Conservar mis correcciones</button>
+        <button type="button" id="writing-restore-confirm" class="secondary">Restaurar texto original</button>
+      </div>
+    </dialog>
 
     <dialog id="writing-dialog" aria-labelledby="writing-dialog-title" aria-describedby="writing-dialog-message">
       <h2 id="writing-dialog-title">¿Entregar tu texto?</h2>

@@ -11,6 +11,9 @@ Checks W01-W07 (shared with ADR-020) plus W09-W12 below, then the independent re
 | W10 | Applying the corrections to the text gives exactly the reference text (nothing else changes) |
 | W11 | Each fix is the kind of change its criterion covers (for example only b/v for EE09, only accents for EE15) |
 | W12 | The text is not a near duplicate of a stored Nivel 1 text (word overlap below 0.5) |
+| W13 | Instructions use Costa Rican voseo, not tú (for example «No cambiés», not «No cambies») (T024) |
+| W14 | No repetitive wording: no content word twice in one sentence of the text, no repeated sentence, no two instructions that say nearly the same (T024) |
+| W15 | A correction that adds «¿» or «¡» needs a colon or sentence start before it, or a documented alternative (T024) |
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ from app.llm.client import OpenRouterClient
 from app.llm.router import Store, route
 from app.writing import generation as gen
 
-PROMPT_VERSION = "writing-edit-1.0"
+PROMPT_VERSION = "writing-edit-1.1"  # 1.1 (T024): voseo, repetition, ambiguity, meaning
 # Correction exercises make reasoning models count words and errors; 4000 output tokens truncated the first
 # live request (T023). Own limit, like SOLVE/RUBRIC_MAX_TOKENS; daily request and USD budgets are unchanged.
 EDIT_MAX_TOKENS = 8000
@@ -47,7 +50,8 @@ CATEGORIES = {
 }
 EDIT_FIELDS = ("title_es", "topic_es", "communicative_situation_es", "instructions_es",
                "deliverable_description_es", "source_text_es", "reference_text_es", "corrections")
-EDIT_REVIEW_KEYS = gen.REVIEW_KEYS + ("errors_genuine", "reference_correct", "unambiguous")
+EDIT_REVIEW_KEYS = gen.REVIEW_KEYS + ("errors_genuine", "reference_correct", "unambiguous", "meaning_preserved",
+                                      "natural_text")
 SYSTEM = ("Usted diseña ejercicios de corrección de textos para estudiantes de sexto grado de primaria en Costa "
           "Rica, según la rúbrica MEP 2026 de producción escrita. Escribe en español de Costa Rica, claro para "
           "niñas y niños de 11 a 12 años. Responde solo con un objeto JSON.")
@@ -81,8 +85,15 @@ Instrucciones para crear el ejercicio:
 - Cada error debe aparecer una sola vez en el texto. En "corrections", "error" es el fragmento exacto con el error
   (una o pocas palabras, copiado tal cual del texto) y "correction" es ese mismo fragmento corregido.
 - "reference_text_es" es el mismo texto con esas correcciones aplicadas, sin ningún otro cambio.
-- Instrucciones (3 a 5) en voseo costarricense, cortas: que lea el texto, qué tipo de errores debe corregir
-  (sin decir dónde están ni cuántos son), que escriba el texto completo corregido y que no cambie las ideas.
+- Oraciones naturales y expositivas: no repita palabras dentro de una oración ni use frases poéticas o vacías.
+- Si un error es una pregunta sin signos, escríbala como pregunta directa precedida de dos puntos (por ejemplo
+  «preguntan: cuál es…?»), para que tenga una sola corrección. Si un error admite otra corrección válida,
+  explíquela en "ambiguities_es".
+- Las correcciones no cambian el sentido del texto.
+- Instrucciones (3 a 5), cortas y sin repetir ideas, en voseo costarricense también en negativo («Leé»,
+  «Corregí», «Escribí», «No cambiés», «No agregués»; nunca «cambies», «agregues», «Lee», «Corrige»): que lea el
+  texto, qué tipo de errores debe corregir (sin decir dónde están ni cuántos son), que corrija el texto completo y
+  que no cambie las ideas.
 - Situación comunicativa breve: quién escribió el texto y para qué (por ejemplo, el boletín del grado).
 - No mencione códigos de criterios, puntos, rúbricas ni calificación.
 
@@ -113,8 +124,12 @@ Califique de 0 a 2 (2 = cumple por completo):
 - errors_genuine: cada error es realmente incorrecto según la normativa.
 - reference_correct: el texto corregido resuelve todos los errores, no deja otros y conserva el sentido.
 - unambiguous: cada error tiene una sola corrección válida, o la alternativa está documentada en ambigüedades.
+- meaning_preserved: ninguna corrección cambia el sentido de la oración.
+- natural_text: oraciones naturales y expositivas, sin repeticiones ni frases poéticas o vacías; instrucciones en
+  voseo costarricense sin repetir ideas.
 Responda solo con JSON: {{"clarity": 0, "age_appropriate": 0, "completeness": 0, "alignment": 0, "language": 0,
-"errors_genuine": 0, "reference_correct": 0, "unambiguous": 0, "notes": "..."}}"""
+"errors_genuine": 0, "reference_correct": 0, "unambiguous": 0, "meaning_preserved": 0, "natural_text": 0,
+"notes": "..."}}"""
     return [{"role": "system", "content": REVIEW_SYSTEM}, {"role": "user", "content": user}]
 
 
@@ -262,6 +277,57 @@ def editing_checks(g: gen.Grounding, exercise: dict[str, Any], reference: dict[s
     return checks
 
 
+# W13: tú imperatives and negative tú subjunctives that Costa Rican voseo replaces (Leé, Corregí, No cambiés…).
+TU_FORMS = re.compile(
+    r"^(lee|corrige|escribe|revisa|agrega|usa|piensa|recuerda|cambia|copia|borra|subraya|completa|presta)\b"
+    r"|\bno\s+(cambies|agregues|quites|olvides|uses|escribas|copies|borres|dejes|pongas|cambies|repitas|"
+    r"inventes|modifiques|elimines|añadas)\b", re.IGNORECASE)
+STOPWORDS = {"para", "como", "este", "esta", "estos", "estas", "pero", "porque", "cada", "todos", "todas", "también",
+             "donde", "cuando", "desde", "entre", "sobre", "muy", "más", "sus", "son", "que", "los", "las", "del",
+             "una", "uno", "unos", "unas", "con", "por", "sin", "hay", "ser", "está", "están", "tiene", "tienen"}
+
+
+def _content_words(sentence: str) -> list[str]:
+    return [w for w in re.findall(r"[a-záéíóúñü]+", sentence.lower()) if len(w) >= 4 and w not in STOPWORDS]
+
+
+def quality_checks(exercise: dict[str, Any], reference: dict[str, Any]) -> list[dict[str, str]]:
+    """W13-W15 (T024): voseo, repetition and undocumented ambiguity."""
+    checks: list[dict[str, str]] = []
+
+    def check(check_id: str, ok: bool, message: str) -> None:
+        checks.append({"id": check_id, "status": "pass" if ok else "fail", "message": "ok" if ok else message})
+
+    tu = [i for i in exercise["instructions_es"] if TU_FORMS.search(i.strip())]
+    check("W13", not tu, f"tú forms instead of voseo: {tu}")
+
+    sentences = [x for x in re.split(r"(?<=[.!?])\s+", reference["corrected_text_es"]) if x.strip()]
+    repeated = []
+    for sentence in sentences:
+        words = _content_words(sentence)
+        repeated += sorted({w for w in words if words.count(w) > 1})
+    duplicate_sentences = len({x.lower() for x in sentences}) < len(sentences)
+    sets = [set(_content_words(i)) for i in exercise["instructions_es"]]
+    similar = [(a, b) for a in range(len(sets)) for b in range(a + 1, len(sets))
+               if sets[a] and sets[b] and len(sets[a] & sets[b]) / len(sets[a] | sets[b]) >= 0.6]
+    check("W14", not repeated and not duplicate_sentences and not similar,
+          f"repetition: words {repeated}, duplicate sentence {duplicate_sentences}, similar instructions {similar}")
+
+    source = exercise["source_text_es"]
+    unclear = []
+    for c in reference["corrections"]:
+        if c["correction"].count("¿") + c["correction"].count("¡") > c["error"].count("¿") + c["error"].count("¡"):
+            before = source[:source.find(c["error"])].rstrip()
+            mark = c["correction"].find("¿") if "¿" in c["correction"] else c["correction"].find("¡")
+            inline = c["correction"][:mark].rstrip()
+            context = (before + " " + inline).rstrip()
+            if not (context.endswith(":") or context == "" or context[-1] in ".!?") and not reference["ambiguities_es"]:
+                unclear.append(c["error"])
+    check("W15", not unclear, f"added question/exclamation marks without a colon or documented alternative: "
+                              f"{unclear}")
+    return checks
+
+
 def parse_review(text: str) -> dict[str, Any]:
     raw = extract_json(text, required=EDIT_REVIEW_KEYS)
     scores = {}
@@ -311,7 +377,8 @@ def generate_editing_exercise(client: OpenRouterClient, usage_store: Store, cata
             continue
         exercise, reference = assemble(g, fields)
         attempt.exercise, attempt.reference = exercise, reference
-        attempt.checks += gen.deterministic_checks(g, exercise, avoid) + editing_checks(g, exercise, reference, sources)
+        attempt.checks += (gen.deterministic_checks(g, exercise, avoid) + editing_checks(g, exercise, reference, sources)
+                           + quality_checks(exercise, reference))
         failed = [c for c in attempt.checks if c["status"] == "fail"]
         if failed:
             attempt.reasons += [f"{c['id']}: {c['message']}" for c in failed]

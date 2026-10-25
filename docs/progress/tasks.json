@@ -747,6 +747,41 @@
       "result_file": "docs/progress/task_T023_result.md",
       "failures": [],
       "notes": "3/3 categories after 20 requests (USD 0); live 15/15; browser 309/309; suite 467."
+    },
+    {
+      "id": "T024",
+      "name": "L1 writing editor and editorial quality (PO task T024)",
+      "objective": "Prefilled L1 editor with restore; versioned editorial revisions of the three L1 exercises; stronger L1 checks.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-023-l1-editor-and-editorial-revisions.md",
+          "app/writing/revisions.py",
+          "scripts/dev/revise_writing_l1.py",
+          "scripts/dev/fixtures/writing-revisions-T024.json",
+          "docs/progress/task_T024_result.md",
+          "docs/progress/screenshots/T024/"
+        ],
+        "modify": [
+          "app/static/",
+          "app/writing/routes.py",
+          "app/writing/store.py",
+          "app/writing/editing.py",
+          "scripts/dev/fixtures/writing-exercises-L1-T023.json",
+          "scripts/dev/practice_e2e.py",
+          "tests/app/test_writing_editing.py"
+        ]
+      },
+      "depends_on": [
+        "T023"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T024_result.md",
+      "failures": [],
+      "notes": "Three revisions stored as revision 2; suite 472; browser 319/319."
     }
   ]
 }

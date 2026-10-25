@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T023)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T024)
 
 ## Current Objective
 
@@ -82,6 +82,10 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   agreement) generated and stored with tutor-only references in
   `writing.reference_correction`; seeding command `seed_writing_l1.py`
   ([ADR-022](../adr/ADR-022-nivel-1-correction-exercises.md)).
+- **T024** — L1 editor starts with the text to correct (restore with
+  confirmation); versioned editorial revisions (`writing.exercise_revision`)
+  of the three L1 exercises; checks W13–W15
+  ([ADR-023](../adr/ADR-023-l1-editor-and-editorial-revisions.md)).
 
 ### Current State
 
@@ -97,7 +101,7 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 467 passing; browser (mocked) 309/309 and live 14/14 on
+- Tests: 472 passing; browser (mocked) 319/319 and live 14/14 on
   `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
@@ -163,5 +167,5 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-022](../adr/ADR-022-nivel-1-correction-exercises.md)
+  [ADR-023](../adr/ADR-023-l1-editor-and-editorial-revisions.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-003)
