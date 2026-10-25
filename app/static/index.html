@@ -224,7 +224,8 @@
           <textarea id="writing-text" rows="12" spellcheck="false" autocorrect="off" autocapitalize="off"
             autocomplete="off" lang="es-CR"></textarea>
           <p class="muted small" aria-live="polite"><span id="writing-words">0 palabras</span>
-            <span id="writing-saved"></span></p>
+            <span id="writing-saved" class="save-status"></span>
+            <button type="button" id="writing-retry" class="link-button" hidden>Reintentar</button></p>
           <div class="actions">
             <button type="button" id="writing-save" class="secondary">Guardar borrador</button>
             <button type="button" id="writing-restore" class="secondary" hidden>Restaurar texto original</button>
@@ -271,7 +272,8 @@
             <div id="guided-preview" class="submitted-text"></div>
           </div>
           <p class="muted small" aria-live="polite">Composición: <span id="guided-words">0 palabras</span>
-            (meta: al menos 200)<span id="guided-saved"></span></p>
+            (meta: al menos 200)<span id="guided-saved" class="save-status"></span>
+            <button type="button" id="guided-retry" class="link-button" hidden>Reintentar</button></p>
           <div class="actions">
             <button type="button" id="guided-prev" class="secondary">Etapa anterior</button>
             <button type="button" id="guided-save" class="secondary">Guardar borrador</button>

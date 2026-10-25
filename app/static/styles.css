@@ -282,3 +282,9 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 #guided-preview p:last-child { margin-bottom: 0; }
 .tutor-section h4 { margin: 8px 0 4px; }
 .tutor-optional-title { margin: 16px 0 4px; }
+
+/* ------------------------------------------------------------------ draft saving (T030) */
+.save-status[data-state="error"] { color: var(--danger); font-weight: 650; }
+.link-button { border: 0; background: none; padding: 0 0 0 6px; color: var(--accent); font: inherit;
+  text-decoration: underline; cursor: pointer; }
+.link-button[hidden] { display: none; }

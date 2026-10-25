@@ -624,7 +624,7 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
             edited = source.replace("las niños", "los niños")
             editor.fill(edited)
             page.get_by_role("button", name="Guardar borrador").click()
-            expect(page.locator("#writing-saved")).to_contain_text("Borrador guardado")
+            expect(page.locator("#writing-saved")).to_contain_text("Guardado")
             page.screenshot(path=str(out / f"{name}-l1.png"), full_page=True)
             page.reload()
             expect(page.locator("#writing-editor")).to_be_visible()
@@ -672,7 +672,7 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
         if index == 0:
             page.locator("#writing-text").fill("Primer párrafo sobre las causas.\n\nSegundo párrafo sobre las consecuencias.")
             page.get_by_role("button", name="Guardar borrador").click()
-            expect(page.locator("#writing-saved")).to_contain_text("Borrador guardado")
+            expect(page.locator("#writing-saved")).to_contain_text("Guardado")
             page.reload()
             expect(page.locator("#writing-editor")).to_be_visible()
             report.check("Segundo párrafo" in page.locator("#writing-text").input_value(),
@@ -722,7 +722,7 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
     report.check(page.locator("#writing-words").inner_text() == f"{words} palabras",
                  f"[{name}] word counter {page.locator('#writing-words').inner_text()}")
     page.get_by_role("button", name="Guardar borrador").click()
-    expect(page.locator("#writing-saved")).to_contain_text("Borrador guardado")
+    expect(page.locator("#writing-saved")).to_contain_text("Guardado")
     page.screenshot(path=str(out / f"{name}-draft.png"), full_page=True)
 
     page.reload()
@@ -914,7 +914,7 @@ def scenario_guided(student: Page, tutor: Page, report: Report, viewport: str, o
     report.check(student.locator("#guided-plan").inner_text().strip() == record["scaffolding_es"][0],
                  f"[{name}] stage 2 shows the exercise's own plan hint for the introduction")
     student.locator("#guided-introduction").fill(GUIDED_TEXT["introduction"])
-    expect(student.locator("#guided-saved")).to_contain_text("Borrador guardado", timeout=10000)  # autosave
+    expect(student.locator("#guided-saved")).to_contain_text("Guardado", timeout=10000)  # autosave
     student.reload()
     expect(student.locator("#guided-introduction")).to_be_visible()
     report.check(student.locator("#guided-introduction").input_value() == GUIDED_TEXT["introduction"]
@@ -1006,6 +1006,115 @@ def scenario_guided(student: Page, tutor: Page, report: Report, viewport: str, o
                  f"[{name}] dashboard: L4 evaluated, EE09 latest 4 de 4")
     student.screenshot(path=str(out / f"{name}-dashboard.png"), full_page=True)
     report.check(not errors, f"[{name}] no JavaScript errors {errors}")
+
+
+def scenario_drafts(page: Page, report: Report, out: Path, url: str) -> None:
+    """T030 (ADR-028): saving indicator, retry, lifecycle flushes and ordering, on L2 and L1 exercises."""
+    name = "desktop-drafts"
+    errors: list[str] = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    page.on("dialog", lambda dialog: dialog.accept())  # beforeunload: the student chooses to leave
+
+    def free(level: str) -> str:
+        return writing_rows(url, "SELECT exercise_id FROM writing.exercise e WHERE level = %s AND NOT EXISTS (SELECT "
+                                 "1 FROM writing.submission s WHERE s.exercise_id = e.exercise_id) ORDER BY "
+                                 "exercise_id LIMIT 1", level)[0][0]
+
+    def stored(eid: str) -> str | None:
+        rows = writing_rows(url, "SELECT text_es FROM writing.draft WHERE exercise_id = %s", eid)
+        return rows[0][0] if rows else None
+
+    def wait_stored(eid: str, text: str, ms: int, waiter: Page | None = None) -> bool:
+        # After page.close, a second page keeps Playwright processing browser events (the closing page's
+        # beforeunload dialog) while the database is polled; time.sleep alone would not.
+        for _ in range(ms // 100):
+            if stored(eid) == text:
+                return True
+            (waiter or page).wait_for_timeout(100)
+        return stored(eid) == text
+
+    def open_exercise(level: str, eid: str) -> None:
+        page.goto(BASE)
+        page.evaluate("sessionStorage.clear()")
+        page.goto(BASE)
+        page.get_by_role("button", name="Abrir Producción escrita").click()
+        page.locator(f'.level-choice[data-level="{level}"]').click()
+        page.locator(f'.exercise-choice[data-exercise="{eid}"]').click()
+        expect(page.locator("#writing-editor")).to_be_visible()
+
+    l2 = free("idea_development")
+    open_exercise("idea_development", l2)
+    text = page.locator("#writing-text")
+    text.press_sequentially("Escribo rápido y salgo enseguida.", delay=5)
+    page.get_by_role("button", name="Volver a los ejercicios").click()
+    expect(page.locator("#writing-list-panel")).to_be_visible()
+    report.check(stored(l2) == "Escribo rápido y salgo enseguida.",
+                 f"[{name}] rapid typing then navigation: text saved before leaving")
+
+    page.locator(f'.exercise-choice[data-exercise="{l2}"]').click()
+    text.fill("Segunda versión del borrador.")
+    report.check(page.locator("#writing-saved").inner_text().strip() == "· Cambios sin guardar",
+                 f"[{name}] pending edits are shown as not saved yet")
+    expect(page.locator("#writing-saved")).to_contain_text("Guardado", timeout=5000)
+    report.check(stored(l2) == "Segunda versión del borrador.",
+                 f"[{name}] autosave: «Guardado» only once the server stored the text")
+
+    page.route("**/draft", lambda route: route.abort())
+    text.fill("Versión escrita sin conexión.")
+    page.get_by_role("button", name="Guardar borrador").click()
+    expect(page.locator("#writing-saved")).to_contain_text("No se pudo guardar")
+    page.get_by_role("button", name="Volver a los ejercicios").click()
+    expect(page.locator("#writing-error")).to_contain_text("Reintentar")
+    report.check(page.locator("#writing-retry").is_visible() and text.input_value() == "Versión escrita sin conexión."
+                 and stored(l2) == "Segunda versión del borrador." and page.locator("#writing-editor").is_visible()
+                 and "Reintentar" in page.locator("#writing-error").inner_text(),
+                 f"[{name}] failed save: text kept, earlier draft untouched, student stays, retry offered")
+    page.screenshot(path=str(out / f"{name}-failed.png"), full_page=True)
+    page.unroute("**/draft")
+    page.get_by_role("button", name="Reintentar").click()
+    expect(page.locator("#writing-saved")).to_contain_text("Guardado")
+    report.check(stored(l2) == "Versión escrita sin conexión." and page.locator("#writing-retry").is_hidden(),
+                 f"[{name}] retry after the connection returns saves the text")
+
+    text.fill("Texto antes de cambiar de pestaña.")
+    page.evaluate("""() => { Object.defineProperty(document, 'visibilityState', {value: 'hidden', configurable: true});
+                     document.dispatchEvent(new Event('visibilitychange')); }""")
+    report.check(wait_stored(l2, "Texto antes de cambiar de pestaña.", 1500),
+                 f"[{name}] hidden tab: pending edits sent at once (before the 2 s autosave)")
+    page.evaluate("() => { delete document.visibilityState; }")
+
+    held: list = []
+    page.route("**/draft", lambda route: held.append(route))
+    text.fill("Primera parte")
+    page.get_by_role("button", name="Guardar borrador").click()
+    expect(page.locator("#writing-saved")).to_contain_text("Guardando")
+    text.fill("Primera parte y segunda parte, la más nueva.")
+    page.unroute("**/draft")
+    page.reload()  # beforeunload accepted; pagehide sends the newest text with keepalive
+    expect(page.locator("#writing-editor")).to_be_visible()
+    newest = "Primera parte y segunda parte, la más nueva."
+    report.check(wait_stored(l2, newest, 3000), f"[{name}] reload during an outstanding save keeps the newest text")
+    for route in held:  # the older request arrives late
+        try:
+            route.continue_()
+        except Exception:  # noqa: BLE001 - the browser may already have cancelled it
+            pass
+    page.wait_for_timeout(500)
+    page.reload()
+    expect(page.locator("#writing-editor")).to_be_visible()
+    report.check(stored(l2) == newest and text.input_value() == newest,
+                 f"[{name}] the delayed older save did not overwrite it; reload restores it")
+
+    l1 = free("writing_conventions")
+    open_exercise("writing_conventions", l1)
+    original = text.input_value()
+    text.fill(original + " Corrección final antes de cerrar.")
+    pump = page.context.new_page()
+    page.close(run_before_unload=True)
+    report.check(wait_stored(l1, original + " Corrección final antes de cerrar.", 3000, pump),
+                 f"[{name}] L1: closing the tab sends the pending correction")
+    report.check(not errors, f"[{name}] no JavaScript errors {errors}")
+    pump.close()
 
 
 def scenario_quarantine(page: Page, report: Report, viewport: str, url: str) -> None:
@@ -1191,6 +1300,8 @@ def run_mock(out: Path, url: str) -> Report:
             scenario_guided(page, tutor_context.new_page(), report, viewport, out, url)
             tutor_context.close()
             scenario_quarantine(page, report, viewport, url)
+            if viewport == "desktop":
+                scenario_drafts(context.new_page(), report, out, url)  # closes its own page
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()

@@ -977,6 +977,39 @@
         "Rerun re-quarantined a reinstated exercise; quarantine made idempotent"
       ],
       "notes": "3 reinstated, 1 quarantined (no reviewer), 1 L1 replacement; inventory 3/3/3/2; suite 518; browser 437/437; $0."
+    },
+    {
+      "id": "T030",
+      "name": "Reliable writing draft persistence (PO task T030)",
+      "objective": "Ordered draft saves, saving indicator with retry, lifecycle flushes, recovery after failures and restarts for L1-L4.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-028-reliable-draft-saving.md",
+          "tests/app/test_writing_drafts.py",
+          "scripts/dev/draft_restart_check.py",
+          "docs/progress/task_T030_result.md",
+          "docs/progress/screenshots/T030/"
+        ],
+        "modify": [
+          "app/writing/store.py",
+          "app/writing/routes.py",
+          "app/static/app.js",
+          "app/static/index.html",
+          "app/static/styles.css",
+          "scripts/dev/practice_e2e.py"
+        ]
+      },
+      "depends_on": [
+        "T029"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T030_result.md",
+      "failures": [],
+      "notes": "Suite 523; browser 447/447; live restart 4/4; no OpenRouter calls."
     }
   ]
 }

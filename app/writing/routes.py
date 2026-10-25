@@ -14,6 +14,7 @@ import re
 import threading
 from typing import Any, Callable
 
+import psycopg
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -70,6 +71,8 @@ class Sections(BaseModel):
 class DraftRequest(BaseModel):
     text: str = Field(default="", max_length=MAX_TEXT)
     sections: Sections | None = None
+    # T030: increasing per save (the browser uses a millisecond clock); a delayed older save is ignored.
+    client_seq: int | None = Field(default=None, ge=0, le=2**62)
 
 
 class SubmitRequest(BaseModel):
@@ -217,7 +220,8 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             "draft": None if handwritten or draft is None else {"text": draft["text_es"],
                                                                 "word_count": draft["word_count"],
                                                                 "sections": draft.get("sections"),
-                                                                "saved_at": draft["updated_at"].isoformat()},
+                                                                "saved_at": draft["updated_at"].isoformat(),
+                                                                "client_seq": draft.get("client_seq")},
             # T028: five-stage guided composition; the plan items are the exercise's own scaffolding.
             "guided": None if record["exercise_type"] != "guided_composition" else {
                 "stages": [{**{k: v for k, v in st.items() if k != "plan"},
@@ -244,16 +248,24 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
 
     @router.put("/exercises/{exercise_id}/draft")
     def save_draft(exercise_id: str, request: DraftRequest) -> dict[str, Any]:
-        store, row = load(exercise_id, writable=True)
+        try:
+            store, row = load(exercise_id, writable=True)
+        except psycopg.Error:
+            raise api_error(503, "save_failed", "No se pudo guardar el borrador. Intentá de nuevo.") from None
         typed_only(row)
-        if guided(row):
-            parts = guided_sections(row, request.sections)
-            saved = store.save_draft(exercise_id, assemble_sections(parts), parts)
-        else:
-            saved = store.save_draft(exercise_id, request.text)
+        try:
+            if guided(row):
+                parts = guided_sections(row, request.sections)
+                saved = store.save_draft(exercise_id, assemble_sections(parts), parts, request.client_seq)
+            else:
+                saved = store.save_draft(exercise_id, request.text, client_seq=request.client_seq)
+        except psycopg.Error:
+            # T030: nothing was written; the earlier draft stays as it was and the browser keeps the text.
+            raise api_error(503, "save_failed", "No se pudo guardar el borrador. Intentá de nuevo.") from None
         if saved is None:
             raise api_error(409, "already_submitted", "Este ejercicio ya fue entregado; no se puede cambiar.")
-        return {"word_count": saved["word_count"], "saved_at": saved["updated_at"].isoformat()}
+        return {"word_count": saved["word_count"], "saved_at": saved["updated_at"].isoformat(),
+                "applied": saved["applied"], "client_seq": saved["client_seq"]}
 
     @router.post("/exercises/{exercise_id}/submit")
     def submit(exercise_id: str, request: SubmitRequest) -> dict[str, Any]:

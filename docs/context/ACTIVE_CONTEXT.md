@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-25
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T029)
+- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T030)
 
 ## Current Objective
 
@@ -83,6 +83,9 @@ Producción escrita (Español, written rubric EE01–EE20)
   3 exercises reinstated, `PE-L1-feria-ciencia-escuela-c9576f` still
   quarantined, L1 replacement `PE-L1-huerta-escolar-8c310b`
   ([ADR-027](../adr/ADR-027-writing-exercise-eligibility.md)).
+- **T030** — reliable drafts: ordered saves (`client_seq`), autosave in
+  L1–L4, keepalive flush on hide/close, "Guardando… / Guardado / No se pudo
+  guardar" with retry ([ADR-028](../adr/ADR-028-reliable-draft-saving.md)).
 
 ### Current State
 
@@ -108,7 +111,7 @@ Producción escrita (Español, written rubric EE01–EE20)
   (`session_classification`), `writing` (`exercise`, `exercise_revision`,
   `reference_correction`, `generation_attempt`, `draft`, `submission`,
   `evaluation`, `criterion_score`).
-- Tests: 518 passing; browser (mocked, `mentor_pro_test`) 437/437; ACE gate
+- Tests: 523 passing; browser (mocked, `mentor_pro_test`) 447/447; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
@@ -188,5 +191,5 @@ Producción escrita (Español, written rubric EE01–EE20)
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-027](../adr/ADR-027-writing-exercise-eligibility.md)
+  [ADR-028](../adr/ADR-028-reliable-draft-saving.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-004)

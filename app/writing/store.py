@@ -132,6 +132,10 @@ ALTER TABLE writing.criterion_score ADD COLUMN IF NOT EXISTS descriptor_ref TEXT
 -- the four paragraphs joined by a blank line.
 ALTER TABLE writing.draft ADD COLUMN IF NOT EXISTS sections JSONB;
 ALTER TABLE writing.submission ADD COLUMN IF NOT EXISTS sections JSONB;
+-- T030 (ADR-028): ordering of draft saves (a delayed older save never overwrites newer text) and the exercise
+-- revision the draft was written against.
+ALTER TABLE writing.draft ADD COLUMN IF NOT EXISTS client_seq BIGINT;
+ALTER TABLE writing.draft ADD COLUMN IF NOT EXISTS exercise_revision INTEGER;
 -- T029 (ADR-027, RCA-004): append-only eligibility history; the latest event decides, no event = eligible.
 CREATE TABLE IF NOT EXISTS writing.eligibility_event (
     event_id       BIGSERIAL PRIMARY KEY,
@@ -383,20 +387,33 @@ class WritingStore:
         with self._connect() as conn:
             return conn.execute("SELECT * FROM writing.submission WHERE exercise_id = %s", (exercise_id,)).fetchone()
 
-    def save_draft(self, exercise_id: str, text_es: str,
-                   sections: dict[str, str] | None = None) -> dict[str, Any] | None:
+    def save_draft(self, exercise_id: str, text_es: str, sections: dict[str, str] | None = None,
+                   client_seq: int | None = None) -> dict[str, Any] | None:
         """Upsert the draft; None when the exercise was already submitted (drafts are then frozen).
-        Guided compositions (T028) pass their sections; text_es is then the assembled paragraphs."""
+        Guided compositions (T028) pass their sections; text_es is then the assembled paragraphs.
+        T030: a save carrying a `client_seq` not newer than the stored one is stale (a delayed request) and
+        changes nothing; the row is returned with `applied` False. Each save records the exercise revision."""
         with self._connect() as conn, conn.transaction():
             conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
             if conn.execute("SELECT 1 FROM writing.submission WHERE exercise_id = %s", (exercise_id,)).fetchone():
                 return None
-            return conn.execute(
-                """INSERT INTO writing.draft (exercise_id, text_es, word_count, sections) VALUES (%s, %s, %s, %s)
+            current = conn.execute("SELECT * FROM writing.draft WHERE exercise_id = %s", (exercise_id,)).fetchone()
+            if current and client_seq is not None and current["client_seq"] is not None \
+                    and client_seq <= current["client_seq"]:
+                return {**current, "applied": False}
+            revision = conn.execute("SELECT COALESCE(MAX(revision), 1) AS n FROM writing.exercise_revision "
+                                    "WHERE exercise_id = %s", (exercise_id,)).fetchone()["n"]
+            row = conn.execute(
+                """INSERT INTO writing.draft (exercise_id, text_es, word_count, sections, client_seq, exercise_revision)
+                   VALUES (%s, %s, %s, %s, %s, %s)
                    ON CONFLICT (exercise_id) DO UPDATE SET text_es = EXCLUDED.text_es,
-                       word_count = EXCLUDED.word_count, sections = EXCLUDED.sections, updated_at = now()
+                       word_count = EXCLUDED.word_count, sections = EXCLUDED.sections,
+                       client_seq = COALESCE(EXCLUDED.client_seq, writing.draft.client_seq),
+                       exercise_revision = EXCLUDED.exercise_revision, updated_at = now()
                    RETURNING *""", (exercise_id, text_es, word_count(text_es),
-                                    Jsonb(sections) if sections is not None else None)).fetchone()
+                                    Jsonb(sections) if sections is not None else None, client_seq,
+                                    revision)).fetchone()
+            return {**row, "applied": True}
 
     def submit_typed(self, exercise_id: str, text_es: str, client_request_id: str,
                      sections: dict[str, str] | None = None) -> tuple[dict[str, Any], bool]:

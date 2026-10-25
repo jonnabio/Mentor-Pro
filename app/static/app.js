@@ -733,8 +733,8 @@ function renderGuided() {
     button.addEventListener("click", () => goToStage(index));
     return el("li", {}, button);
   }));
-  $("guided-saved").textContent = data.draft
-    ? ` · Borrador guardado ${new Date(data.draft.saved_at).toLocaleString("es-CR")}` : "";
+  if (data.draft) saveSeq = Math.max(saveSeq, data.draft.client_seq || 0);
+  saveStatus(data.draft ? "saved" : null, data.draft && data.draft.saved_at);
   renderStage(rememberedStage(data.exercise_id));
 }
 
@@ -771,21 +771,22 @@ function updateGuided() {
   $("guided-submit").disabled = missing.length > 0 || writing.busy;
   $("guided-preview").replaceChildren(...writing.exercise.guided.paragraphs
     .filter((key) => sections[key].trim()).map((key) => el("p", { "data-section": key }, sections[key].trim())));
-  if (writingDirty()) $("guided-saved").textContent = " · Cambios sin guardar";
 }
 
 async function goToStage(index) {
-  if (writingDirty() && !(await saveWritingDraft())) return;
+  if (writingDirty() && !(await saveWritingDraft())) {
+    showError($("writing-error"), SAVE_FAILED_ES);
+    return;
+  }
+  showError($("writing-error"), "");
   renderStage(index);
   window.scrollTo({ top: $("writing-guided").offsetTop - 8 });
 }
 
-let autosaveTimer = null;
 for (const field of guidedFields()) {
   field.addEventListener("input", () => {
     updateGuided();
-    clearTimeout(autosaveTimer);
-    autosaveTimer = setTimeout(() => { if (writingDirty()) saveWritingDraft(); }, AUTOSAVE_MS);
+    scheduleAutosave();
   });
 }
 $("guided-prev").addEventListener("click", () => goToStage(writing.stage - 1));
@@ -794,7 +795,10 @@ $("guided-save").addEventListener("click", () => saveWritingDraft());
 $("guided-submit").addEventListener("click", async () => {
   updateGuided();
   if (!$("guided-missing").hidden) return;
-  if (writingDirty() && !(await saveWritingDraft())) return;
+  if (writingDirty() && !(await saveWritingDraft())) {
+    showError($("writing-error"), SAVE_FAILED_ES);
+    return;
+  }
   showError($("writing-dialog-error"), "");
   $("writing-dialog-confirm").disabled = false;
   writingDialog.showModal();
@@ -925,8 +929,8 @@ function renderWritingState() {
   $("writing-restore").hidden = !data.editable_source;
   $("writing-text").placeholder = data.source_text_es
     ? "Corregí aquí el texto completo." : "";
-  $("writing-saved").textContent = data.draft
-    ? ` · Borrador guardado ${new Date(data.draft.saved_at).toLocaleString("es-CR")}` : "";
+  if (data.draft) saveSeq = Math.max(saveSeq, data.draft.client_seq || 0);
+  saveStatus(data.draft ? "saved" : null, data.draft && data.draft.saved_at);
   updateWordCount();
 }
 
@@ -954,39 +958,118 @@ function updateWordCount() {
   const words = countWords($("writing-text").value);
   $("writing-words").textContent = words === 1 ? "1 palabra" : `${words} palabras`;
   $("writing-submit").disabled = words === 0 || writing.busy;
-  if (writingDirty()) $("writing-saved").textContent = " · Cambios sin guardar";
 }
 
-async function saveWritingDraft() {
-  if (!writing.exercise || writing.busy) return true;
+// ------------------------------------------------------------------ draft saving (T030, ADR-028)
+// One save in flight at a time; edits made meanwhile are saved right after it. Every request carries an
+// increasing client_seq, so the server ignores a delayed older save. "Guardado" appears only after the server
+// confirmed; a failed save keeps the text on screen, leaves the earlier draft untouched and offers "Reintentar".
+// When the tab is hidden or the page closes, pending edits are sent with a keepalive request.
+
+const SAVE_TEXT = { saving: "Guardando…", saved: "Guardado", error: "No se pudo guardar", dirty: "Cambios sin guardar" };
+const KEEPALIVE_LIMIT = 60000; // bytes; browsers cap keepalive bodies at 64 KiB
+let saveSeq = 0;
+let autosaveTimer = null;
+const nextSeq = () => (saveSeq = Math.max(Date.now(), saveSeq + 1));
+const draftUrl = (exercise) => `/api/writing/exercises/${encodeURIComponent(exercise.exercise_id)}/draft`;
+
+function saveStatus(state, savedAt) {
+  const guided = Boolean(writing.exercise && writing.exercise.guided);
+  const target = $(guided ? "guided-saved" : "writing-saved");
+  const time = state === "saved" && savedAt
+    ? ` ${new Date(savedAt).toLocaleTimeString("es-CR", { hour: "2-digit", minute: "2-digit" })}` : "";
+  target.dataset.state = state || "";
+  target.textContent = state ? ` · ${SAVE_TEXT[state]}${time}` : "";
+  $(guided ? "guided-retry" : "writing-retry").hidden = state !== "error";
+}
+
+function currentDraft() {
   const guided = Boolean(writing.exercise.guided);
   const sections = guided ? guidedSections() : null;
   const text = guided ? guidedComposition(sections) : $("writing-text").value;
-  writing.busy = true;
-  $("writing-save").disabled = $("guided-save").disabled = true;
+  const body = JSON.stringify({ ...(guided ? { sections } : { text }), client_seq: nextSeq() });
+  return { guided, sections, text, key: guided ? JSON.stringify(sections) : text, body };
+}
+
+function markSaved(exercise, draft, saved) {
+  if (writing.exercise !== exercise) return; // the student opened another exercise meanwhile
+  if (draft.guided) writing.savedSections = draft.key;
+  else writing.savedText = draft.text;
+  exercise.draft = { text: draft.text, sections: draft.sections, word_count: saved.word_count,
+    saved_at: saved.saved_at, client_seq: saved.client_seq };
+  saveStatus(writingDirty() ? "dirty" : "saved", saved.saved_at);
+}
+
+async function sendDraft() {
+  const exercise = writing.exercise;
+  const draft = currentDraft();
+  saveStatus("saving");
   try {
-    const saved = await api(`/api/writing/exercises/${encodeURIComponent(writing.exercise.exercise_id)}/draft`,
-      { method: "PUT", body: JSON.stringify(guided ? { sections } : { text }) });
-    if (guided) writing.savedSections = JSON.stringify(sections);
-    else writing.savedText = text;
-    writing.exercise.draft = { text, sections, word_count: saved.word_count, saved_at: saved.saved_at };
-    $(guided ? "guided-saved" : "writing-saved").textContent =
-      ` · Borrador guardado ${new Date(saved.saved_at).toLocaleString("es-CR")}`;
+    markSaved(exercise, draft, await api(draftUrl(exercise), { method: "PUT", body: draft.body }));
     return true;
-  } catch (error) {
-    showError($("writing-error"), error.message);
+  } catch {
+    if (writing.exercise === exercise) saveStatus("error");
     return false;
-  } finally {
-    writing.busy = false;
-    $("writing-save").disabled = $("guided-save").disabled = false;
-    if (guided) updateGuided();
-    else updateWordCount();
   }
 }
 
-// Leaving keeps the work: unsaved changes are saved as a draft first.
+async function saveWritingDraft() {
+  const exercise = writing.exercise;
+  if (!exercise || exercise.submission || exercise.handwritten) return true;
+  clearTimeout(autosaveTimer);
+  if (writing.saving) {
+    writing.saveAgain = true;
+    return writing.saving;
+  }
+  writing.saving = (async () => {
+    let ok;
+    do {
+      writing.saveAgain = false;
+      ok = await sendDraft();
+    } while (ok && writing.saveAgain && writingDirty());
+    return ok;
+  })();
+  try {
+    return await writing.saving;
+  } finally {
+    writing.saving = null;
+  }
+}
+
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  if (!writingDirty()) return;
+  saveStatus("dirty");
+  autosaveTimer = setTimeout(() => { if (writingDirty()) saveWritingDraft(); }, AUTOSAVE_MS);
+}
+
+// Tab hidden or page closing: send pending edits now. keepalive lets the request outlive the page; a body over
+// the keepalive limit is sent normally (it may not complete if the page is already gone).
+function flushDraft() {
+  if (!writingDirty()) return;
+  clearTimeout(autosaveTimer);
+  const exercise = writing.exercise;
+  const draft = currentDraft();
+  try {
+    fetch(draftUrl(exercise), { method: "PUT", headers: { "Content-Type": "application/json" }, body: draft.body,
+      keepalive: new Blob([draft.body]).size < KEEPALIVE_LIMIT })
+      .then((response) => (response.ok ? response.json() : Promise.reject(response)))
+      .then((saved) => markSaved(exercise, draft, saved))
+      .catch(() => { if (writing.exercise === exercise && writingDirty()) saveStatus("error"); });
+  } catch {
+    saveStatus("error");
+  }
+}
+
+const SAVE_FAILED_ES = "No se pudo guardar. Tu texto sigue en pantalla; presioná «Reintentar».";
+
+// Leaving keeps the work: unsaved changes are saved as a draft first; a failed save keeps the student here.
 async function leaveWriting(target) {
-  if (writingDirty() && !(await saveWritingDraft())) return;
+  if (writingDirty() && !(await saveWritingDraft())) {
+    showError($("writing-error"), SAVE_FAILED_ES);
+    return;
+  }
+  showError($("writing-error"), "");
   if (target === "list" && writing.level) {
     rememberWriting(null);
     writing.exercise = null;
@@ -1002,8 +1085,13 @@ async function leaveWriting(target) {
 
 const writingDialog = $("writing-dialog");
 $("form-writing").addEventListener("click", openWriting);
-$("writing-text").addEventListener("input", updateWordCount);
+$("writing-text").addEventListener("input", () => {
+  updateWordCount();
+  scheduleAutosave();
+});
 $("writing-save").addEventListener("click", saveWritingDraft);
+$("writing-retry").addEventListener("click", saveWritingDraft);
+$("guided-retry").addEventListener("click", saveWritingDraft);
 $("writing-back-levels").addEventListener("click", () => leaveWriting("levels"));
 $("writing-back-list").addEventListener("click", () => leaveWriting("list"));
 $("writing-menu").addEventListener("click", () => leaveWriting("menu"));
@@ -1023,12 +1111,14 @@ $("writing-restore-confirm").addEventListener("click", () => {
   $("writing-text").value = writing.exercise.source_text_es;
   restoreDialog.close();
   updateWordCount();
+  scheduleAutosave();
 });
 $("writing-dialog-confirm").addEventListener("click", async () => {
   const button = $("writing-dialog-confirm");
   if (button.disabled) return;
   button.disabled = true; // one submission; the server also keeps only the first
   writing.busy = true;
+  clearTimeout(autosaveTimer); // the submission carries the full text; no draft save after it
   writing.requestId = writing.requestId || newRequestId();
   const sections = writing.exercise.guided ? guidedSections() : null;
   const text = sections ? guidedComposition(sections) : $("writing-text").value;
@@ -1050,8 +1140,12 @@ $("writing-dialog-confirm").addEventListener("click", async () => {
   }
 });
 window.addEventListener("beforeunload", (event) => {
-  if (writingDirty()) event.preventDefault();
+  if (writingDirty()) event.preventDefault(); // the browser asks before discarding unsaved text
 });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") flushDraft();
+});
+window.addEventListener("pagehide", flushDraft);
 
 // ------------------------------------------------------------------ start
 
