@@ -18,13 +18,13 @@ from app.generation.parsing import OutputError
 from app.generation.pipeline import RUBRIC_MAX_TOKENS
 from app.llm.budget import BudgetGate
 from app.llm.client import OpenRouterClient
-from app.llm.router import Store, route
+from app.llm.router import Store, same_model
 from app.writing import contracts, editing, generation, revisions
 from app.writing.store import WritingStore
 
 VERSION = "independent-review-1.1"  # 1.0: first T029 runs; 1.1: L1 reviews get EDIT_REVIEW_MAX_TOKENS
 SOURCE = "RCA-004"
-MAX_CALLS = 4  # review calls per exercise, including route() retries
+MAX_CALLS = 6  # review calls per exercise, including route() retries; T031: 3 per reviewer, primary and fallback
 # Approved eligible inventory (T029): level code -> minimum eligible exercises.
 REQUIRED_INVENTORY = {"writing_conventions": 3, "idea_development": 3, "paragraph_writing": 3,
                       "guided_composition": 1}
@@ -48,7 +48,8 @@ def accepted_reviews(url: str) -> list[dict[str, Any]]:
 
 def self_reviewed(url: str) -> list[dict[str, Any]]:
     """RCA-004: accepted exercises whose review came from the generating model (or from no recorded model)."""
-    return [r for r in accepted_reviews(url) if not r["reviewer_model"] or r["reviewer_model"] == r["generator_model"]]
+    return [r for r in accepted_reviews(url)
+            if not r["reviewer_model"] or same_model(r["reviewer_model"], r["generator_model"])]
 
 
 def quarantine(store: WritingStore, affected: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -107,8 +108,8 @@ def revalidate(client: OpenRouterClient, usage_store: Store, catalog: psycopg.Co
                                        record["target_criteria"], exercise_type=record["exercise_type"])
         messages, parse, prompt_version, max_tokens = _review(g, record, reference)
         gate = BudgetGate(usage_store, client.settings, max_calls=MAX_CALLS)
-        reviewed = route(client, usage_store, messages, purpose="review", max_tokens=max_tokens,
-                         request_id=request_id, exclude=frozenset({generator_model}), gate=gate)
+        reviewed = generation.review_route(client, usage_store, messages, max_tokens, request_id, generator_model,
+                                           gate)
         usage = reviewed.records
         row["version"] = f"{VERSION}+{prompt_version}"
         reviewer = reviewed.final.model_used if reviewed.final else None

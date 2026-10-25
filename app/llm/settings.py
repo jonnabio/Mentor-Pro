@@ -59,6 +59,8 @@ class LlmSettings:
     generation_max_tokens: int = GENERATION_MAX_TOKENS_DEFAULT  # question generation only (ADR-010)
     generation_excluded_models: tuple[str, ...] = (GENERATION_EXCLUDED_DEFAULT,)
     generation_reasoning_effort: str = ""   # optional; sent only to models that support `reasoning`
+    # T031 (ADR-029): writing reviews only, ordered primary then qualified fallbacks; empty = free_models.
+    writing_review_models: tuple[str, ...] = ()
     max_requests_per_day: int = 50
     max_usd_per_day: float = 0.0
     app_title: str = "Mentor Pro"
@@ -89,6 +91,8 @@ class LlmSettings:
                     m.strip() for m in get("OPENROUTER_GENERATION_EXCLUDED_MODELS", GENERATION_EXCLUDED_DEFAULT)
                     .split(",") if m.strip()),
                 generation_reasoning_effort=get("OPENROUTER_GENERATION_REASONING_EFFORT").lower(),
+                writing_review_models=tuple(
+                    m.strip() for m in get("OPENROUTER_WRITING_REVIEW_MODELS").split(",") if m.strip()),
                 max_requests_per_day=int(get("OPENROUTER_MAX_REQUESTS_PER_DAY", "50")),
                 max_usd_per_day=float(get("OPENROUTER_MAX_USD_PER_DAY", "0")),
             )
@@ -110,5 +114,7 @@ class LlmSettings:
         if self.generation_reasoning_effort not in REASONING_EFFORTS:
             raise LlmConfigurationError("OPENROUTER_GENERATION_REASONING_EFFORT must be empty, minimal, low, "
                                         "medium or high")
+        if len(set(self.writing_review_models)) != len(self.writing_review_models):
+            raise LlmConfigurationError("OPENROUTER_WRITING_REVIEW_MODELS lists a model twice")
         if self.allow_paid and not self.paid_model:
             raise LlmConfigurationError("OPENROUTER_ALLOW_PAID=true requires OPENROUTER_PAID_MODEL")

@@ -24,7 +24,7 @@ from app.generation.parsing import OutputError, extract_json
 from app.generation.pipeline import RUBRIC_MAX_TOKENS
 from app.llm.budget import BudgetGate
 from app.llm.client import OpenRouterClient
-from app.llm.router import RouteResult, Store, route
+from app.llm.router import RouteResult, Store, route, same_model
 from app.writing import contracts
 from curriculum.catalog import list_rubric_criteria
 
@@ -555,9 +555,8 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
             _record(writing_store, g, attempt)
             continue
         generator = generated.final.model_used if generated.final else None
-        reviewed = route(client, usage_store, review_messages(g, exercise), purpose="review",
-                         max_tokens=RUBRIC_MAX_TOKENS, request_id=attempt.request_id,
-                         exclude=frozenset({generator} if generator else ()), gate=gate)
+        reviewed = review_route(client, usage_store, review_messages(g, exercise), RUBRIC_MAX_TOKENS,
+                                attempt.request_id, generator, gate)
         attempt.usage += reviewed.records
         if reviewed.status != "ok":
             attempt.status, stop = "unavailable", _stop_reason(reviewed)
@@ -571,7 +570,7 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
             _record(writing_store, g, attempt)
             continue
         try:
-            attempt.review = parse_review(reviewed.content or "", COMPOSE_REVIEW_KEYS)
+            attempt.review = parse_review(reviewed.content or "", COMPOSE_REVIEW_KEYS) | reviewer_of(reviewed)
         except OutputError as exc:
             attempt.checks.append({"id": "W08", "status": "fail", "message": f"review output: {exc}"})
             attempt.reasons.append(f"W08: review output: {exc}")
@@ -593,12 +592,29 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
     return WritingOutcome(status, None, attempts, stop or "max_requests")
 
 
+def review_route(client: OpenRouterClient, usage_store: Store, messages: list[dict[str, str]], max_tokens: int,
+                 request_id: str, generator: str | None, gate: BudgetGate) -> RouteResult:
+    """The independent review call of every writing level (T031, ADR-029): the configured writing reviewers in
+    order (primary, then qualified fallbacks; empty = the free list), never the generator or a variant of it,
+    through the caller's budget gate. Retries per reviewer stay bounded by OPENROUTER_MAX_RETRIES."""
+    return route(client, usage_store, messages, purpose="review", max_tokens=max_tokens, request_id=request_id,
+                 exclude=frozenset({generator} if generator else ()), gate=gate,
+                 models=client.settings.writing_review_models or None)
+
+
+def reviewer_of(reviewed: RouteResult) -> dict[str, Any]:
+    """The model that actually answered the review, stored with it (T031)."""
+    final = reviewed.final
+    return {"reviewer_model": (final.model_used or final.model_requested) if final else None}
+
+
 def same_model_review(generator: str | None, reviewed: RouteResult) -> str | None:
     """RCA-004: W08 is an independent review (ADR-020). Reviews exclude the generator from routing (T029); this
-    is the second defense: a review that still comes from the generator is refused, never accepted."""
-    reviewer = reviewed.final.model_used if reviewed.final else None
-    if generator and reviewer == generator:
-        return f"review not independent: {reviewer} also generated the exercise"
+    is the second defense: a review that still comes from the generator, under any id variant, is refused."""
+    final = reviewed.final
+    for reviewer in ((final.model_used, final.model_requested) if final else ()):
+        if same_model(generator, reviewer):
+            return f"review not independent: {reviewer} also generated the exercise"
     return None
 
 

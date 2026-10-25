@@ -387,9 +387,8 @@ def generate_editing_exercise(client: OpenRouterClient, usage_store: Store, cata
             _record(writing_store, g, attempt)
             continue
         generator = generated.final.model_used if generated.final else None
-        reviewed = route(client, usage_store, review_messages(g, exercise, reference), purpose="review",
-                         max_tokens=EDIT_REVIEW_MAX_TOKENS, request_id=attempt.request_id,
-                         exclude=frozenset({generator} if generator else ()), gate=gate)
+        reviewed = gen.review_route(client, usage_store, review_messages(g, exercise, reference),
+                                    EDIT_REVIEW_MAX_TOKENS, attempt.request_id, generator, gate)
         attempt.usage += reviewed.records
         if reviewed.status != "ok":
             attempt.status, stop = "unavailable", gen._stop_reason(reviewed)
@@ -403,7 +402,7 @@ def generate_editing_exercise(client: OpenRouterClient, usage_store: Store, cata
             _record(writing_store, g, attempt)
             continue
         try:
-            attempt.review = parse_review(reviewed.content or "")
+            attempt.review = parse_review(reviewed.content or "") | gen.reviewer_of(reviewed)
         except OutputError as exc:
             attempt.checks.append({"id": "W08", "status": "fail", "message": f"review output: {exc}"})
             attempt.reasons.append(f"W08: review output: {exc}")

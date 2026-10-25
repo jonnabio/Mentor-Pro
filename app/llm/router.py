@@ -49,6 +49,17 @@ def free_candidates(client: OpenRouterClient) -> list[str]:
     return [m.id for m in discovered[:AUTO_FREE_LIMIT]]
 
 
+def same_model(a: str | None, b: str | None) -> bool:
+    """One model under two ids: OpenRouter variants (`:free`, `:beta`) share the model (T031, RCA-004)."""
+    return bool(a and b) and a.split(":", 1)[0].lower() == b.split(":", 1)[0].lower()
+
+
+def listed_free(client: OpenRouterClient, models: tuple[str, ...]) -> list[str]:
+    """The given models, in order, that are currently listed as free text models (never a substitute)."""
+    usable = {m.id for m in client.list_models() if m.is_free and m.is_text_chat}
+    return [m for m in models if m in usable]
+
+
 def supports(client: OpenRouterClient, model: str, parameter: str) -> bool:
     info = next((m for m in client.list_models() if m.id == model), None)
     return info is not None and parameter in info.supported_parameters
@@ -65,9 +76,11 @@ def reasoning_body(client: OpenRouterClient, model: str, purpose: str) -> dict[s
 def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]], purpose: str,
           max_tokens: int | None = None, request_id: str | None = None,
           avoid: frozenset[str] = frozenset(), practice_set_id: str | None = None,
-          gate: BudgetGate | None = None, exclude: frozenset[str] = frozenset()) -> RouteResult:
+          gate: BudgetGate | None = None, exclude: frozenset[str] = frozenset(),
+          models: tuple[str, ...] | None = None) -> RouteResult:
     """Route one request. Models in `avoid` are tried last (e.g. the generator, for a blind solve); models in
-    `exclude` are never called (T029: an independent review must not fall back to the generator).
+    `exclude`, or a variant of them, are never called (T029: an independent review must not fall back to the
+    generator). `models` replaces the free list with an explicit ordered one (T031: writing reviewers).
 
     Pass one shared `gate` to every concurrent caller; without it a private gate is used.
     """
@@ -77,7 +90,7 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
     settings = client.settings
 
     try:
-        free = free_candidates(client)
+        free = listed_free(client, models) if models else free_candidates(client)
     except AuthenticationError as exc:
         return RouteResult(status="auth_error", message=str(exc))
     except TransientError as exc:
@@ -85,10 +98,10 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
     if purpose == "generation":
         # T012: some models are kept for blind solve and review but never generate questions.
         free = [m for m in free if m not in settings.generation_excluded_models]
-    free = [m for m in free if m not in exclude]
+    free = [m for m in free if not any(same_model(m, x) for x in exclude)]
     free = [m for m in free if m not in avoid] + [m for m in free if m in avoid]
     plan = [(m, "free") for m in free]
-    if settings.allow_paid and settings.paid_model and settings.paid_model not in exclude:
+    if settings.allow_paid and settings.paid_model and not any(same_model(settings.paid_model, x) for x in exclude):
         plan.append((settings.paid_model, "paid"))
     result.candidates = [m for m, _ in plan]
     if not plan:

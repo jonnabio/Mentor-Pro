@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-25
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T030)
+- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T031)
 
 ## Current Objective
 
@@ -86,6 +86,11 @@ Producción escrita (Español, written rubric EE01–EE20)
 - **T030** — reliable drafts: ordered saves (`client_seq`), autosave in
   L1–L4, keepalive flush on hide/close, "Guardando… / Guardado / No se pudo
   guardar" with retry ([ADR-028](../adr/ADR-028-reliable-draft-saving.md)).
+- **T031** — second writing reviewer: `OPENROUTER_WRITING_REVIEW_MODELS`,
+  `review_route()` with generator and variant exclusion, revalidation cap 6,
+  `benchmark_writing_reviewers.py`; **no candidate qualified** (dots 4/8
+  defects; xing and gemma HTTP 429)
+  ([ADR-029](../adr/ADR-029-writing-review-fallback.md)).
 
 ### Current State
 
@@ -117,18 +122,22 @@ Producción escrita (Español, written rubric EE01–EE20)
 - PostgreSQL `writing` schema adds `eligibility_event`,
   `independent_validation`, `draft.sections/client_seq/exercise_revision`,
   `submission.sections`.
-- Tests: 523 passing; browser (mocked, `mentor_pro_test`) 447/447; live
+- Writing reviewers (ADR-029): local `.env`
+  `OPENROUTER_WRITING_REVIEW_MODELS=nvidia/nemotron-3.5-super-vl:free`
+  (primary only); append a model only after it passes the benchmark.
+  `minimax/minimax-m3.1-flash:free` is configured but no longer listed.
+- Tests: 536 passing (T031); browser (mocked, `mentor_pro_test`) 447/447; live
   draft restart check 4/4; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
 1. Receive and plan the next Product Owner task (ADR first). Named
-   candidate: T031 L5 examination simulation (handwritten, 90 minutes,
+   candidate: T032 L5 examination simulation (handwritten, 90 minutes,
    EE19/EE20); also reopening or correcting a completed evaluation.
-2. Add a second free reviewer model to `OPENROUTER_FREE_MODELS`
-   (only nemotron-3-ultra generates and only nemotron-3.5-super-vl reviews
-   independently; it often answers 502 or truncates). Test on a small
-   sample.
+2. Rerun `scripts/dev/benchmark_writing_reviewers.py --discover` then
+   `--primary --out FILE` when the free listing changes (T031: none
+   qualified). Possible separate task: review prompt for ambiguous
+   corrections and L4 plan order (all reviewers missed them).
 3. Retry the revalidation of `PE-L1-feria-ciencia-escuela-c9576f`:
    `.venv/Scripts/python.exe scripts/dev/remediate_writing_review.py --out FILE`
    (idempotent; never re-quarantines a reinstated exercise).
@@ -201,5 +210,5 @@ Producción escrita (Español, written rubric EE01–EE20)
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-028](../adr/ADR-028-reliable-draft-saving.md)
+  [ADR-029](../adr/ADR-029-writing-review-fallback.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-004)

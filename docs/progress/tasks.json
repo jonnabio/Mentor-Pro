@@ -1010,6 +1010,41 @@
       "result_file": "docs/progress/task_T030_result.md",
       "failures": [],
       "notes": "Suite 523; browser 447/447; live restart 4/4; no OpenRouter calls."
+    },
+    {
+      "id": "T031",
+      "name": "Qualify a second independent writing reviewer (PO task T031)",
+      "objective": "Discover, benchmark and qualify a free fallback writing reviewer; configurable review routing with generator exclusion.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-029-writing-review-fallback.md",
+          "docs/planning/2026-10-25-T031-second-writing-reviewer.md",
+          "scripts/dev/benchmark_writing_reviewers.py",
+          "tests/app/test_writing_review_fallback.py",
+          "docs/progress/task_T031_result.md",
+          "docs/progress/T031/benchmark.json"
+        ],
+        "modify": [
+          "app/llm/settings.py",
+          "app/llm/router.py",
+          "app/writing/generation.py",
+          "app/writing/editing.py",
+          "app/writing/revalidation.py",
+          ".env.example",
+          "tests/app/test_writing_review_independence.py"
+        ]
+      },
+      "depends_on": [
+        "T029"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T031_result.md",
+      "failures": [],
+      "notes": "No candidate qualified (dots 4/8 defects; xing, gemma HTTP 429). Suite 536; 91 benchmark calls; $0."
     }
   ]
 }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import httpx
 
+from app.llm.client import Attempt
 from app.llm.router import RouteResult
 from app.llm.usage import MemoryUsageStore
 from app.writing import editing, generation
@@ -37,10 +38,9 @@ def test_l1_reviews_exclude_the_generator_too(catalog, store):
 
 
 def test_same_model_review_helper():
-    class Final:
-        model_used = "gen/a:free"
-
-    same = RouteResult(status="ok", content="{}", final=Final(), records=[], message="")
+    final = Attempt("gen/a:free", 1, "ok", 10, model_used="gen/a:free")
+    same = RouteResult(status="ok", content="{}", final=final, records=[], message="")
     assert generation.same_model_review("gen/a:free", same)
+    assert generation.same_model_review("gen/a:beta", same)  # T031: a variant id is the same model
     assert generation.same_model_review("other/x:free", same) is None
     assert generation.same_model_review(None, same) is None
