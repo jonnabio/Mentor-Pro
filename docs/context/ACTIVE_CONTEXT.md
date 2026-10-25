@@ -10,8 +10,8 @@
 ## Current Objective
 
 No task in progress. Wait for the next Product Owner task; plan it with an
-ADR first. Do not start L4/L5 generation, 10–30 question sets or new
-features without approval.
+ADR first. Do not start L5, 10–30 question sets or new features without
+approval.
 
 ## Handoff Summary
 
@@ -89,63 +89,69 @@ Producción escrita (Español, written rubric EE01–EE20)
 
 ### Current State
 
-- `main` committed and pushed to `origin/main`; working tree clean; no task
-  in progress, no lock files; no server or generation job left running.
-- Multiple choice: free models only (paid disabled), checker 1.6.0, prompts
-  generation 1.3.0 / rubric 1.1.0, generation limit 4000 tokens, daily
-  request budget 1000 (`.env`), 5 questions per practice, concurrency 2.
+- `main` committed and pushed to `origin/main` (T027–T030 pushed at
+  handoff); working tree clean; no task in progress, no lock files; no
+  server, browser or generation job left running.
+- Multiple choice: unchanged since T019 — free models only (paid
+  disabled), checker 1.6.0, prompts generation 1.3.0 / rubric 1.1.0,
+  generation limit 4000 tokens, daily request budget 1000, daily USD 0.
 - Student database: 381 multiple-choice answers (dashboard counts only the
-  2 `student` sessions, T017); eligible writing inventory L1 3, L2 3,
-  L3 3, L4 2 (L5 none in the real database); 0 writing drafts, submissions and
+  2 `student` sessions, T017); 0 writing drafts, submissions and
   evaluations.
-- Writing app: Producción escrita card on the main menu → levels →
-  exercises → editor (L1 prefilled with the text; L2–L5 empty) → one
-  submission → "Pendiente de revisión del tutor" → tutor review at `/tutor`
-  → "Revisado por el tutor" with scores and feedback. Tutor-only
-  references in `writing.reference_correction` and
-  `writing.exercise_revision.reference`, never in student responses.
-- Writing generation: prompts `writing-1.3` (composed, L4 plan) and
-  `writing-edit-1.1` (L1); checks W01–W19; correction exercises use 8000
-  output tokens; seeding commands generate only missing exercises.
-- PostgreSQL schemas: `curriculum`, `llm`, `generation`, `practice`
-  (`session_classification`), `writing` (`exercise`, `exercise_revision`,
-  `reference_correction`, `generation_attempt`, `draft`, `submission`,
-  `evaluation`, `criterion_score`).
-- Tests: 523 passing; browser (mocked, `mentor_pro_test`) 447/447; ACE gate
-  `VERIFY_RESULT=pass gate=all`.
+- Writing bank (eligible, ADR-027): L1 3 (`futbol-comunidad`,
+  `manglares-terraba`, `huerta-escolar`), L2 3, L3 3, L4 2
+  (`uso-responsable-materiales`, `uso-responsable-redes`), L5 none.
+  Quarantined: `PE-L1-feria-ciencia-escuela-c9576f` (no independent review
+  yet). Eligibility is the latest row of `writing.eligibility_event`;
+  revalidations in `writing.independent_validation`.
+- Writing app: main menu → levels → exercises → editor (L1 prefilled; L2–L3
+  one text area; L4 five stages with section drafts) → one submission →
+  `/tutor` review (L4: EE01–EE06 required, EE07–EE18 optional) → student
+  feedback → "Mi progreso" tab "Producción escrita" (ADR-025).
+- Drafts (ADR-028): ordered by `writing.draft.client_seq`, autosave 2 s in
+  L1–L4, keepalive flush on tab hidden/close, indicator "Guardando… /
+  Guardado / No se pudo guardar" with "Reintentar"; DB errors answer 503.
+- Writing generation: prompts `writing-1.3` (L2–L5; L4 paragraph plan,
+  W19) and `writing-edit-1.1` (L1); checks W01–W19; reviews exclude the
+  generator (`route(exclude=…)`, RCA-004); L1 review limit 6000 tokens.
+- PostgreSQL `writing` schema adds `eligibility_event`,
+  `independent_validation`, `draft.sections/client_seq/exercise_revision`,
+  `submission.sections`.
+- Tests: 523 passing; browser (mocked, `mentor_pro_test`) 447/447; live
+  draft restart check 4/4; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-1. Receive and plan the next Product Owner task (ADR first). Candidates
-   named so far: L5 examination simulation, reopening or correcting a
-   completed evaluation. Retry the revalidation of the quarantined
-   `PE-L1-feria-ciencia-escuela-c9576f`
-   (`scripts/dev/remediate_writing_review.py`).
-2. Restore a generation fallback model: only
-   `nvidia/nemotron-3-ultra-550b-a55b:free` generates and it often truncates
-   (writing L1 needed several seeding runs). Add another free text model to
-   `OPENROUTER_FREE_MODELS` and test on a small sample.
-3. Run one live L1 generation with prompt `writing-edit-1.1` and one L2/L3
-   with `writing-1.2` to confirm the T024/T025 rules on new output.
+1. Receive and plan the next Product Owner task (ADR first). Named
+   candidate: T031 L5 examination simulation (handwritten, 90 minutes,
+   EE19/EE20); also reopening or correcting a completed evaluation.
+2. Add a second free reviewer model to `OPENROUTER_FREE_MODELS`
+   (only nemotron-3-ultra generates and only nemotron-3.5-super-vl reviews
+   independently; it often answers 502 or truncates). Test on a small
+   sample.
+3. Retry the revalidation of `PE-L1-feria-ciencia-escuela-c9576f`:
+   `.venv/Scripts/python.exe scripts/dev/remediate_writing_review.py --out FILE`
+   (idempotent; never re-quarantines a reinstated exercise).
 4. Follow-up from T018: `fail_interrupted()` fails every queued or running
    practice in the shared test database on app start.
-5. Investigate the suite slowdown (about 42 s → about 160–200 s since T020;
-   about 110 ms per PostgreSQL connection).
+5. Investigate the suite slowdown (about 110 ms per PostgreSQL connection;
+   suite about 80 s).
 
 ### Blockers/Issues
 
-- **Single generating model** (Next Steps 2); free models truncate or
-  return 502 often; review quality inherits free models (missed one
-  ambiguity in T023 and one paragraph-count error in T025, both fixed
-  manually).
-- Writing checks are partly keyword-based (W04, W13 voseo list, W16 scope);
-  instructions of one paragraph type share the same structure.
+- **One generator and one independent reviewer** (free models); a reviewer
+  outage blocks new exercises and revalidations (reported as unavailable,
+  never bypassed).
+- `PE-L1-feria-ciencia-escuela-c9576f` quarantined (RCA-004).
+- Draft limits (ADR-028): keepalive bodies above 64 KiB may not arrive on
+  close; a crash keeps only server-confirmed text (up to 2 s lost).
+- Writing checks are partly keyword-based (W04, W13 voseo list, W16, W19).
 - Tutor boundary is a local code, not authentication (ADR-024); a completed
   evaluation cannot be reopened.
 - The unexplained T016 `gate=test` failure was never reproduced
   (RCA-003); full logs are kept if it recurs.
-- 14 quarantined sessions await an optional human review (T017). Backup:
-  `%USERPROFILE%\mentor-pro-backups\mentor_pro_pre_T017_2026-10-24.dump`;
+- 14 quarantined practice sessions await an optional human review (T017).
+  Backup `%USERPROFILE%\mentor-pro-backups\mentor_pro_pre_T017_2026-10-24.dump`;
   rollback `scripts/dev/classify_sessions.py --rollback T017-2026-10-24`.
 - Property detection (T009) is keyword-based.
 - Local `pg_hba.conf` uses `trust`; `mentor_pro_admin` has no password.
@@ -154,6 +160,8 @@ Producción escrita (Español, written rubric EE01–EE20)
 - Student first name in pushed commit `42adbe7`; rewrite needs approval.
 - Remote branch `origin/copilot/clean-repository` (merged PR #1) remains.
 - Framework markdown lint debt (`docs/TODO-markdown-lint.md`).
+- The session-start prompt's `scripts/pubs/check_lane.py` step belongs to
+  another project; skip it here.
 
 ### Notes
 
@@ -163,23 +171,25 @@ Producción escrita (Español, written rubric EE01–EE20)
 - Tutor review: `http://127.0.0.1:8000/tutor`, code `MENTOR_PRO_TUTOR_TOKEN`
   in the local `.env` (git-ignored; empty disables review).
 - Browser tests: `.venv/Scripts/python.exe scripts/dev/practice_e2e.py --out DIR`
-  (mocked; includes writing and tutor scenarios; resets the test
-  database's `writing` schema) and `--live`. Both use only
-  `TEST_DATABASE_URL`. Never create artificial submissions in the student
-  database; delete any acceptance-test draft created live.
+  (mocked; writing, tutor, L4, quarantine and draft scenarios; resets the
+  test database's `writing` schema) and `--live`. Live draft check:
+  `scripts/dev/draft_restart_check.py DIR` (uvicorn on port 8010, test
+  database). All use only `TEST_DATABASE_URL`. Never create artificial
+  submissions in the student database.
 - Writing commands: `scripts/dev/seed_writing_l1.py`,
-  `scripts/dev/seed_writing_l2_l3.py` (`--inventory` read-only),
+  `scripts/dev/seed_writing_l2_l3.py` (L2–L4; `--inventory` read-only),
+  `scripts/dev/remediate_writing_review.py [--dry-run]`,
   `scripts/dev/revise_writing_l1.py [--specs FILE] [--dry-run]`,
   `scripts/dev/generate_writing_exercise.py`.
-- Other live helpers: `generate_examples.py`, `generate_practice_set.py`,
-  `.venv/Scripts/python.exe -m app.llm.connectivity`.
+- Backups before real-database changes:
+  `%USERPROFILE%\mentor-pro-backups\mentor_pro_pre_T029_2026-10-25.dump`
+  (`writing`, `llm`); `pg_dump` is in `C:\Program Files\PostgreSQL\17\bin`.
 - Gate: `bash .ace/scripts/verify.sh`; check its exit code (not a piped
   `tail`) before committing; logs in `.ace/logs/verify/<run>/`.
-- Key settings: `OPENROUTER_GENERATION_MAX_TOKENS`,
-  `OPENROUTER_GENERATION_EXCLUDED_MODELS`,
-  `OPENROUTER_GENERATION_REASONING_EFFORT`, `QUESTION_GENERATION_CONCURRENCY`,
-  `MENTOR_PRO_SET_MAX_*`, `MENTOR_PRO_MASTERY_*`, `MENTOR_PRO_TUTOR_TOKEN`
-  (see `.env.example`).
+- Key settings: `OPENROUTER_FREE_MODELS`, `OPENROUTER_GENERATION_MAX_TOKENS`,
+  `OPENROUTER_GENERATION_EXCLUDED_MODELS`, `OPENROUTER_MAX_REQUESTS_PER_DAY`,
+  `QUESTION_GENERATION_CONCURRENCY`, `MENTOR_PRO_MASTERY_*`,
+  `MENTOR_PRO_TUTOR_TOKEN` (see `.env.example`).
 - Tracker IDs `^T[0-9]{3}$`; PO labels kept in task names and notes.
 - Never expose keys, student data or tutor references; never put the
   student's name in code, tests or commits; `approved_baseline` items are
