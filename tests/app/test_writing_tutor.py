@@ -44,8 +44,12 @@ def env(synthetic_client):
 
 
 def submit(student, exercise_id, text="Texto corregido por el estudiante."):
-    student.post(f"/api/writing/exercises/{exercise_id}/submit",
-                 json={"text": text, "client_request_id": str(uuid.uuid4())})
+    body = {"text": text, "client_request_id": str(uuid.uuid4())}
+    if exercise_id.startswith("PE-L4-"):  # T028: guided compositions are submitted by sections
+        body["sections"] = {"plan": "", "introduction": text, "development_1": text, "development_2": text,
+                            "conclusion": text}
+    response = student.post(f"/api/writing/exercises/{exercise_id}/submit", json=body)
+    assert response.status_code == 200, response.text
     return student.get("/api/tutor/queue", headers=HEADERS).json()["submissions"]
 
 

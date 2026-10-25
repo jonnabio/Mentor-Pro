@@ -873,6 +873,141 @@ def scenario_tutor(tutor: Page, student: Page, report: Report, viewport: str, ou
     report.check(no_overflow(tutor) and not errors, f"[{name}] tutor page: no overflow, no JavaScript errors {errors}")
 
 
+L4_FIXTURE = db.REPO_ROOT / "scripts" / "dev" / "fixtures" / "writing-exercise-L4-T028.json"  # generated in T028
+GUIDED_TEXT = {"plan": "Ideas: qué es, por qué pasa, qué provoca y qué podemos hacer.",
+               "introduction": "Este tema es importante para toda la comunidad escolar.",
+               "development_1": "Una causa es que muchas personas no conocen el problema.",
+               "development_2": "Una consecuencia es que la convivencia en la escuela empeora.",
+               "conclusion": "Podemos organizar campañas y conversar en clase para mejorar."}
+
+
+def scenario_guided(student: Page, tutor: Page, report: Report, viewport: str, out: Path, url: str) -> None:
+    """T028: Nivel 4 in five stages; drafts survive reload and navigation; tutor review; dashboard."""
+    name = f"{viewport}-guided"
+    from app.writing import contracts
+    errors: list[str] = []
+    student.on("pageerror", lambda exc: errors.append(str(exc)))
+    record = json.loads(L4_FIXTURE.read_text(encoding="utf-8"))
+    WritingStore(url).add_exercise(record)  # after scenario_writing, which checks that Nivel 4 starts empty
+    eid = record["exercise_id"]
+    student.goto(BASE)
+    student.evaluate("sessionStorage.clear()")
+    student.goto(BASE)
+    student.get_by_role("button", name="Abrir Producción escrita").click()
+    student.locator('.level-choice[data-level="guided_composition"]').click()
+    student.locator(f'.exercise-choice[data-exercise="{eid}"]').click()
+    expect(student.locator("#writing-guided")).to_be_visible()
+    steps = student.locator(".guided-step").all_inner_texts()
+    report.check(len(steps) == 5 and student.locator("#writing-editor").is_hidden(),
+                 f"[{name}] five stages, no single-text editor {steps}")
+    view = student.locator("#writing-view").inner_text()
+    report.check(not any(w in view for w in ("EE0", "EE1", "rúbrica", "El texto evidencia")),
+                 f"[{name}] no criteria codes, rubric or descriptors shown to the student")
+    visible = lambda: [s for s in GUIDED_TEXT if student.locator(f'.guided-field[data-section="{s}"]').is_visible()]  # noqa: E731
+    report.check(visible() == ["plan"] and all(not student.locator(f"#guided-{k}").input_value()
+                                               for k in ("plan-text", "introduction")),
+                 f"[{name}] stage 1 shows only the planning notes, empty (nothing generated) {visible()}")
+    student.locator("#guided-plan-text").fill(GUIDED_TEXT["plan"])
+    student.screenshot(path=str(out / f"{name}-stage1.png"), full_page=True)
+    student.get_by_role("button", name="Siguiente etapa").click()
+    expect(student.locator("#guided-introduction")).to_be_visible()
+    report.check(student.locator("#guided-plan").inner_text().strip() == record["scaffolding_es"][0],
+                 f"[{name}] stage 2 shows the exercise's own plan hint for the introduction")
+    student.locator("#guided-introduction").fill(GUIDED_TEXT["introduction"])
+    expect(student.locator("#guided-saved")).to_contain_text("Borrador guardado", timeout=10000)  # autosave
+    student.reload()
+    expect(student.locator("#guided-introduction")).to_be_visible()
+    report.check(student.locator("#guided-introduction").input_value() == GUIDED_TEXT["introduction"]
+                 and student.locator("#guided-plan-text").input_value() == GUIDED_TEXT["plan"],
+                 f"[{name}] reload resumes stage 2 with the plan and introduction")
+    student.get_by_role("button", name="Siguiente etapa").click()
+    report.check(visible() == ["development_1", "development_2"], f"[{name}] stage 3 has two text areas {visible()}")
+    student.locator("#guided-development-1").fill(GUIDED_TEXT["development_1"])
+    student.locator("#guided-development-2").fill(GUIDED_TEXT["development_2"])
+    student.screenshot(path=str(out / f"{name}-stage3.png"), full_page=True)
+    student.locator('.guided-step[data-stage="introduction"]').click()
+    expect(student.locator("#guided-introduction")).to_be_visible()
+    report.check(student.locator("#guided-introduction").input_value() == GUIDED_TEXT["introduction"],
+                 f"[{name}] going back keeps the introduction")
+    student.get_by_role("button", name="Volver al menú principal").click()
+    expect(student.locator("#practice-form")).to_be_visible()
+    stored = writing_rows(url, "SELECT sections FROM writing.draft WHERE exercise_id = %s", eid)[0][0]
+    report.check({k: stored[k] for k in ("plan", "introduction", "development_1", "development_2")}
+                 == {k: GUIDED_TEXT[k] for k in ("plan", "introduction", "development_1", "development_2")},
+                 f"[{name}] leaving to the main menu saved every section in PostgreSQL")
+    student.get_by_role("button", name="Abrir Producción escrita").click()
+    student.locator('.level-choice[data-level="guided_composition"]').click()
+    student.locator(f'.exercise-choice[data-exercise="{eid}"]').click()
+    student.locator('.guided-step[data-stage="conclusion"]').click()
+    student.locator("#guided-conclusion").fill(GUIDED_TEXT["conclusion"])
+    student.get_by_role("button", name="Siguiente etapa").click()
+    expect(student.locator("#guided-review")).to_be_visible()
+    paragraphs = student.locator("#guided-preview p").all_inner_texts()
+    order = ["introduction", "development_1", "development_2", "conclusion"]
+    expected_words = sum(len(GUIDED_TEXT[k].split()) for k in order)
+    report.check(paragraphs == [GUIDED_TEXT[k] for k in order]
+                 and student.locator("#guided-words").inner_text() == f"{expected_words} palabras",
+                 f"[{name}] review shows the four paragraphs in order and {expected_words} words")
+    report.check(no_overflow(student), f"[{name}] no horizontal overflow")
+    student.screenshot(path=str(out / f"{name}-review.png"), full_page=True)
+    student.get_by_role("button", name="Entregar composición").click()
+    student.locator("#writing-dialog-confirm").click()
+    expect(student.locator("#writing-pending")).to_contain_text("Pendiente de revisión del tutor")
+    sub = writing_rows(url, "SELECT text_es, sections, paragraph_count, exercise_revision, "
+                            "(SELECT COUNT(*) FROM writing.submission WHERE exercise_id = %s) "
+                            "FROM writing.submission WHERE exercise_id = %s", eid, eid)[0]
+    report.check(sub[0] == "\n\n".join(GUIDED_TEXT[k] for k in order) and sub[1]["plan"] == GUIDED_TEXT["plan"]
+                 and GUIDED_TEXT["plan"] not in sub[0] and sub[2:] == (4, 1, 1),
+                 f"[{name}] one submission: four paragraphs assembled, plan kept apart, revision {sub[3]}")
+    student.screenshot(path=str(out / f"{name}-submitted.png"), full_page=True)
+
+    tutor.goto(BASE + "tutor")
+    tutor.locator("#tutor-token").fill(TUTOR_TOKEN)
+    tutor.get_by_role("button", name="Entrar").click()
+    tutor.locator(".exercise-choice", has_text=record["topic_es"]).click()
+    expect(tutor.locator("#tutor-sections-block")).to_be_visible()
+    sections = tutor.locator(".tutor-section p").all_inner_texts()
+    report.check(sections == [GUIDED_TEXT[k] for k in ["plan"] + order]
+                 and tutor.locator("#tutor-plan li").count() == 4
+                 and "\n\n" in tutor.locator("#tutor-student").inner_text(),
+                 f"[{name}] tutor sees plan hints, planning notes, four paragraphs and the composition")
+    official = contracts.criteria()
+    labels = tutor.locator('fieldset[data-criterion="EE04"] .tutor-option').all_inner_texts()
+    report.check([x.split("\n", 1)[-1].strip() for x in labels] == official["EE04"]["descriptors_es"]
+                 and tutor.locator(".tutor-optional-title").is_visible(),
+                 f"[{name}] EE04 with official descriptors; conventions shown as optional")
+    for code in ("EE01", "EE02", "EE03", "EE04", "EE05", "EE06"):
+        tutor.locator(f'fieldset[data-criterion="{code}"] input[value="3"]').check()
+    tutor.locator('fieldset[data-criterion="EE09"] input[value="4"]').check()
+    tutor.locator("#tutor-strengths").fill("Tu plan ordenó muy bien las ideas.")
+    tutor.screenshot(path=str(out / f"{name}-tutor.png"), full_page=True)
+    tutor.get_by_role("button", name="Completar evaluación").click()
+    tutor.get_by_role("button", name="Completar", exact=True).click()
+    expect(tutor.locator("#tutor-locked")).to_be_visible()
+    codes = [r[0] for r in writing_rows(url, "SELECT c.criterion_code FROM writing.criterion_score c JOIN "
+                                             "writing.evaluation v USING (evaluation_id) JOIN writing.submission s "
+                                             "USING (submission_id) WHERE s.exercise_id = %s ORDER BY 1", eid)]
+    report.check(codes == ["EE01", "EE02", "EE03", "EE04", "EE05", "EE06", "EE09"],
+                 f"[{name}] completed with EE01-EE06 and the optional EE09 only {codes}")
+
+    student.reload()
+    expect(student.locator("#writing-feedback")).to_be_visible()
+    feedback = student.locator("#writing-feedback").inner_text()
+    report.check(feedback.count("3 de 4") == 6 and "4 de 4" in feedback and "Tu plan ordenó" in feedback,
+                 f"[{name}] student sees the completed evaluation")
+    student.screenshot(path=str(out / f"{name}-feedback.png"), full_page=True)
+    student.get_by_role("button", name="Volver al menú principal").click()
+    student.get_by_role("button", name="Ver mi progreso").click()
+    student.locator("#dashboard-subjects label", has_text="Producción escrita").click()
+    expect(student.locator('#dw-levels li[data-level="guided_composition"]')).to_contain_text("1 evaluado")
+    ee09 = student.locator('li.dw-criterion[data-code="EE09"]').inner_text()
+    report.check("Última calificación: 4 de 4" in ee09
+                 and "1 entregado" in student.locator('#dw-levels li[data-level="guided_composition"]').inner_text(),
+                 f"[{name}] dashboard: L4 evaluated, EE09 latest 4 de 4")
+    student.screenshot(path=str(out / f"{name}-dashboard.png"), full_page=True)
+    report.check(not errors, f"[{name}] no JavaScript errors {errors}")
+
+
 LATEST_SCORES_SQL = """SELECT DISTINCT ON (c.criterion_code) c.criterion_code, c.points
     FROM writing.criterion_score c JOIN writing.evaluation v USING (evaluation_id)
     WHERE v.status = 'completed' AND c.status = 'scored'
@@ -1026,6 +1161,10 @@ def run_mock(out: Path, url: str) -> Report:
             scenario_tutor(tutor_context.new_page(), page, report, viewport, out, url)
             tutor_context.close()
             scenario_writing_dashboard(page, report, viewport, out, url)
+            tutor_context = browser.new_context(viewport=size, locale="es-CR", is_mobile=viewport == "mobile",
+                                                has_touch=viewport == "mobile")
+            scenario_guided(page, tutor_context.new_page(), report, viewport, out, url)
+            tutor_context.close()
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()

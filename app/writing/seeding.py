@@ -62,12 +62,14 @@ def seed(client: OpenRouterClient, usage_store: Store, catalog: psycopg.Connecti
     }
 
 
-# ---------------------------------------------------------------- T025: composed paragraphs (L2, L3)
+# ---------------------------------------------------------------- T025: composed paragraphs (L2, L3); T028: L4
 
 COMPOSE_PLAN = (  # (level, exercise type, criteria, approved exercises wanted)
     ("L2", "introduction_paragraph", ["EE03", "EE04"], 3),
     ("L3", "development_paragraphs", ["EE03", "EE05"], 2),
     ("L3", "conclusion_paragraph", ["EE03", "EE06"], 1),
+    # T028 (ADR-026): EE01-EE06 mandatory; EE07-EE18 optional conventions the tutor may score.
+    ("L4", "guided_composition", [f"EE{n:02d}" for n in range(1, 19)], 1),
 )
 
 
@@ -83,7 +85,7 @@ def compose_inventory(writing_store: Any) -> dict[str, list[str]]:
 
 def seed_compose(client: OpenRouterClient, usage_store: Store, catalog: psycopg.Connection, writing_store: Any,
                  difficulty: str = "medium") -> dict[str, Any]:
-    """Generate only the missing L2/L3 exercises; stop at a budget or provider stop and report the gap."""
+    """Generate only the missing L2-L4 exercises; stop at a budget or provider stop and report the gap."""
     from app.writing import generation
 
     before = compose_inventory(writing_store)

@@ -394,6 +394,12 @@ def generate_editing_exercise(client: OpenRouterClient, usage_store: Store, cata
             attempt.reasons.append(f"review {reviewed.status}: {reviewed.message}")
             _record(writing_store, g, attempt)
             break
+        same = gen.same_model_review(generator, reviewed)  # RCA-004: W08 must come from another model
+        if same:
+            attempt.checks.append({"id": "W08", "status": "fail", "message": same})
+            attempt.reasons.append(f"W08: {same}")
+            _record(writing_store, g, attempt)
+            continue
         try:
             attempt.review = parse_review(reviewed.content or "")
         except OutputError as exc:

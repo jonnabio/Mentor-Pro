@@ -71,7 +71,8 @@
               "rubric_ref": { "type": "string", "pattern": "^[A-Z0-9-]+#EE(0[1-9]|1[0-9]|20)$" },
               "applicability": { "enum": ["scored", "not_evaluable"] },
               "not_evaluable_reason": { "enum": ["handwritten_evidence_required"] },
-              "guidance_es": { "type": "string" }
+              "guidance_es": { "type": "string" },
+              "optional": { "type": "boolean", "description": "T028: a criterion the tutor may score but completion never requires (EE07-EE18 in guided_composition)." }
             },
             "if": { "properties": { "applicability": { "const": "not_evaluable" } } },
             "then": { "required": ["not_evaluable_reason"] }

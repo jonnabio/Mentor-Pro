@@ -889,6 +889,55 @@
       "result_file": "docs/progress/task_T027_result.md",
       "failures": [],
       "notes": "Suite 495; browser 399/399; stale writing-list answers ignored (app.js, RCA-003 class)."
+    },
+    {
+      "id": "T028",
+      "name": "Guided expository composition L4 (PO task T028)",
+      "objective": "One validated L4 exercise; five-stage guided editor with section drafts; assembled submission with planning notes apart; tutor review with optional EE07-EE18; dashboard.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-026-guided-composition-l4.md",
+          "docs/rca/RCA-004-writing-review-not-independent.md",
+          "tests/app/test_writing_guided.py",
+          "tests/app/test_writing_review_independence.py",
+          "scripts/dev/fixtures/writing-exercise-L4-T028.json",
+          "docs/progress/task_T028_result.md",
+          "docs/progress/screenshots/T028/"
+        ],
+        "modify": [
+          "app/writing/contracts.py",
+          "app/writing/generation.py",
+          "app/writing/editing.py",
+          "app/writing/seeding.py",
+          "app/writing/store.py",
+          "app/writing/routes.py",
+          "app/writing/tutor.py",
+          "app/static/app.js",
+          "app/static/index.html",
+          "app/static/styles.css",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          ".ace/schemas/writing/writing-exercise.schema.json",
+          "scripts/dev/practice_e2e.py",
+          "scripts/dev/seed_writing_l2_l3.py",
+          "tests/app/test_writing_tutor.py",
+          "tests/app/test_writing_generation.py",
+          "docs/rca/regression-guards.yaml"
+        ]
+      },
+      "depends_on": [
+        "T027"
+      ],
+      "complexity": "L",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T028_result.md",
+      "failures": [
+        "First L4 exercise self-reviewed (RCA-004)"
+      ],
+      "notes": "Browser 433/433; L4 PE-L4-uso-responsable-materiales-aba7b0; 7 OpenRouter calls, $0."
     }
   ]
 }

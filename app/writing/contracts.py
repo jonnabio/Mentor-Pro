@@ -20,6 +20,7 @@ SCHEMAS = REPO_ROOT / ".ace" / "schemas" / "writing"
 RUBRIC_FILE = DATA / "MEP-RUBRICA-PE-2026.json"
 LEVELS_FILE = DATA / "exercise-levels.json"
 CONVENTION_CRITERIA = tuple(f"EE{n:02d}" for n in range(7, 19))  # descriptors count non-normative uses
+OPTIONAL_LEVELS = ("guided_composition",)  # T028 (ADR-026): EE07-EE18 may be scored, never required
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -49,6 +50,11 @@ def criteria() -> dict[str, dict[str, Any]]:
 
 def handwritten_criteria() -> set[str]:
     return set(levels()["rules"]["handwritten_criteria"])
+
+
+def optional_criteria(exercise: dict[str, Any]) -> set[str]:
+    """Target criteria the tutor may leave unscored (T028); every other evaluable criterion is required."""
+    return {p["criterion"] for p in exercise["evaluation"]["parameters"] if p.get("optional")}
 
 
 def level(code: str) -> dict[str, Any]:
@@ -112,6 +118,9 @@ def validate_exercise(exercise: dict[str, Any]) -> list[str]:
         expected = "not_evaluable" if needs_hand and typed else "scored"
         if p["applicability"] != expected:
             errors.append(f"{code}: applicability must be {expected} for {deliverable['evidence_mode']} evidence")
+        if p.get("optional") and (exercise["level"] not in OPTIONAL_LEVELS or code not in CONVENTION_CRITERIA
+                                  or code in core):
+            errors.append(f"{code}: only EE07-EE18 outside the core may be optional, in {OPTIONAL_LEVELS}")
 
     provenance = exercise["provenance"]
     if provenance["baseline_version"] != levels()["baseline_version"]:
@@ -142,8 +151,14 @@ def validate_evaluation(evaluation: dict[str, Any], exercise: dict[str, Any]) ->
     if mode != exercise["deliverable"]["evidence_mode"]:
         errors.append(f"submission evidence {mode} differs from the exercise ({exercise['deliverable']['evidence_mode']})")
     scores = {s["criterion"]: s for s in evaluation["criterion_scores"]}
-    if sorted(scores) != sorted(exercise["target_criteria"]) or len(scores) != len(evaluation["criterion_scores"]):
-        errors.append("criterion_scores must list each target criterion exactly once")
+    optional = optional_criteria(exercise)
+    required = set(exercise["target_criteria"]) - optional
+    if not required <= set(scores) <= set(exercise["target_criteria"]) or len(scores) != len(evaluation["criterion_scores"]):
+        errors.append("criterion_scores must list each required target criterion exactly once "
+                      "(optional criteria at most once)")
+    for code in sorted(optional & set(scores)):
+        if scores[code]["status"] != "scored":
+            errors.append(f"{code}: an optional criterion is listed only when scored")
     for code, s in scores.items():
         if code in handwritten_criteria() and mode == "typed" and s["status"] != "not_evaluable":
             errors.append(f"{code}: requires handwritten evidence; a typed submission is not_evaluable")

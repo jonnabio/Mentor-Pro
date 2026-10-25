@@ -686,7 +686,119 @@ const countWords = (text) => (text.trim() ? text.trim().split(/\s+/).length : 0)
 const difficultyLabel = (code) => ({ easy: "Fácil", medium: "Intermedia", hard: "Difícil" })[code] || code;
 const writingDirty = () =>
   Boolean(writing.exercise) && !writing.exercise.submission && !writing.exercise.handwritten &&
-  $("writing-text").value !== writing.savedText;
+  (writing.exercise.guided ? JSON.stringify(guidedSections()) !== writing.savedSections
+    : $("writing-text").value !== writing.savedText);
+
+// ------------------------------------------------------------------ guided composition (T028, ADR-026)
+// Five stages; one text area per section. Sections are saved in PostgreSQL (draft) on demand, when the stage
+// changes, after a pause in typing and before leaving. Nothing generated is ever written into a section.
+
+const GUIDED_STAGE_KEY = "mentorpro.writing.stage";
+const AUTOSAVE_MS = 2000;
+const guidedFields = () => [...document.querySelectorAll("#writing-guided textarea[data-section]")];
+
+function guidedSections() {
+  return Object.fromEntries(guidedFields().map((field) => [field.dataset.section, field.value]));
+}
+
+// Same rule as the server: the four paragraphs in order, one blank line apart; the plan is not part of it.
+function guidedComposition(sections) {
+  return writing.exercise.guided.paragraphs.map((key) => sections[key].trim()).filter(Boolean).join("\n\n");
+}
+
+function rememberStage(index) {
+  try {
+    sessionStorage.setItem(GUIDED_STAGE_KEY, `${writing.exercise.exercise_id}:${index}`);
+  } catch {
+    // The stage is only a convenience; the sections themselves are in PostgreSQL.
+  }
+}
+
+function rememberedStage(exerciseId) {
+  try {
+    const [id, index] = (sessionStorage.getItem(GUIDED_STAGE_KEY) || "").split(":");
+    return id === exerciseId ? Number(index) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function renderGuided() {
+  const data = writing.exercise;
+  const saved = (data.draft && data.draft.sections) || {};
+  for (const field of guidedFields()) field.value = saved[field.dataset.section] || "";
+  writing.savedSections = JSON.stringify(guidedSections());
+  $("guided-steps").replaceChildren(...data.guided.stages.map((stage, index) => {
+    const button = el("button", { type: "button", class: "guided-step", "data-stage": stage.key }, stage.title_es);
+    button.addEventListener("click", () => goToStage(index));
+    return el("li", {}, button);
+  }));
+  $("guided-saved").textContent = data.draft
+    ? ` · Borrador guardado ${new Date(data.draft.saved_at).toLocaleString("es-CR")}` : "";
+  renderStage(rememberedStage(data.exercise_id));
+}
+
+function renderStage(index) {
+  const stages = writing.exercise.guided.stages;
+  writing.stage = Math.max(0, Math.min(index, stages.length - 1));
+  const stage = stages[writing.stage];
+  rememberStage(writing.stage);
+  for (const button of document.querySelectorAll(".guided-step")) {
+    if (button.dataset.stage === stage.key) button.setAttribute("aria-current", "step");
+    else button.removeAttribute("aria-current");
+  }
+  $("guided-title").textContent = stage.title_es;
+  $("guided-guidance").textContent = stage.guidance_es;
+  $("guided-plan").replaceChildren(...stage.plan_es.map((hint) => el("li", {}, hint)));
+  $("guided-plan-block").hidden = stage.plan_es.length === 0;
+  for (const box of document.querySelectorAll(".guided-field")) box.hidden = !stage.sections.includes(box.dataset.section);
+  const review = stage.key === "review";
+  $("guided-review").hidden = !review;
+  $("guided-prev").disabled = writing.stage === 0;
+  $("guided-next").hidden = review;
+  $("guided-submit").hidden = !review;
+  updateGuided();
+}
+
+function updateGuided() {
+  const sections = guidedSections();
+  const words = countWords(guidedComposition(sections));
+  $("guided-words").textContent = words === 1 ? "1 palabra" : `${words} palabras`;
+  const labels = writing.exercise.guided.section_labels_es;
+  const missing = writing.exercise.guided.paragraphs.filter((key) => !sections[key].trim()).map((key) => labels[key]);
+  $("guided-missing").textContent = missing.length ? `Falta escribir: ${missing.join(", ")}.` : "";
+  $("guided-missing").hidden = missing.length === 0;
+  $("guided-submit").disabled = missing.length > 0 || writing.busy;
+  $("guided-preview").replaceChildren(...writing.exercise.guided.paragraphs
+    .filter((key) => sections[key].trim()).map((key) => el("p", { "data-section": key }, sections[key].trim())));
+  if (writingDirty()) $("guided-saved").textContent = " · Cambios sin guardar";
+}
+
+async function goToStage(index) {
+  if (writingDirty() && !(await saveWritingDraft())) return;
+  renderStage(index);
+  window.scrollTo({ top: $("writing-guided").offsetTop - 8 });
+}
+
+let autosaveTimer = null;
+for (const field of guidedFields()) {
+  field.addEventListener("input", () => {
+    updateGuided();
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(() => { if (writingDirty()) saveWritingDraft(); }, AUTOSAVE_MS);
+  });
+}
+$("guided-prev").addEventListener("click", () => goToStage(writing.stage - 1));
+$("guided-next").addEventListener("click", () => goToStage(writing.stage + 1));
+$("guided-save").addEventListener("click", () => saveWritingDraft());
+$("guided-submit").addEventListener("click", async () => {
+  updateGuided();
+  if (!$("guided-missing").hidden) return;
+  if (writingDirty() && !(await saveWritingDraft())) return;
+  showError($("writing-dialog-error"), "");
+  $("writing-dialog-confirm").disabled = false;
+  writingDialog.showModal();
+});
 
 function writingPanel(name) {
   for (const id of ["writing-levels-panel", "writing-list-panel", "writing-exercise-panel"]) {
@@ -790,7 +902,8 @@ async function openWritingExercise(exerciseId) {
 function renderWritingState() {
   const data = writing.exercise;
   const submitted = Boolean(data.submission);
-  $("writing-editor").hidden = data.handwritten || submitted;
+  $("writing-editor").hidden = data.handwritten || submitted || Boolean(data.guided);
+  $("writing-guided").hidden = data.handwritten || submitted || !data.guided;
   $("writing-submitted").hidden = !submitted;
   if (submitted) {
     $("writing-pending").textContent = `${data.submission.status_es}. Entregado el ` +
@@ -800,6 +913,10 @@ function renderWritingState() {
     return;
   }
   if (data.handwritten) return;
+  if (data.guided) {
+    renderGuided();
+    return;
+  }
   // T024: L1 correction exercises start from a copy of the text with errors; a saved draft always wins.
   // L2-L5 start empty. The copy is not "unsaved work" until the student changes it.
   const text = data.draft ? data.draft.text : (data.editable_source ? data.source_text_es : "");
@@ -842,23 +959,28 @@ function updateWordCount() {
 
 async function saveWritingDraft() {
   if (!writing.exercise || writing.busy) return true;
-  const text = $("writing-text").value;
+  const guided = Boolean(writing.exercise.guided);
+  const sections = guided ? guidedSections() : null;
+  const text = guided ? guidedComposition(sections) : $("writing-text").value;
   writing.busy = true;
-  $("writing-save").disabled = true;
+  $("writing-save").disabled = $("guided-save").disabled = true;
   try {
     const saved = await api(`/api/writing/exercises/${encodeURIComponent(writing.exercise.exercise_id)}/draft`,
-      { method: "PUT", body: JSON.stringify({ text }) });
-    writing.savedText = text;
-    writing.exercise.draft = { text, word_count: saved.word_count, saved_at: saved.saved_at };
-    $("writing-saved").textContent = ` · Borrador guardado ${new Date(saved.saved_at).toLocaleString("es-CR")}`;
+      { method: "PUT", body: JSON.stringify(guided ? { sections } : { text }) });
+    if (guided) writing.savedSections = JSON.stringify(sections);
+    else writing.savedText = text;
+    writing.exercise.draft = { text, sections, word_count: saved.word_count, saved_at: saved.saved_at };
+    $(guided ? "guided-saved" : "writing-saved").textContent =
+      ` · Borrador guardado ${new Date(saved.saved_at).toLocaleString("es-CR")}`;
     return true;
   } catch (error) {
     showError($("writing-error"), error.message);
     return false;
   } finally {
     writing.busy = false;
-    $("writing-save").disabled = false;
-    updateWordCount();
+    $("writing-save").disabled = $("guided-save").disabled = false;
+    if (guided) updateGuided();
+    else updateWordCount();
   }
 }
 
@@ -908,13 +1030,16 @@ $("writing-dialog-confirm").addEventListener("click", async () => {
   button.disabled = true; // one submission; the server also keeps only the first
   writing.busy = true;
   writing.requestId = writing.requestId || newRequestId();
-  const text = $("writing-text").value;
+  const sections = writing.exercise.guided ? guidedSections() : null;
+  const text = sections ? guidedComposition(sections) : $("writing-text").value;
   try {
     const submission = await api(`/api/writing/exercises/${encodeURIComponent(writing.exercise.exercise_id)}/submit`,
-      { method: "POST", body: JSON.stringify({ text, client_request_id: writing.requestId }) });
+      { method: "POST", body: JSON.stringify(sections ? { sections, client_request_id: writing.requestId }
+        : { text, client_request_id: writing.requestId }) });
     writing.exercise.submission = submission;
-    writing.exercise.draft = { text, word_count: submission.word_count, saved_at: submission.submitted_at };
+    writing.exercise.draft = { text, sections, word_count: submission.word_count, saved_at: submission.submitted_at };
     writing.savedText = text;
+    if (sections) writing.savedSections = JSON.stringify(sections);
     writingDialog.close();
     renderWritingState();
   } catch (error) {

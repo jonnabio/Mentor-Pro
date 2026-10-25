@@ -4,6 +4,8 @@ Shows only validated exercises already stored in writing.exercise; never generat
 omits evaluation parameters, criteria and rubric descriptors. Typed work is saved as a draft and
 submitted once; handwritten (L5) exercises show their official conditions and take no typed answer.
 No grading: a submission waits for the tutor.
+T028 (ADR-026): guided compositions (L4) are written in five stages; each section is saved in the draft and
+the submission keeps the planning notes apart from the four assembled paragraphs.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.writing import contracts, progress
-from app.writing.store import WritingStore, word_count
+from app.writing.store import GUIDED_PARAGRAPHS, GUIDED_SECTIONS, WritingStore, assemble_sections, word_count
 
 MAX_TEXT = 20000
 PENDING_ES = "Pendiente de revisión del tutor"
@@ -32,14 +34,47 @@ HANDWRITTEN_ES = ("Este ejercicio se escribe a mano, como en la prueba: en una h
                   "negra (no lápiz) y con un solo tipo de letra. Entregá tu hoja al tutor. No se puede responder "
                   "escribiendo en la computadora, porque la letra también se revisa.")
 EXERCISE_ID = re.compile(r"^PE-L[1-5]-[A-Za-z0-9-]{3,60}$")
+# T028: code-owned guidance per stage (no model text, criteria or scores); `plan` is the index of the
+# exercise's own paragraph-plan items shown with the stage.
+GUIDED_STAGES = (
+    {"key": "plan", "title_es": "1. Planificá tu texto", "sections": ["plan"], "plan": [],
+     "guidance_es": "Antes de escribir, anotá ideas sobre el tema: por qué es importante, sus causas, sus "
+                    "consecuencias y qué se puede hacer. Estas notas son para vos; tu tutor también las verá."},
+    {"key": "introduction", "title_es": "2. Escribí la introducción", "sections": ["introduction"], "plan": [0],
+     "guidance_es": "Presentá el tema y por qué es importante. Escribí una idea principal y al menos dos ideas "
+                    "que la apoyen."},
+    {"key": "development", "title_es": "3. Escribí los dos párrafos de desarrollo",
+     "sections": ["development_1", "development_2"], "plan": [1, 2],
+     "guidance_es": "En el primer párrafo explicá las causas; en el segundo, las consecuencias. Cada párrafo "
+                    "tiene su idea principal y al menos dos ideas que la apoyen."},
+    {"key": "conclusion", "title_es": "4. Escribí la conclusión", "sections": ["conclusion"], "plan": [3],
+     "guidance_es": "Proponé acciones o soluciones y cerrá el texto. No agregués causas ni consecuencias nuevas."},
+    {"key": "review", "title_es": "5. Revisá y entregá", "sections": [], "plan": [],
+     "guidance_es": "Leé tu texto completo. Revisá la ortografía, la puntuación y que tenga al menos 200 "
+                    "palabras. Después de entregarlo no podrás cambiarlo."},
+)
+SECTION_LABEL_ES = {"plan": "Notas de planificación", "introduction": "Introducción",
+                    "development_1": "Desarrollo 1 (causas)", "development_2": "Desarrollo 2 (consecuencias)",
+                    "conclusion": "Conclusión"}
+
+
+class Sections(BaseModel):
+    """T028: one text per stage section; the plan is optional, the four paragraphs are required to submit."""
+    plan: str = Field(default="", max_length=MAX_TEXT)
+    introduction: str = Field(default="", max_length=MAX_TEXT)
+    development_1: str = Field(default="", max_length=MAX_TEXT)
+    development_2: str = Field(default="", max_length=MAX_TEXT)
+    conclusion: str = Field(default="", max_length=MAX_TEXT)
 
 
 class DraftRequest(BaseModel):
-    text: str = Field(max_length=MAX_TEXT)
+    text: str = Field(default="", max_length=MAX_TEXT)
+    sections: Sections | None = None
 
 
 class SubmitRequest(BaseModel):
-    text: str = Field(min_length=1, max_length=MAX_TEXT)
+    text: str = Field(default="", max_length=MAX_TEXT)
+    sections: Sections | None = None
     client_request_id: str = Field(pattern=r"^[A-Za-z0-9-]{8,64}$")
 
 
@@ -177,10 +212,26 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             "handwritten": handwritten, "handwritten_es": HANDWRITTEN_ES if handwritten else None,
             "draft": None if handwritten or draft is None else {"text": draft["text_es"],
                                                                 "word_count": draft["word_count"],
+                                                                "sections": draft.get("sections"),
                                                                 "saved_at": draft["updated_at"].isoformat()},
+            # T028: five-stage guided composition; the plan items are the exercise's own scaffolding.
+            "guided": None if record["exercise_type"] != "guided_composition" else {
+                "stages": [{**{k: v for k, v in st.items() if k != "plan"},
+                            "plan_es": [record.get("scaffolding_es", [])[i] for i in st["plan"]
+                                        if i < len(record.get("scaffolding_es", []))]} for st in GUIDED_STAGES],
+                "section_labels_es": SECTION_LABEL_ES, "paragraphs": list(GUIDED_PARAGRAPHS),
+                "sections": list(GUIDED_SECTIONS)},
             "submission": submission_view(submission, evaluation),
             "feedback": feedback_view(evaluation),
         }
+
+    def guided(row: dict[str, Any]) -> bool:
+        return row["record"]["exercise_type"] == "guided_composition"
+
+    def guided_sections(row: dict[str, Any], sections: Sections | None) -> dict[str, str]:
+        if sections is None:
+            raise api_error(422, "sections_required", "Este ejercicio se escribe por partes.")
+        return sections.model_dump()
 
     def typed_only(row: dict[str, Any]) -> None:
         if row["evidence_mode"] != "typed":
@@ -191,7 +242,11 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
     def save_draft(exercise_id: str, request: DraftRequest) -> dict[str, Any]:
         store, row = load(exercise_id)
         typed_only(row)
-        saved = store.save_draft(exercise_id, request.text)
+        if guided(row):
+            parts = guided_sections(row, request.sections)
+            saved = store.save_draft(exercise_id, assemble_sections(parts), parts)
+        else:
+            saved = store.save_draft(exercise_id, request.text)
         if saved is None:
             raise api_error(409, "already_submitted", "Este ejercicio ya fue entregado; no se puede cambiar.")
         return {"word_count": saved["word_count"], "saved_at": saved["updated_at"].isoformat()}
@@ -200,9 +255,24 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
     def submit(exercise_id: str, request: SubmitRequest) -> dict[str, Any]:
         store, row = load(exercise_id)
         typed_only(row)
-        if word_count(request.text) == 0:
+        parts = None
+        if guided(row):
+            parts = guided_sections(row, request.sections)
+            existing = store.submission(exercise_id)
+            if existing is None:  # a repeated request returns the first submission below
+                missing = [SECTION_LABEL_ES[k] for k in GUIDED_PARAGRAPHS if not parts[k].strip()]
+                if missing:
+                    raise api_error(422, "missing_sections", f"Falta escribir: {', '.join(missing)}.")
+                split = [SECTION_LABEL_ES[k] for k in GUIDED_PARAGRAPHS if re.search(r"\n\s*\n", parts[k].strip())]
+                if split:
+                    raise api_error(422, "blank_line_in_paragraph", "Cada párrafo va en su propio cuadro, sin "
+                                    f"líneas en blanco: revisá {', '.join(split)}.")
+            text = assemble_sections(parts)
+        else:
+            text = request.text
+        if word_count(text) == 0:
             raise api_error(422, "empty_text", "Escribí tu texto antes de entregarlo.")
-        sub, created = store.submit_typed(exercise_id, request.text, request.client_request_id)
+        sub, created = store.submit_typed(exercise_id, text, request.client_request_id, parts)
         return {"created": created, **submission_view(sub, store.evaluation_for(sub["submission_id"]))}
 
     return router

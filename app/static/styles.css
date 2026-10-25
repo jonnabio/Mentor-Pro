@@ -225,10 +225,10 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 .level-choice .meta-line, .exercise-choice .meta-line { color: var(--muted); font-size: 0.85rem; }
 #writing-view h4 { margin: 14px 0 4px; }
 #writing-view ol, #writing-view ul:not(.plain-list) { padding-left: 1.3rem; margin: 4px 0; }
-#writing-text { width: 100%; box-sizing: border-box; min-height: 14rem; padding: 10px 12px; font: inherit;
+#writing-text, .guided-field textarea { width: 100%; box-sizing: border-box; min-height: 14rem; padding: 10px 12px; font: inherit;
   line-height: 1.5; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: inherit;
   resize: vertical; }
-#writing-text:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+#writing-text:focus, .guided-field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .submitted-text { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--border);
   border-radius: 8px; padding: 10px 12px; }
 #writing-back-levels, #writing-back-list, #writing-menu { margin-top: 12px; }
@@ -270,3 +270,15 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 @media (prefers-color-scheme: dark) { .crit-pending { color: #f5d27a; background: #3a2f12; } }
 .objective-status li.dw-unassessed { border-style: dashed; }
 #dw-open-writing { margin: 8px 0 12px; }
+
+/* ------------------------------------------------------------------ guided composition (T028) */
+#writing-view .guided-steps { list-style: none; padding: 0; margin: 8px 0 12px; display: grid; gap: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.guided-step { width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg); color: inherit; font: inherit; font-size: 0.9rem; cursor: pointer; }
+.guided-step[aria-current="step"] { border-color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+.guided-field[hidden] { display: none; }
+#guided-preview p { margin: 0 0 10px; white-space: pre-wrap; }
+#guided-preview p:last-child { margin-bottom: 0; }
+.tutor-section h4 { margin: 8px 0 4px; }
+.tutor-optional-title { margin: 16px 0 4px; }

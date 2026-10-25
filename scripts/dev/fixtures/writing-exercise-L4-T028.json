@@ -1,0 +1,268 @@
+{
+  "level": "guided_composition",
+  "language": "es-CR",
+  "topic_es": "El uso responsable de los materiales escolares y su efecto en el aprendizaje",
+  "text_type": "expositivo",
+  "difficulty": "medium",
+  "evaluation": {
+    "scale": {
+      "max": 4,
+      "min": 0
+    },
+    "evaluator": "human",
+    "rubric_id": "MEP-RUBRICA-PE-2026",
+    "parameters": [
+      {
+        "criterion": "EE01",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE01",
+        "applicability": "scored"
+      },
+      {
+        "criterion": "EE02",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE02",
+        "applicability": "scored"
+      },
+      {
+        "criterion": "EE03",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE03",
+        "applicability": "scored"
+      },
+      {
+        "criterion": "EE04",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE04",
+        "applicability": "scored"
+      },
+      {
+        "criterion": "EE05",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE05",
+        "applicability": "scored"
+      },
+      {
+        "criterion": "EE06",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE06",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE07",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE07",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE08",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE08",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE09",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE09",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE10",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE10",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE11",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE11",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE12",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE12",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE13",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE13",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE14",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE14",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE15",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE15",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE16",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE16",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE17",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE17",
+        "applicability": "scored"
+      },
+      {
+        "optional": true,
+        "criterion": "EE18",
+        "rubric_ref": "MEP-RUBRICA-PE-2026#EE18",
+        "applicability": "scored"
+      }
+    ],
+    "counting_rule": "identical_repetition_counts_once",
+    "rubric_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+  },
+  "provenance": {
+    "sources": [
+      {
+        "role": "rubric",
+        "document_id": "MEP-RUBRICA-PE-2026",
+        "file_sha256": "460a931a4e2c37d7f7250607f41627391dbed966ff2d9b0ca43d7002a635187d"
+      },
+      {
+        "role": "task_model",
+        "document_id": "MEP-PRUEBA-PE-2026-MODELO",
+        "file_sha256": "7e657f24295b8fdc63bcdc25217e31bb69ef5d2cdf7d1d148979fe641cc00928"
+      },
+      {
+        "role": "topic_model",
+        "document_id": "GUIA-PE-2026",
+        "file_sha256": "2b42d432a0eca2bc3f363823db5941381abea806f511af8573a3da46f092b265"
+      }
+    ],
+    "authored_by": "llm_draft_human_reviewed",
+    "baseline_version": "PNE2026-SUM-v1.0",
+    "curriculum_records": [
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B1-A1",
+        "workbook_code": "EE01"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B1-A2",
+        "workbook_code": "EE02"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B2-A3",
+        "workbook_code": "EE03"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B3-A4",
+        "workbook_code": "EE04"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B3-A5",
+        "workbook_code": "EE05"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B3-A6",
+        "workbook_code": "EE06"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A7",
+        "workbook_code": "EE07"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A8",
+        "workbook_code": "EE08"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A9",
+        "workbook_code": "EE09"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A10",
+        "workbook_code": "EE10"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A11",
+        "workbook_code": "EE11"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A12",
+        "workbook_code": "EE12"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A13",
+        "workbook_code": "EE13"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A14",
+        "workbook_code": "EE14"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A15",
+        "workbook_code": "EE15"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A16",
+        "workbook_code": "EE16"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A17",
+        "workbook_code": "EE17"
+      },
+      {
+        "assertion_id": "PNE2026-PRI-ESP-PE-B4-A18",
+        "workbook_code": "EE18"
+      }
+    ]
+  },
+  "deliverable": {
+    "max": 4,
+    "min": 4,
+    "unit": "paragraphs",
+    "words_target": 200,
+    "evidence_mode": "typed",
+    "description_es": "Un texto expositivo de cuatro párrafos: introducción, dos de desarrollo y conclusión, con al menos 200 palabras."
+  },
+  "exercise_id": "PE-L4-uso-responsable-materiales-aba7b0",
+  "exercise_type": "guided_composition",
+  "scaffolding_es": [
+    "¿Qué es el cuidado de los útiles y por qué importa para tu aprendizaje?",
+    "¿Por qué se dañan o pierden los útiles? Pensá en hábitos y situaciones cotidianas.",
+    "¿Qué pasa cuando no hay útiles en buen estado? Efectos en tareas y concentración.",
+    "¿Qué acciones podés hacer vos y tu grupo para cuidar los útiles y cerrar el tema?"
+  ],
+  "schema_version": "1.0",
+  "instructions_es": [
+    "Escribí un texto expositivo de cuatro párrafos: introducción, dos de desarrollo y conclusión.",
+    "Asegurá que el texto tenga al menos 200 palabras.",
+    "En la introducción presentá el tema y dos ideas complementarias.",
+    "En el primer desarrollo explicá las causas del mal cuidado de los útiles.",
+    "En el segundo desarrollo describí las consecuencias y en la conclusión proponé soluciones y cerrá el texto.",
+    "No copiés ideas de otros textos."
+  ],
+  "target_criteria": [
+    "EE01",
+    "EE02",
+    "EE03",
+    "EE04",
+    "EE05",
+    "EE06",
+    "EE07",
+    "EE08",
+    "EE09",
+    "EE10",
+    "EE11",
+    "EE12",
+    "EE13",
+    "EE14",
+    "EE15",
+    "EE16",
+    "EE17",
+    "EE18"
+  ],
+  "suggested_ideas_es": [
+    "Importancia de cuidar los útiles escolares",
+    "Causas: descuido, falta de hábitos, préstamos sin control",
+    "Consecuencias: pérdida de materiales, distracción, bajo rendimiento",
+    "Soluciones: rutinas de organización, responsabilidad compartida, revisión semanal"
+  ],
+  "communicative_situation_es": "Tu escuela organiza una campaña para cuidar los útiles. Vos escribís un texto para que tus compañeros entiendan por qué es importante. El texto se publicará en el mural del aula."
+}

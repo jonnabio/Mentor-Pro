@@ -4,6 +4,8 @@ The model writes only student-facing text (topic, situation, ideas, instructions
 Code assembles the record from the level map and the official rubric (ADR-019), so criteria and
 descriptors cannot be invented or altered. Each attempt passes deterministic checks W01-W07 and an
 independent review W08; up to MAX_REQUESTS generation requests share one budget gate.
+T028 (ADR-026): Nivel 4 adds a four-item paragraph plan (W19); its optional EE07-EE18 are left out of the
+prompts, which name only the criteria every evaluation scores.
 """
 
 from __future__ import annotations
@@ -26,7 +28,8 @@ from app.llm.router import RouteResult, Store, route
 from app.writing import contracts
 from curriculum.catalog import list_rubric_criteria
 
-PROMPT_VERSION = "writing-1.2"  # 1.1 (T025): paragraph scope, no model text, voseo; 1.2: short sentences
+PROMPT_VERSION = "writing-1.3"  # 1.1 (T025): paragraph scope, no model text, voseo; 1.2: short sentences;
+# 1.3 (T028): L4 paragraph plan. Prompts of the other levels are unchanged.
 MAX_REQUESTS = 3
 MAX_CALLS = 12  # generation and review calls per exercise, including route() retries
 LEVEL_ALIASES = {f"L{lv['ordinal']}": lv["code"] for lv in contracts.levels()["levels"]}
@@ -62,6 +65,14 @@ REVIEW_SYSTEM = ("Usted revisa ejercicios de producción escrita para sexto grad
                  "evaluar los criterios indicados. Responde solo con un objeto JSON.")
 MODEL_FIELDS = ("topic_es", "communicative_situation_es", "suggested_ideas_es", "instructions_es",
                 "deliverable_description_es")
+PLAN_FIELD = "paragraph_plan_es"  # T028: guided_composition only, stored as scaffolding_es
+# W19: what each of the four plan items must (first) and must not (second) talk about, in order.
+PLAN_SCOPE = (
+    ((), ("causa", "consecuencia", "solucion")),
+    (("causa", "por que", "origen", "motivo", "razon"), ("solucion",)),
+    (("consecuencia", "efecto", "afecta", "provoca", "result"), ("solucion",)),
+    (("accion", "solucion", "medida", "propuesta", "recomend", "podemos", "pueden", "cierre", "conclu"), ("causa",)),
+)
 
 
 class WritingRequestError(ValueError):
@@ -80,6 +91,19 @@ class Grounding:
     @property
     def codes(self) -> list[str]:
         return [c["code"] for c in self.criteria]
+
+    @property
+    def guided(self) -> bool:
+        return self.exercise_type == "guided_composition"
+
+    def optional(self, code: str) -> bool:
+        """T028: conventions criteria the tutor may score in a guided composition, never required."""
+        return (self.level["code"] in contracts.OPTIONAL_LEVELS and code in contracts.CONVENTION_CRITERIA
+                and code not in self.level["core_criteria"])
+
+    @property
+    def required(self) -> list[dict[str, Any]]:
+        return [c for c in self.criteria if not self.optional(c["code"])]
 
 
 @dataclass
@@ -222,7 +246,7 @@ SCOPE_ES = {
 def generation_messages(g: Grounding, avoid_topics: list[str]) -> list[dict[str, str]]:
     criteria = "\n".join(
         f"- {c['code']}: {c['statement_es']}\n  Desempeño esperado (4 puntos): {c['descriptors_es'][4]}\n"
-        f"  Contenidos: {c['concepts_es']}" for c in g.criteria)
+        f"  Contenidos: {c['concepts_es']}" for c in g.required)
     avoid = "; ".join(list(MODEL_TOPICS) + avoid_topics)
     user = f"""Cree UN ejercicio original de producción escrita.
 
@@ -251,18 +275,30 @@ Reglas:
   párrafo modelo ni un ejemplo completo.
 - Las ideas sugeridas corresponden solo a este tipo de párrafo: {SCOPE_ES[g.exercise_type]}
 - Instrucciones sin repetir la misma idea, en voseo también en negativo («No copiés»; nunca «No copies»).
-
+{PLAN_RULES_ES if g.guided else ""}
 Responda solo con este JSON:
 {{"topic_es": "...", "communicative_situation_es": "...", "suggested_ideas_es": ["..."],
-  "instructions_es": ["..."], "deliverable_description_es": "..."}}"""
+  "instructions_es": ["..."], "deliverable_description_es": "..."{PLAN_JSON if g.guided else ""}}}"""
     return [{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}]
+
+
+PLAN_RULES_ES = """- Las instrucciones nombran los cuatro párrafos: introducción, dos de desarrollo y conclusión.
+- Agregue un plan de párrafos con exactamente 4 orientaciones cortas (máximo 20 palabras cada una), en este orden:
+  1) introducción: qué presentar del tema; 2) primer párrafo de desarrollo: causas;
+  3) segundo párrafo de desarrollo: consecuencias; 4) conclusión: acciones o soluciones y un cierre.
+  Cada orientación es una pregunta o una pista para pensar (por ejemplo «¿Por qué ocurre…?»), nunca una oración
+  lista para copiar en el texto.
+"""
+PLAN_JSON = ', "paragraph_plan_es": ["...", "...", "...", "..."]'
 
 
 def review_messages(g: Grounding, exercise: dict[str, Any]) -> list[dict[str, str]]:
     student = {k: exercise[k] for k in ("topic_es", "communicative_situation_es", "suggested_ideas_es",
                                          "instructions_es")}
     student["deliverable_es"] = exercise["deliverable"]["description_es"]
-    criteria = "\n".join(f"- {c['code']}: {c['statement_es']}" for c in g.criteria)
+    if exercise.get("scaffolding_es"):
+        student["paragraph_plan_es"] = exercise["scaffolding_es"]
+    criteria = "\n".join(f"- {c['code']}: {c['statement_es']}" for c in g.required)
     user = f"""Ejercicio para sexto grado (nivel {g.level['ordinal']}, {g.level['name_es']}; producto esperado:
 {_deliverable_es(g)}):
 {json.dumps(student, ensure_ascii=False, indent=1)}
@@ -285,15 +321,16 @@ Responda solo con JSON: {{"clarity": 0, "age_appropriate": 0, "completeness": 0,
 
 # ---------------------------------------------------------------- assembly and checks
 
-def model_fields(text: str) -> dict[str, Any]:
+def model_fields(text: str, guided: bool = False) -> dict[str, Any]:
     """W01: the required fields with the right types (only these are taken from the model)."""
-    raw = extract_json(text, required=MODEL_FIELDS)
-    fields = {k: raw[k] for k in MODEL_FIELDS}
+    names = MODEL_FIELDS + ((PLAN_FIELD,) if guided else ())
+    raw = extract_json(text, required=names)
+    fields = {k: raw[k] for k in names}
     for key in ("topic_es", "communicative_situation_es", "deliverable_description_es"):
         if not isinstance(fields[key], str) or not fields[key].strip():
             raise OutputError(f"{key} must be a non-empty string")
         fields[key] = " ".join(fields[key].split())
-    for key in ("suggested_ideas_es", "instructions_es"):
+    for key in ("suggested_ideas_es", "instructions_es") + ((PLAN_FIELD,) if guided else ()):
         if not isinstance(fields[key], list) or not all(isinstance(x, str) and x.strip() for x in fields[key]):
             raise OutputError(f"{key} must be a list of non-empty strings")
         fields[key] = [" ".join(re.sub(r"^\s*(\d+[.)]|[-•])\s*", "", x).split()) for x in fields[key]]
@@ -316,14 +353,18 @@ def assemble(g: Grounding, fields: dict[str, Any]) -> dict[str, Any]:
         p = {"criterion": c["code"], "rubric_ref": f"{rubric['rubric_id']}#{c['code']}", "applicability": "scored"}
         if c["code"] in contracts.handwritten_criteria() and typed:
             p.update(applicability="not_evaluable", not_evaluable_reason="handwritten_evidence_required")
+        if g.optional(c["code"]):
+            p["optional"] = True
         parameters.append(p)
+    scaffolding = {"scaffolding_es": fields[PLAN_FIELD]} if g.guided and PLAN_FIELD in fields else {}
     return {
         "schema_version": "1.0",
         "exercise_id": f"PE-L{g.level['ordinal']}-{_slug(fields['topic_es'])}-{secrets.token_hex(3)}",
         "level": g.level["code"], "exercise_type": g.exercise_type, "difficulty": g.difficulty,
         "language": "es-CR", "text_type": "expositivo",
         "topic_es": fields["topic_es"], "communicative_situation_es": fields["communicative_situation_es"],
-        "suggested_ideas_es": fields["suggested_ideas_es"], "instructions_es": fields["instructions_es"],
+        "suggested_ideas_es": fields["suggested_ideas_es"], **scaffolding,
+        "instructions_es": fields["instructions_es"],
         "deliverable": {"description_es": fields["deliverable_description_es"], **g.deliverable},
         "target_criteria": g.codes,
         "evaluation": {"evaluator": "human", "rubric_id": rubric["rubric_id"],
@@ -348,7 +389,8 @@ def _plain(text: str) -> str:
 def _student_text(exercise: dict[str, Any]) -> str:
     """Everything the student sees (T023: also the title and the text to correct)."""
     return " ".join([exercise.get("title_es", ""), exercise["topic_es"], exercise["communicative_situation_es"],
-                     *exercise.get("suggested_ideas_es", []), *exercise["instructions_es"],
+                     *exercise.get("suggested_ideas_es", []), *exercise.get("scaffolding_es", []),
+                     *exercise["instructions_es"],
                      exercise["deliverable"]["description_es"], exercise.get("source_text_es", "")]).strip()
 
 
@@ -376,7 +418,8 @@ def deterministic_checks(g: Grounding, exercise: dict[str, Any], avoid_topics: l
                                    ("dos ideas", "ideas complementarias", "ideas que la apoyen")],
         "development_paragraphs": [("dos parrafos",), ("causa",), ("consecuencia",)],
         "conclusion_paragraph": [("parrafo",), ("conclusion",), ("accion", "solucion")],
-        "guided_composition": [("cuatro parrafos", "4 parrafos"), ("200 palabras",)],
+        "guided_composition": [("cuatro parrafos", "4 parrafos"), ("200 palabras",), ("desarrollo",),
+                               ("conclusion",)],
         "full_composition": [("cuatro parrafos", "4 parrafos"), ("200 palabras",), ("90 minutos",)],
     }[g.exercise_type]
     if "EE04" in g.codes and g.exercise_type != "introduction_paragraph":
@@ -440,7 +483,25 @@ def compose_checks(g: Grounding, exercise: dict[str, Any], stored: list[dict[str
             if (own_topic and len(own_topic & set(_content_words(r["topic_es"]))) / len(own_topic) >= 0.6)
             or (own and len(own & bag(r)) / len(own | bag(r)) >= 0.4)]
     check("W18", not near, f"near-duplicate topic or situation: {near}")
+    if g.guided:
+        check("W19", *plan_problems(exercise.get("scaffolding_es", [])))
     return checks
+
+
+def plan_problems(plan: list[str]) -> tuple[bool, str]:
+    """W19 (T028): four short plan items in order (introduction, causes, consequences, conclusion), each in its
+    paragraph's scope; questions or hints, not sentences to copy."""
+    if len(plan) != 4:
+        return False, f"paragraph plan needs exactly 4 items, got {len(plan)}"
+    problems = [f"item {n + 1} over 25 words" for n, item in enumerate(plan) if len(item.split()) > 25]
+    for n, (item, (need, avoid)) in enumerate(zip(plan, PLAN_SCOPE)):
+        text = _plain(item)
+        if need and not any(w in text for w in need):
+            problems.append(f"item {n + 1} does not name its paragraph scope {need[:2]}")
+        off = [w for w in avoid if w in text]
+        if off:
+            problems.append(f"item {n + 1} talks about another paragraph {off}")
+    return not problems, "; ".join(problems)
 
 
 def parse_review(text: str, keys: tuple[str, ...] = REVIEW_KEYS) -> dict[str, Any]:
@@ -478,7 +539,7 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
             _record(writing_store, g, attempt)
             break
         try:
-            fields = model_fields(generated.content or "")
+            fields = model_fields(generated.content or "", g.guided)
             attempt.checks.append({"id": "W01", "status": "pass", "message": "ok"})
         except OutputError as exc:
             attempt.checks.append({"id": "W01", "status": "fail", "message": str(exc)})
@@ -503,6 +564,12 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
             attempt.reasons.append(f"review {reviewed.status}: {reviewed.message}")
             _record(writing_store, g, attempt)
             break
+        same = same_model_review(generator, reviewed)  # RCA-004: W08 must come from another model
+        if same:
+            attempt.checks.append({"id": "W08", "status": "fail", "message": same})
+            attempt.reasons.append(f"W08: {same}")
+            _record(writing_store, g, attempt)
+            continue
         try:
             attempt.review = parse_review(reviewed.content or "", COMPOSE_REVIEW_KEYS)
         except OutputError as exc:
@@ -524,6 +591,15 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
         return WritingOutcome("accepted", exercise, attempts)
     status = "unavailable" if stop else "rejected"
     return WritingOutcome(status, None, attempts, stop or "max_requests")
+
+
+def same_model_review(generator: str | None, reviewed: RouteResult) -> str | None:
+    """RCA-004: route() only tries the generator last, so when every other model fails the generator can review
+    its own exercise. W08 is an independent review (ADR-020): that review is refused, never accepted."""
+    reviewer = reviewed.final.model_used if reviewed.final else None
+    if generator and reviewer == generator:
+        return f"review not independent: {reviewer} also generated the exercise"
+    return None
 
 
 def _stop_reason(result: RouteResult) -> str:

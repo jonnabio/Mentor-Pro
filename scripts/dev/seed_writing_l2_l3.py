@@ -1,4 +1,4 @@
-"""Seed the L2 and L3 Producción escrita inventory (T025): generate only missing exercises.
+"""Seed the L2, L3 (T025) and L4 (T028) Producción escrita inventory: generate only missing exercises.
 
 Uses the real catalog and writing store (DATABASE_URL) and OpenRouter with the configured free models,
 budgets and usage records. Existing exercises, drafts and submissions are never changed. Writes the
@@ -30,7 +30,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", type=Path)
     parser.add_argument("--difficulty", default="medium", choices=["easy", "medium", "hard"])
-    parser.add_argument("--inventory", action="store_true", help="only print the stored L2/L3 inventory")
+    parser.add_argument("--inventory", action="store_true", help="only print the stored L2-L4 inventory")
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     url = db.database_url()

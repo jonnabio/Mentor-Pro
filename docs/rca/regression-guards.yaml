@@ -128,3 +128,25 @@ guards:
     review_triggers:
       - "New UI handlers reading form controls created after a fetch"
       - "Changes to run_gate or the verify output contract"
+
+  - id: RCA-004
+    title: "Writing exercise reviewed by the model that generated it"
+    severity: medium
+    created: 2026-10-25
+    rca_file: docs/rca/RCA-004-writing-review-not-independent.md
+
+    guarded_files:
+      - app/writing/generation.py
+      - app/writing/editing.py
+
+    invariants:
+      - "W08 fails when the reviewing model is the generating model"
+      - "An exercise whose review is not independent is never stored"
+
+    tests:
+      - tests/app/test_writing_review_independence.py
+
+    standard_rule: "ADR-020 W08 (independent review by another free model)"
+
+    review_triggers:
+      - "Changes to the review call, avoid sets or route() fallback order"

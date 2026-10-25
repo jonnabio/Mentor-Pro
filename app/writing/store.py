@@ -128,7 +128,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_evaluation_submission ON writing.evaluation
 ALTER TABLE writing.evaluation ADD COLUMN IF NOT EXISTS exercise_revision INTEGER;
 ALTER TABLE writing.evaluation ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
 ALTER TABLE writing.criterion_score ADD COLUMN IF NOT EXISTS descriptor_ref TEXT;
+-- T028 (ADR-026): guided composition (L4) keeps planning notes and each paragraph separately; text_es holds
+-- the four paragraphs joined by a blank line.
+ALTER TABLE writing.draft ADD COLUMN IF NOT EXISTS sections JSONB;
+ALTER TABLE writing.submission ADD COLUMN IF NOT EXISTS sections JSONB;
 """
+
+GUIDED_PARAGRAPHS = ("introduction", "development_1", "development_2", "conclusion")
+GUIDED_SECTIONS = ("plan",) + GUIDED_PARAGRAPHS
+
+
+def assemble_sections(sections: dict[str, str]) -> str:
+    """The composition as the tutor reads it: the four paragraphs in order, one blank line apart (no plan)."""
+    return "\n\n".join(sections.get(k, "").strip() for k in GUIDED_PARAGRAPHS if sections.get(k, "").strip())
 
 CURRENT_RECORD_SQL = """COALESCE((SELECT r.record FROM writing.exercise_revision r WHERE r.exercise_id = e.exercise_id
                              ORDER BY r.revision DESC LIMIT 1), e.record)"""
@@ -293,19 +305,23 @@ class WritingStore:
         with self._connect() as conn:
             return conn.execute("SELECT * FROM writing.submission WHERE exercise_id = %s", (exercise_id,)).fetchone()
 
-    def save_draft(self, exercise_id: str, text_es: str) -> dict[str, Any] | None:
-        """Upsert the draft; None when the exercise was already submitted (drafts are then frozen)."""
+    def save_draft(self, exercise_id: str, text_es: str,
+                   sections: dict[str, str] | None = None) -> dict[str, Any] | None:
+        """Upsert the draft; None when the exercise was already submitted (drafts are then frozen).
+        Guided compositions (T028) pass their sections; text_es is then the assembled paragraphs."""
         with self._connect() as conn, conn.transaction():
             conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
             if conn.execute("SELECT 1 FROM writing.submission WHERE exercise_id = %s", (exercise_id,)).fetchone():
                 return None
             return conn.execute(
-                """INSERT INTO writing.draft (exercise_id, text_es, word_count) VALUES (%s, %s, %s)
+                """INSERT INTO writing.draft (exercise_id, text_es, word_count, sections) VALUES (%s, %s, %s, %s)
                    ON CONFLICT (exercise_id) DO UPDATE SET text_es = EXCLUDED.text_es,
-                       word_count = EXCLUDED.word_count, updated_at = now()
-                   RETURNING *""", (exercise_id, text_es, word_count(text_es))).fetchone()
+                       word_count = EXCLUDED.word_count, sections = EXCLUDED.sections, updated_at = now()
+                   RETURNING *""", (exercise_id, text_es, word_count(text_es),
+                                    Jsonb(sections) if sections is not None else None)).fetchone()
 
-    def submit_typed(self, exercise_id: str, text_es: str, client_request_id: str) -> tuple[dict[str, Any], bool]:
+    def submit_typed(self, exercise_id: str, text_es: str, client_request_id: str,
+                     sections: dict[str, str] | None = None) -> tuple[dict[str, Any], bool]:
         """Store the one typed submission of an exercise; repeated or parallel calls return the first."""
         with self._connect() as conn, conn.transaction():
             conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
@@ -317,14 +333,15 @@ class WritingStore:
                                     "WHERE exercise_id = %s", (exercise_id,)).fetchone()["n"]
             row = conn.execute(
                 """INSERT INTO writing.submission (submission_id, exercise_id, evidence_mode, text_es, word_count,
-                       paragraph_count, submitted_at, client_request_id, exercise_revision)
-                   VALUES (%s, %s, 'typed', %s, %s, %s, now(), %s, %s) RETURNING *""",
+                       paragraph_count, submitted_at, client_request_id, exercise_revision, sections)
+                   VALUES (%s, %s, 'typed', %s, %s, %s, now(), %s, %s, %s) RETURNING *""",
                 (f"SUB-{exercise_id[3:40]}-{secrets.token_hex(4)}", exercise_id, text_es, word_count(text_es),
-                 paragraph_count(text_es), client_request_id, revision)).fetchone()
-            conn.execute("""INSERT INTO writing.draft (exercise_id, text_es, word_count) VALUES (%s, %s, %s)
+                 paragraph_count(text_es), client_request_id, revision,
+                 Jsonb(sections) if sections is not None else None)).fetchone()
+            conn.execute("""INSERT INTO writing.draft (exercise_id, text_es, word_count, sections) VALUES (%s, %s, %s, %s)
                             ON CONFLICT (exercise_id) DO UPDATE SET text_es = EXCLUDED.text_es,
-                                word_count = EXCLUDED.word_count, updated_at = now()""",
-                         (exercise_id, text_es, word_count(text_es)))
+                                word_count = EXCLUDED.word_count, sections = EXCLUDED.sections, updated_at = now()""",
+                         (exercise_id, text_es, word_count(text_es), Jsonb(sections) if sections is not None else None))
             return row, True
 
     # ------------------------------------------------------------ tutor evaluation (T026)
@@ -406,7 +423,8 @@ class WritingStore:
             last_draft = conn.execute("SELECT MAX(updated_at) AS at FROM writing.draft").fetchone()["at"]
         submissions = [{"submission_id": r["submission_id"], "submitted_at": r["submitted_at"].isoformat(),
                         "level": r["level"], "evaluation_status": r["evaluation_status"],
-                        "scorable_criteria": [p["criterion"] for p in r["parameters"] if p["applicability"] == "scored"]}
+                        "scorable_criteria": [p["criterion"] for p in r["parameters"]
+                                              if p["applicability"] == "scored" and not p.get("optional")]}
                        for r in rows]
         evaluations = [r["evaluation"] for r in rows if r["evaluation_status"] == "completed"]
         return evaluations, submissions, last_draft.isoformat() if last_draft else None

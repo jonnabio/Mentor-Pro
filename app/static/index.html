@@ -231,6 +231,54 @@
             <button type="button" id="writing-submit" class="primary">Entregar texto</button>
           </div>
         </div>
+        <!-- T028 (ADR-026): Nivel 4 guided composition in five stages; every section is saved in the draft. -->
+        <div id="writing-guided" hidden>
+          <ol id="guided-steps" class="guided-steps" aria-label="Etapas de la composición"></ol>
+          <h4 id="guided-title"></h4>
+          <p id="guided-guidance" class="choice-notice"></p>
+          <div id="guided-plan-block" hidden>
+            <p class="field-label">Pistas del plan</p>
+            <ul id="guided-plan"></ul>
+          </div>
+          <div class="guided-field" data-section="plan">
+            <label for="guided-plan-text" class="field-label">Mis notas de planificación</label>
+            <textarea id="guided-plan-text" data-section="plan" rows="7" spellcheck="false" autocorrect="off"
+              autocapitalize="off" autocomplete="off" lang="es-CR"></textarea>
+          </div>
+          <div class="guided-field" data-section="introduction">
+            <label for="guided-introduction" class="field-label">Párrafo de introducción</label>
+            <textarea id="guided-introduction" data-section="introduction" rows="7" spellcheck="false"
+              autocorrect="off" autocapitalize="off" autocomplete="off" lang="es-CR"></textarea>
+          </div>
+          <div class="guided-field" data-section="development_1">
+            <label for="guided-development-1" class="field-label">Primer párrafo de desarrollo (causas)</label>
+            <textarea id="guided-development-1" data-section="development_1" rows="7" spellcheck="false"
+              autocorrect="off" autocapitalize="off" autocomplete="off" lang="es-CR"></textarea>
+          </div>
+          <div class="guided-field" data-section="development_2">
+            <label for="guided-development-2" class="field-label">Segundo párrafo de desarrollo (consecuencias)</label>
+            <textarea id="guided-development-2" data-section="development_2" rows="7" spellcheck="false"
+              autocorrect="off" autocapitalize="off" autocomplete="off" lang="es-CR"></textarea>
+          </div>
+          <div class="guided-field" data-section="conclusion">
+            <label for="guided-conclusion" class="field-label">Párrafo de conclusión</label>
+            <textarea id="guided-conclusion" data-section="conclusion" rows="7" spellcheck="false"
+              autocorrect="off" autocapitalize="off" autocomplete="off" lang="es-CR"></textarea>
+          </div>
+          <div id="guided-review" hidden>
+            <p id="guided-missing" class="alert" role="alert" hidden></p>
+            <p class="field-label">Tu composición completa</p>
+            <div id="guided-preview" class="submitted-text"></div>
+          </div>
+          <p class="muted small" aria-live="polite">Composición: <span id="guided-words">0 palabras</span>
+            (meta: al menos 200)<span id="guided-saved"></span></p>
+          <div class="actions">
+            <button type="button" id="guided-prev" class="secondary">Etapa anterior</button>
+            <button type="button" id="guided-save" class="secondary">Guardar borrador</button>
+            <button type="button" id="guided-next" class="primary">Siguiente etapa</button>
+            <button type="button" id="guided-submit" class="primary" hidden>Entregar composición</button>
+          </div>
+        </div>
         <div id="writing-submitted" hidden>
           <p id="writing-pending" class="choice-notice" role="status"></p>
           <div id="writing-feedback" hidden>

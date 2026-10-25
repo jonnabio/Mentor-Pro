@@ -8,7 +8,8 @@ const $ = (id) => document.getElementById(id);
 const tutor = { submission: null, busy: false };
 const STATUS_ES = { pending: "Pendiente", in_progress: "En revisión", completed: "Completada" };
 const LEVEL_TYPE = { conventions_editing: "Corrección de texto", introduction_paragraph: "Párrafo de introducción",
-  development_paragraphs: "Párrafos de desarrollo", conclusion_paragraph: "Párrafo de conclusión" };
+  development_paragraphs: "Párrafos de desarrollo", conclusion_paragraph: "Párrafo de conclusión",
+  guided_composition: "Composición guiada" };
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -90,6 +91,14 @@ async function openSubmission(id) {
   $("tutor-source").textContent = ex.source_text_es || "";
   $("tutor-source-block").hidden = !ex.source_text_es;
   $("tutor-student").textContent = data.student_text;
+  // T028: guided composition: the exercise's paragraph plan, the planning notes and each paragraph.
+  $("tutor-plan").replaceChildren(...ex.scaffolding_es.map((t) => el("li", {}, t)));
+  $("tutor-plan-block").hidden = ex.scaffolding_es.length === 0;
+  $("tutor-sections-block").hidden = !data.sections;
+  $("tutor-student-title").hidden = Boolean(data.sections);
+  $("tutor-sections").replaceChildren(...(data.sections || []).map((s) => el("div", { class: "tutor-section",
+    "data-section": s.key }, el("h4", {}, s.label_es),
+    el("p", { class: "submitted-text" }, s.text_es || "(sin notas)"))));
   const ref = data.reference;
   $("tutor-reference-block").hidden = !ref;
   if (ref) {
@@ -102,9 +111,17 @@ async function openSubmission(id) {
   $("tutor-note").textContent = `Rúbrica ${data.rubric.rubric_id}. ${data.rubric.counting_note_es}`;
   const saved = data.evaluation ? data.evaluation.record : null;
   const scores = Object.fromEntries((saved ? saved.criterion_scores : []).map((s) => [s.criterion, s]));
-  $("tutor-criteria").replaceChildren(...data.criteria.map((c) => {
+  const firstOptional = data.criteria.find((c) => c.optional);
+  $("tutor-criteria").replaceChildren(...data.criteria.flatMap((c) => {
     const box = el("fieldset", { class: "tutor-criterion", "data-criterion": c.code },
-      el("legend", {}, `${c.code}. ${c.statement_es}`));
+      el("legend", {}, `${c.code}. ${c.statement_es}${c.optional ? " (opcional)" : ""}`));
+    // T028: optional conventions criteria can stay unscored ("Sin calificar").
+    if (c.optional) {
+      const none = el("input", { type: "radio", name: `score-${c.code}`, value: "" });
+      if (!scores[c.code]) none.checked = true;
+      box.append(el("label", { class: "tutor-option" }, none, el("span", { class: "points" }, "–"),
+        el("span", {}, "Sin calificar")));
+    }
     if (c.applicability === "not_evaluable") {
       box.append(el("p", { class: "muted" }, "No evaluable: este criterio requiere evidencia manuscrita y la " +
         "entrega fue escrita en la computadora."));
@@ -116,7 +133,10 @@ async function openSubmission(id) {
       box.append(el("label", { class: "tutor-option" }, input, el("span", { class: "points" }, String(points)),
         el("span", {}, text)));
     });
-    return box;
+    if (c !== firstOptional) return [box];
+    return [el("h4", { class: "tutor-optional-title" }, "Convenciones (opcional)"),
+      el("p", { class: "muted small" }, "Calificá estos criterios solo si el texto da evidencia suficiente. " +
+        "No son necesarios para completar la evaluación."), box];
   }));
   const feedback = saved ? saved.feedback_es : { strengths: [], improvements: [] };
   $("tutor-strengths").value = feedback.strengths.join("\n");
@@ -134,7 +154,7 @@ function payload(complete) {
   for (const c of tutor.submission.criteria) {
     if (c.applicability === "not_evaluable") continue;
     const checked = document.querySelector(`input[name="score-${c.code}"]:checked`);
-    scores[c.code] = checked ? Number(checked.value) : null;
+    scores[c.code] = checked && checked.value !== "" ? Number(checked.value) : null;
   }
   const lines = (id) => $(id).value.split("\n").map((x) => x.trim()).filter(Boolean);
   return { scores, strengths: lines("tutor-strengths"), improvements: lines("tutor-improvements"),
@@ -167,7 +187,7 @@ $("tutor-enter").addEventListener("click", () => {
 });
 $("tutor-save").addEventListener("click", () => save(false));
 $("tutor-complete").addEventListener("click", () => {
-  const missing = tutor.submission.criteria.filter((c) => c.applicability !== "not_evaluable" &&
+  const missing = tutor.submission.criteria.filter((c) => c.applicability !== "not_evaluable" && !c.optional &&
     !document.querySelector(`input[name="score-${c.code}"]:checked`));
   if (missing.length) {
     showError(`Calificá todos los criterios antes de completar: ${missing.map((c) => c.code).join(", ")}.`);

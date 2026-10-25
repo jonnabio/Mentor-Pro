@@ -157,7 +157,7 @@ def test_valid_exercise_is_accepted_and_stored_with_metadata(catalog, store):
     [row] = store.generation_attempts()
     assert (row["status"], row["exercise_id"], row["calls"], row["tokens_in"], row["tokens_out"]) == (
         "accepted", exercise["exercise_id"], 2, 3000, 800)
-    assert float(row["cost_usd"]) == 0.0 and row["cost_complete"] and row["prompt_version"] == "writing-1.2"
+    assert float(row["cost_usd"]) == 0.0 and row["cost_complete"] and row["prompt_version"] == "writing-1.3"
     assert [c["id"] for c in row["checks"]] == ["W01", "W02", "W03", "W04", "W05", "W06", "W07",
                                                "W13", "W14", "W16", "W17", "W18", "W08"]
     assert {r["purpose"] for r in usage.records} == {"generation", "review"}

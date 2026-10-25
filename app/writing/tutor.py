@@ -8,7 +8,8 @@ limitations of this boundary.
 Scores use the official 0-4 descriptors of curriculum/writing/MEP-RUBRICA-PE-2026.json, referenced as
 `<rubric>#<criterion>@<points>`. EE19 and EE20 are recorded as not evaluable for typed submissions. A
 partial evaluation can be saved and resumed; completion needs every evaluable criterion scored and locks
-the evaluation. No examination grade is computed.
+the evaluation. No examination grade is computed. T028 (ADR-026): guided compositions also show the
+planning notes and each paragraph; their optional EE07-EE18 may be scored and are never required.
 """
 
 from __future__ import annotations
@@ -22,7 +23,8 @@ from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field
 
 from app.writing import contracts
-from app.writing.routes import WritingService
+from app.writing.routes import SECTION_LABEL_ES, WritingService
+from app.writing.store import GUIDED_SECTIONS
 from app.writing.store import EvaluationLocked, InvalidRecord
 
 LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
@@ -67,6 +69,9 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
         return {c: ("not_evaluable" if c in contracts.handwritten_criteria() and typed else "scored")
                 for c in record["target_criteria"]}
 
+    def optional(record: dict[str, Any]) -> set[str]:
+        return contracts.optional_criteria(record)
+
     @router.get("/queue")
     def queue() -> dict[str, Any]:
         store = service.get()
@@ -90,12 +95,16 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
             "submission_id": submission_id, "exercise_id": sub["exercise_id"],
             "exercise_revision": sub["exercise_revision"], "submitted_at": sub["submitted_at"].isoformat(),
             "evidence_mode": sub["evidence_mode"], "student_text": sub["text_es"],
+            "sections": None if not sub.get("sections") else [
+                {"key": k, "label_es": SECTION_LABEL_ES[k], "text_es": sub["sections"].get(k, "")}
+                for k in GUIDED_SECTIONS],
             "exercise": {"title_es": record.get("title_es"), "topic_es": record["topic_es"],
                          "level_es": _level_label(record), "exercise_type": record["exercise_type"],
                          "communicative_situation_es": record["communicative_situation_es"],
                          "instructions_es": record["instructions_es"],
                          "deliverable_es": record["deliverable"]["description_es"],
-                         "source_text_es": record.get("source_text_es")},
+                         "source_text_es": record.get("source_text_es"),
+                         "scaffolding_es": record.get("scaffolding_es", [])},
             "reference": None if reference is None else {
                 "corrected_text_es": reference["corrected_text_es"], "corrections": reference["corrections"],
                 "ambiguities_es": reference["ambiguities_es"], "revision": reference["revision"]},
@@ -103,7 +112,8 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
                        "rubric_sha256": contracts.rubric()["source"]["file_sha256"],
                        "counting_note_es": contracts.rubric()["counting_note_es"]},
             "criteria": [{"code": code, "statement_es": criteria[code]["statement_es"],
-                          "descriptors_es": criteria[code]["descriptors_es"], "applicability": kinds[code]}
+                          "descriptors_es": criteria[code]["descriptors_es"], "applicability": kinds[code],
+                          "optional": code in optional(record)}
                          for code in record["target_criteria"]],
             "evaluation": None if evaluation is None else {
                 "status": evaluation["status"], "record": evaluation["record"],
@@ -114,6 +124,7 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
     def save(submission_id: str, request: EvaluationRequest) -> dict[str, Any]:
         store, sub, record = load(submission_id)
         kinds = applicability(record, sub)
+        optional_codes = optional(record)
         unknown = sorted(set(request.scores) - set(kinds))
         if unknown:
             raise api_error(422, "unknown_criteria", f"Criterios que no corresponden al ejercicio: {unknown}.")
@@ -126,6 +137,8 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
                                     f"{code} requiere evidencia manuscrita; en un texto digitado es «No evaluable».")
                 scores.append({"criterion": code, "status": "not_evaluable",
                                "not_evaluable_reason": "handwritten_evidence_required"})
+            elif points is None and code in optional_codes:
+                continue  # T028: an optional criterion left unscored is not part of the evaluation
             elif points is None:
                 scores.append({"criterion": code, "status": "pending"})
             elif 0 <= points <= 4:
