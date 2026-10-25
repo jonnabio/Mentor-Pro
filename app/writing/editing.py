@@ -28,7 +28,6 @@ from typing import Any
 import psycopg
 
 from app.generation.parsing import OutputError, extract_json
-from app.generation.pipeline import RUBRIC_MAX_TOKENS
 from app.llm.budget import BudgetGate
 from app.llm.client import OpenRouterClient
 from app.llm.router import Store, route
@@ -38,6 +37,9 @@ PROMPT_VERSION = "writing-edit-1.1"  # 1.1 (T024): voseo, repetition, ambiguity,
 # Correction exercises make reasoning models count words and errors; 4000 output tokens truncated the first
 # live request (T023). Own limit, like SOLVE/RUBRIC_MAX_TOKENS; daily request and USD budgets are unchanged.
 EDIT_MAX_TOKENS = 8000
+# T029 (RCA-004): the review checks the text, the reference and every correction; at RUBRIC_MAX_TOKENS (3000) the
+# only independent reviewer truncated 4 of 6 L1 reviews, so the generator reviewed instead. Same budgets.
+EDIT_REVIEW_MAX_TOKENS = 6000
 # Inventory plan for Nivel 1 (T023): one exercise per group of convention criteria (ADR-019 mapping).
 CATEGORIES = {
     "capitalization_punctuation": {"criteria": ["EE16", "EE17", "EE18"],
@@ -386,8 +388,8 @@ def generate_editing_exercise(client: OpenRouterClient, usage_store: Store, cata
             continue
         generator = generated.final.model_used if generated.final else None
         reviewed = route(client, usage_store, review_messages(g, exercise, reference), purpose="review",
-                         max_tokens=RUBRIC_MAX_TOKENS, request_id=attempt.request_id,
-                         avoid=frozenset({generator} if generator else ()), gate=gate)
+                         max_tokens=EDIT_REVIEW_MAX_TOKENS, request_id=attempt.request_id,
+                         exclude=frozenset({generator} if generator else ()), gate=gate)
         attempt.usage += reviewed.records
         if reviewed.status != "ok":
             attempt.status, stop = "unavailable", gen._stop_reason(reviewed)

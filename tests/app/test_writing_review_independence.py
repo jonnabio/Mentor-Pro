@@ -1,32 +1,39 @@
-"""RCA-004: the W08 review of a writing exercise must come from a model other than its generator."""
+"""RCA-004 / T029: the W08 review of a writing exercise must come from a model other than its generator."""
 
 from __future__ import annotations
 
 import httpx
 
 from app.llm.router import RouteResult
-from app.writing import generation
-from test_writing_generation import GOOD, FakeLlm, catalog, run, store  # noqa: F401  (fixtures)
+from app.llm.usage import MemoryUsageStore
+from app.writing import editing, generation
+from test_writing_editing import FakeLlm as EditFake, SPELLING, client_for as edit_client
+from test_writing_generation import GOOD, FakeLlm, catalog, client_for, run, store  # noqa: F401  (fixtures)
+from test_writing_revalidation import Down
 
 
-class ReviewerDown(FakeLlm):
-    """The only other free model answers 502, so route() falls back to the generator for the review."""
+def test_reviewer_outage_never_falls_back_to_the_generator(catalog, store):
+    down = Down(FakeLlm([GOOD]))
+    usage = MemoryUsageStore()
+    outcome = generation.generate_exercise(client_for(down), usage, catalog, store, "L2", "medium", ["EE03", "EE04"])
+    assert outcome.status == "unavailable" and outcome.exercise is None
+    reviews = [r for r in usage.records if r["purpose"] == "review"]
+    assert reviews and {r["model_requested"] for r in reviews} == {"rev/b:free"}  # the generator is never asked
+    assert all(r["status"] == "error" for r in reviews)  # failed reviewer attempts are preserved
+    assert store.exercises() == [] and [a["status"] for a in store.generation_attempts()] == ["unavailable"]
 
-    def __call__(self, request: httpx.Request) -> httpx.Response:
-        if not request.url.path.endswith("/models") and b'"rev/b:free"' in request.content:
-            return httpx.Response(502, json={"error": {"message": "upstream down"}})
-        return super().__call__(request)
+
+def test_exhausted_budget_before_the_review_stores_nothing(catalog, store):
+    outcome, usage = run(catalog, store, FakeLlm([GOOD]), max_requests_per_day=1)
+    assert outcome.status == "unavailable" and outcome.stop_reason == "daily_budget"
+    assert [r["status"] for r in usage.records if r["purpose"] == "review"] == ["budget_blocked"]
+    assert store.exercises() == []
 
 
-def test_a_review_by_the_generator_is_refused(catalog, store):
-    fake = ReviewerDown([GOOD])
-    outcome, _ = run(catalog, store, fake)
-    # Each attempt is refused; the retries then use up the exercise's call budget (unavailable), never accepted.
-    assert outcome.status in ("rejected", "unavailable") and outcome.exercise is None
-    w08 = [r for a in outcome.attempts for r in a.reasons if r.startswith("W08")]
-    assert w08 and all("review not independent: gen/a:free" in r for r in w08)
-    assert any(p == "review" and m == "gen/a:free" for p, m in fake.calls)  # the fallback did happen
-    assert store.exercises() == [] and "accepted" not in {a["status"] for a in store.generation_attempts()}
+def test_l1_reviews_exclude_the_generator_too(catalog, store):
+    down = Down(EditFake([SPELLING]))
+    outcome = editing.generate_editing_exercise(edit_client(down), MemoryUsageStore(), catalog, store, "spelling")
+    assert outcome.status == "unavailable" and down.models.count("gen/a:free") == 1  # generation only
 
 
 def test_same_model_review_helper():

@@ -138,13 +138,17 @@ guards:
     guarded_files:
       - app/writing/generation.py
       - app/writing/editing.py
+      - app/writing/revalidation.py
 
     invariants:
       - "W08 fails when the reviewing model is the generating model"
       - "An exercise whose review is not independent is never stored"
+      - "Writing reviews exclude the generator from routing (route exclude), at every level"
+      - "Only a passed independent validation makes a quarantined exercise eligible again"
 
     tests:
       - tests/app/test_writing_review_independence.py
+      - tests/app/test_writing_revalidation.py
 
     standard_rule: "ADR-020 W08 (independent review by another free model)"
 

@@ -1008,6 +1008,31 @@ def scenario_guided(student: Page, tutor: Page, report: Report, viewport: str, o
     report.check(not errors, f"[{name}] no JavaScript errors {errors}")
 
 
+def scenario_quarantine(page: Page, report: Report, viewport: str, url: str) -> None:
+    """T029 (ADR-027): a quarantined exercise leaves the student list and cannot be opened; reinstated, it returns."""
+    name = f"{viewport}-quarantine"
+    store = WritingStore(url)
+    eid = writing_rows(url, "SELECT exercise_id FROM writing.exercise e WHERE level = 'idea_development' AND NOT "
+                            "EXISTS (SELECT 1 FROM writing.submission s WHERE s.exercise_id = e.exercise_id) "
+                            "ORDER BY exercise_id LIMIT 1")[0][0]  # submitted work would stay readable
+    store.set_eligibility(eid, "quarantined", "e2e: review not independent", "RCA-004")
+    page.goto(BASE)
+    page.evaluate("sessionStorage.clear()")
+    page.goto(BASE)
+    page.get_by_role("button", name="Abrir Producción escrita").click()
+    page.locator('.level-choice[data-level="idea_development"]').click()
+    expect(page.locator(".exercise-choice").first).to_be_visible()
+    listed = page.locator(".exercise-choice").evaluate_all("(n) => n.map((x) => x.dataset.exercise)")
+    status = page.request.get(BASE + f"api/writing/exercises/{eid}").status
+    report.check(eid not in listed and status == 404, f"[{name}] quarantined exercise hidden ({len(listed)} listed) "
+                                                      f"and not openable ({status})")
+    store.set_eligibility(eid, "eligible", "e2e: independent review passed", "independent-review-1.1")
+    page.get_by_role("button", name="Volver a los niveles").click()
+    page.locator('.level-choice[data-level="idea_development"]').click()
+    expect(page.locator(f'.exercise-choice[data-exercise="{eid}"]')).to_be_visible()
+    report.check(True, f"[{name}] reinstated exercise listed again")
+
+
 LATEST_SCORES_SQL = """SELECT DISTINCT ON (c.criterion_code) c.criterion_code, c.points
     FROM writing.criterion_score c JOIN writing.evaluation v USING (evaluation_id)
     WHERE v.status = 'completed' AND c.status = 'scored'
@@ -1165,6 +1190,7 @@ def run_mock(out: Path, url: str) -> Report:
                                                 has_touch=viewport == "mobile")
             scenario_guided(page, tutor_context.new_page(), report, viewport, out, url)
             tutor_context.close()
+            scenario_quarantine(page, report, viewport, url)
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()

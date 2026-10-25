@@ -938,6 +938,45 @@
         "First L4 exercise self-reviewed (RCA-004)"
       ],
       "notes": "Browser 433/433; L4 PE-L4-uso-responsable-materiales-aba7b0; 7 OpenRouter calls, $0."
+    },
+    {
+      "id": "T029",
+      "name": "Writing exercise independent-review remediation (PO task T029)",
+      "objective": "Quarantine the four RCA-004 exercises, revalidate with an independent reviewer, reinstate or replace, keep the minimum eligible inventory, prevent self-review at every level.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-027-writing-exercise-eligibility.md",
+          "app/writing/revalidation.py",
+          "scripts/dev/remediate_writing_review.py",
+          "tests/app/test_writing_revalidation.py",
+          "docs/progress/task_T029_result.md"
+        ],
+        "modify": [
+          "app/llm/router.py",
+          "app/writing/store.py",
+          "app/writing/routes.py",
+          "app/writing/generation.py",
+          "app/writing/editing.py",
+          "app/writing/revisions.py",
+          "tests/app/test_writing_review_independence.py",
+          "scripts/dev/practice_e2e.py",
+          "docs/rca/RCA-004-writing-review-not-independent.md",
+          "docs/rca/regression-guards.yaml"
+        ]
+      },
+      "depends_on": [
+        "T028"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T029_result.md",
+      "failures": [
+        "Rerun re-quarantined a reinstated exercise; quarantine made idempotent"
+      ],
+      "notes": "3 reinstated, 1 quarantined (no reviewer), 1 L1 replacement; inventory 3/3/3/2; suite 518; browser 437/437; $0."
     }
   ]
 }

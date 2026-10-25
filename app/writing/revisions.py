@@ -63,12 +63,12 @@ def checks_for(catalog: psycopg.Connection, store: WritingStore, record: dict[st
     g = generation.build_grounding(catalog, baseline, f"L{level['ordinal']}", record["difficulty"],
                                    record["target_criteria"], exercise_type=record["exercise_type"])
     if record["exercise_type"] != "conventions_editing":
-        stored = [r["record"] for r in store.exercises() if r["exercise_id"] != record["exercise_id"]]
+        stored = [r["record"] for r in store.exercises(eligible_only=False) if r["exercise_id"] != record["exercise_id"]]
         return (generation.deterministic_checks(g, record, [r["topic_es"] for r in stored])
                 + generation.compose_checks(g, record, stored))
-    others = [r["record"]["source_text_es"] for r in store.exercises("writing_conventions")
+    others = [r["record"]["source_text_es"] for r in store.exercises("writing_conventions", eligible_only=False)
               if r["exercise_id"] != record["exercise_id"] and r["record"].get("source_text_es")]
-    topics = [r["record"]["topic_es"] for r in store.exercises() if r["exercise_id"] != record["exercise_id"]]
+    topics = [r["record"]["topic_es"] for r in store.exercises(eligible_only=False) if r["exercise_id"] != record["exercise_id"]]
     return (generation.deterministic_checks(g, record, topics) + editing.editing_checks(g, record, reference, others)
             + editing.quality_checks(record, reference))
 

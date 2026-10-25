@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-25
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T028)
+- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T029)
 
 ## Current Objective
 
@@ -78,6 +78,11 @@ Producción escrita (Español, written rubric EE01–EE20)
   ([ADR-026](../adr/ADR-026-guided-composition-l4.md)); writing reviews by
   the generator are refused
   ([RCA-004](../rca/RCA-004-writing-review-not-independent.md)).
+- **T029** — RCA-004 remediation: eligibility events, independent
+  revalidation with the generator excluded, L1 review limit 6000 tokens;
+  3 exercises reinstated, `PE-L1-feria-ciencia-escuela-c9576f` still
+  quarantined, L1 replacement `PE-L1-huerta-escolar-8c310b`
+  ([ADR-027](../adr/ADR-027-writing-exercise-eligibility.md)).
 
 ### Current State
 
@@ -87,8 +92,8 @@ Producción escrita (Español, written rubric EE01–EE20)
   generation 1.3.0 / rubric 1.1.0, generation limit 4000 tokens, daily
   request budget 1000 (`.env`), 5 questions per practice, concurrency 2.
 - Student database: 381 multiple-choice answers (dashboard counts only the
-  2 `student` sessions, T017); writing inventory L1 3, L2 3, L3 3, L4 2 (L5
-  none in the real database); 0 writing drafts, submissions and
+  2 `student` sessions, T017); eligible writing inventory L1 3, L2 3,
+  L3 3, L4 2 (L5 none in the real database); 0 writing drafts, submissions and
   evaluations.
 - Writing app: Producción escrita card on the main menu → levels →
   exercises → editor (L1 prefilled with the text; L2–L5 empty) → one
@@ -103,15 +108,16 @@ Producción escrita (Español, written rubric EE01–EE20)
   (`session_classification`), `writing` (`exercise`, `exercise_revision`,
   `reference_correction`, `generation_attempt`, `draft`, `submission`,
   `evaluation`, `criterion_score`).
-- Tests: 507 passing; browser (mocked, `mentor_pro_test`) 433/433; ACE gate
+- Tests: 518 passing; browser (mocked, `mentor_pro_test`) 437/437; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
 1. Receive and plan the next Product Owner task (ADR first). Candidates
    named so far: L5 examination simulation, reopening or correcting a
-   completed evaluation. Decide on the four self-reviewed exercises
-   (RCA-004): `PE-L4-uso-responsable-redes-f9acfc` and the three T023 L1.
+   completed evaluation. Retry the revalidation of the quarantined
+   `PE-L1-feria-ciencia-escuela-c9576f`
+   (`scripts/dev/remediate_writing_review.py`).
 2. Restore a generation fallback model: only
    `nvidia/nemotron-3-ultra-550b-a55b:free` generates and it often truncates
    (writing L1 needed several seeding runs). Add another free text model to
@@ -182,5 +188,5 @@ Producción escrita (Español, written rubric EE01–EE20)
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-026](../adr/ADR-026-guided-composition-l4.md)
+  [ADR-027](../adr/ADR-027-writing-exercise-eligibility.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-004)

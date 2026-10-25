@@ -65,8 +65,9 @@ def reasoning_body(client: OpenRouterClient, model: str, purpose: str) -> dict[s
 def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]], purpose: str,
           max_tokens: int | None = None, request_id: str | None = None,
           avoid: frozenset[str] = frozenset(), practice_set_id: str | None = None,
-          gate: BudgetGate | None = None) -> RouteResult:
-    """Route one request. Models in `avoid` are tried last (e.g. the generator, for a blind solve).
+          gate: BudgetGate | None = None, exclude: frozenset[str] = frozenset()) -> RouteResult:
+    """Route one request. Models in `avoid` are tried last (e.g. the generator, for a blind solve); models in
+    `exclude` are never called (T029: an independent review must not fall back to the generator).
 
     Pass one shared `gate` to every concurrent caller; without it a private gate is used.
     """
@@ -84,9 +85,10 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
     if purpose == "generation":
         # T012: some models are kept for blind solve and review but never generate questions.
         free = [m for m in free if m not in settings.generation_excluded_models]
+    free = [m for m in free if m not in exclude]
     free = [m for m in free if m not in avoid] + [m for m in free if m in avoid]
     plan = [(m, "free") for m in free]
-    if settings.allow_paid and settings.paid_model:
+    if settings.allow_paid and settings.paid_model and settings.paid_model not in exclude:
         plan.append((settings.paid_model, "paid"))
     result.candidates = [m for m, _ in plan]
     if not plan:

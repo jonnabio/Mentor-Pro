@@ -123,13 +123,17 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             return "submitted"
         return "draft" if row.get("draft_saved_at") else "new"  # "submitted" covers pending and reviewed
 
-    def load(exercise_id: str) -> tuple[WritingStore, dict[str, Any]]:
+    def load(exercise_id: str, writable: bool = False) -> tuple[WritingStore, dict[str, Any]]:
+        """T029: a quarantined exercise is not offered; it stays readable only when already submitted, and
+        never takes a new draft or submission."""
         if not EXERCISE_ID.match(exercise_id):
             raise api_error(422, "invalid_exercise", "El ejercicio no es válido.")
         store = service.get()
-        row = next((r for r in store.exercises() if r["exercise_id"] == exercise_id), None)
-        if row is None:
+        row = next((r for r in store.exercises(eligible_only=False) if r["exercise_id"] == exercise_id), None)
+        if row is None or (not row["eligible"] and not row["submission_id"]):
             raise api_error(404, "exercise_not_found", "No encontramos este ejercicio.")
+        if writable and not row["eligible"]:
+            raise api_error(409, "exercise_unavailable", "Este ejercicio no está disponible por ahora.")
         return store, row
 
     def submission_view(sub: dict[str, Any] | None, evaluation: dict[str, Any] | None = None) -> dict[str, Any] | None:
@@ -240,7 +244,7 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
 
     @router.put("/exercises/{exercise_id}/draft")
     def save_draft(exercise_id: str, request: DraftRequest) -> dict[str, Any]:
-        store, row = load(exercise_id)
+        store, row = load(exercise_id, writable=True)
         typed_only(row)
         if guided(row):
             parts = guided_sections(row, request.sections)
@@ -253,7 +257,7 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
 
     @router.post("/exercises/{exercise_id}/submit")
     def submit(exercise_id: str, request: SubmitRequest) -> dict[str, Any]:
-        store, row = load(exercise_id)
+        store, row = load(exercise_id, writable=True)
         typed_only(row)
         parts = None
         if guided(row):

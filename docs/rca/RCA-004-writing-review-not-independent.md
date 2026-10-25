@@ -56,6 +56,16 @@ checked which model actually reviewed.
 - The four self-reviewed exercises are not changed or deleted; removing or
   re-reviewing them is a Product Owner decision.
 
+### T029 remediation ([ADR-027](../adr/ADR-027-writing-exercise-eligibility.md))
+
+- The four exercises were quarantined (append-only eligibility events)
+  and revalidated with the generator excluded from routing.
+- A sixth "why" for the L1 cases: at the 3000-token review limit the only
+  independent reviewer truncated 4 of its 6 L1 reviews, so the review fell
+  through to the generator. L1 reviews now have their own 6000-token limit.
+- `route(exclude=…)` replaces "try the generator last" for writing reviews
+  at every level; an outage now ends the attempt as `unavailable`.
+
 ---
 
 ## Prevention

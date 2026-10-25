@@ -524,7 +524,7 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
     g = build_grounding(catalog, baseline, level, difficulty, criteria)
     gate = gate or BudgetGate(usage_store, client.settings, max_calls=MAX_CALLS)
     avoid = writing_store.topics() if writing_store is not None else []
-    stored = [r["record"] for r in writing_store.exercises()] if writing_store is not None else []
+    stored = [r["record"] for r in writing_store.exercises(eligible_only=False)] if writing_store is not None else []
     attempts: list[Attempt] = []
     stop: str | None = None
     for _ in range(MAX_REQUESTS):
@@ -557,7 +557,7 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
         generator = generated.final.model_used if generated.final else None
         reviewed = route(client, usage_store, review_messages(g, exercise), purpose="review",
                          max_tokens=RUBRIC_MAX_TOKENS, request_id=attempt.request_id,
-                         avoid=frozenset({generator} if generator else ()), gate=gate)
+                         exclude=frozenset({generator} if generator else ()), gate=gate)
         attempt.usage += reviewed.records
         if reviewed.status != "ok":
             attempt.status, stop = "unavailable", _stop_reason(reviewed)
@@ -594,8 +594,8 @@ def generate_exercise(client: OpenRouterClient, usage_store: Store, catalog: psy
 
 
 def same_model_review(generator: str | None, reviewed: RouteResult) -> str | None:
-    """RCA-004: route() only tries the generator last, so when every other model fails the generator can review
-    its own exercise. W08 is an independent review (ADR-020): that review is refused, never accepted."""
+    """RCA-004: W08 is an independent review (ADR-020). Reviews exclude the generator from routing (T029); this
+    is the second defense: a review that still comes from the generator is refused, never accepted."""
     reviewer = reviewed.final.model_used if reviewed.final else None
     if generator and reviewer == generator:
         return f"review not independent: {reviewer} also generated the exercise"

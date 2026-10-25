@@ -132,7 +132,41 @@ ALTER TABLE writing.criterion_score ADD COLUMN IF NOT EXISTS descriptor_ref TEXT
 -- the four paragraphs joined by a blank line.
 ALTER TABLE writing.draft ADD COLUMN IF NOT EXISTS sections JSONB;
 ALTER TABLE writing.submission ADD COLUMN IF NOT EXISTS sections JSONB;
+-- T029 (ADR-027, RCA-004): append-only eligibility history; the latest event decides, no event = eligible.
+CREATE TABLE IF NOT EXISTS writing.eligibility_event (
+    event_id       BIGSERIAL PRIMARY KEY,
+    exercise_id    TEXT NOT NULL REFERENCES writing.exercise (exercise_id),
+    status         TEXT NOT NULL CHECK (status IN ('quarantined', 'eligible')),
+    reason         TEXT NOT NULL,
+    source         TEXT NOT NULL,
+    validation_id  TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Every independent revalidation, passed or not, with its models, results and costs.
+CREATE TABLE IF NOT EXISTS writing.independent_validation (
+    validation_id     TEXT PRIMARY KEY,
+    exercise_id       TEXT NOT NULL REFERENCES writing.exercise (exercise_id),
+    exercise_revision INTEGER NOT NULL,
+    version           TEXT NOT NULL,
+    status            TEXT NOT NULL CHECK (status IN ('passed', 'failed', 'unavailable')),
+    generator_model   TEXT,
+    reviewer_model    TEXT,
+    checks            JSONB NOT NULL,
+    review            JSONB,
+    reasons           JSONB NOT NULL,
+    request_id        TEXT NOT NULL,
+    calls             INTEGER NOT NULL,
+    tokens_in         INTEGER NOT NULL,
+    tokens_out        INTEGER NOT NULL,
+    cost_usd          NUMERIC(14, 8) NOT NULL,
+    cost_complete     BOOLEAN NOT NULL,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (status <> 'passed' OR (reviewer_model IS NOT NULL AND reviewer_model IS DISTINCT FROM generator_model))
+);
 """
+
+ELIGIBLE_SQL = """COALESCE((SELECT ev.status FROM writing.eligibility_event ev WHERE ev.exercise_id = e.exercise_id
+                     ORDER BY ev.event_id DESC LIMIT 1), 'eligible') = 'eligible'"""
 
 GUIDED_PARAGRAPHS = ("introduction", "development_1", "development_2", "conclusion")
 GUIDED_SECTIONS = ("plan",) + GUIDED_PARAGRAPHS
@@ -284,18 +318,62 @@ class WritingStore:
 
     # ------------------------------------------------------------ student writing (T022)
 
-    def exercises(self, level: str | None = None) -> list[dict[str, Any]]:
-        """Stored (validated) exercises, oldest first, with the student's draft and submission state."""
+    def exercises(self, level: str | None = None, eligible_only: bool = True) -> list[dict[str, Any]]:
+        """Stored (validated) exercises, oldest first, with the student's draft and submission state.
+        T029: quarantined exercises are left out unless `eligible_only` is False."""
         with self._connect() as conn:
             return conn.execute(
                 f"""SELECT e.exercise_id, e.level, e.difficulty, e.evidence_mode, {CURRENT_RECORD_SQL} AS record,
-                          {CURRENT_REVISION_SQL} AS revision, e.created_at,
+                          {CURRENT_REVISION_SQL} AS revision, e.created_at, {ELIGIBLE_SQL} AS eligible,
                           d.updated_at AS draft_saved_at, s.submission_id, s.submitted_at
                    FROM writing.exercise e
                    LEFT JOIN writing.draft d USING (exercise_id)
                    LEFT JOIN writing.submission s USING (exercise_id)
-                   WHERE %(level)s::text IS NULL OR e.level = %(level)s
-                   ORDER BY e.created_at, e.exercise_id""", {"level": level}).fetchall()
+                   WHERE (%(level)s::text IS NULL OR e.level = %(level)s) AND (NOT %(eligible_only)s OR {ELIGIBLE_SQL})
+                   ORDER BY e.created_at, e.exercise_id""", {"level": level, "eligible_only": eligible_only}).fetchall()
+
+    # ------------------------------------------------------------ eligibility (T029, RCA-004)
+
+    def eligibility(self, exercise_id: str) -> str:
+        with self._connect() as conn:
+            row = conn.execute("SELECT status FROM writing.eligibility_event WHERE exercise_id = %s "
+                               "ORDER BY event_id DESC LIMIT 1", (exercise_id,)).fetchone()
+        return row["status"] if row else "eligible"
+
+    def eligibility_events(self, exercise_id: str | None = None) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.eligibility_event WHERE %(id)s::text IS NULL "
+                                "OR exercise_id = %(id)s ORDER BY event_id", {"id": exercise_id}).fetchall()
+
+    def set_eligibility(self, exercise_id: str, status: str, reason: str, source: str,
+                        validation_id: str | None = None) -> bool:
+        """Append an event unless the exercise already has that status; True when one was added."""
+        with self._connect() as conn, conn.transaction():
+            conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
+            current = conn.execute("SELECT status FROM writing.eligibility_event WHERE exercise_id = %s "
+                                   "ORDER BY event_id DESC LIMIT 1", (exercise_id,)).fetchone()
+            if (current["status"] if current else "eligible") == status:
+                return False
+            conn.execute("INSERT INTO writing.eligibility_event (exercise_id, status, reason, source, validation_id) "
+                         "VALUES (%s, %s, %s, %s, %s)", (exercise_id, status, reason, source, validation_id))
+            return True
+
+    def add_validation(self, row: dict[str, Any]) -> None:
+        with self._connect() as conn, conn.transaction():
+            conn.execute(
+                """INSERT INTO writing.independent_validation (validation_id, exercise_id, exercise_revision, version,
+                       status, generator_model, reviewer_model, checks, review, reasons, request_id, calls, tokens_in,
+                       tokens_out, cost_usd, cost_complete)
+                   VALUES (%(validation_id)s, %(exercise_id)s, %(exercise_revision)s, %(version)s, %(status)s,
+                           %(generator_model)s, %(reviewer_model)s, %(checks)s, %(review)s, %(reasons)s,
+                           %(request_id)s, %(calls)s, %(tokens_in)s, %(tokens_out)s, %(cost_usd)s, %(cost_complete)s)""",
+                {**row, "checks": Jsonb(row["checks"]), "review": Jsonb(row["review"]) if row["review"] else None,
+                 "reasons": Jsonb(row["reasons"])})
+
+    def validations(self, exercise_id: str | None = None) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.independent_validation WHERE %(id)s::text IS NULL "
+                                "OR exercise_id = %(id)s ORDER BY created_at", {"id": exercise_id}).fetchall()
 
     def draft(self, exercise_id: str) -> dict[str, Any] | None:
         with self._connect() as conn:
