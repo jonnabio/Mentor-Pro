@@ -1,0 +1,30 @@
+
+name: Mentor Pro CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    name: Validate Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Mentor Pro image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: mentor-pro:ci-test
