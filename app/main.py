@@ -28,6 +28,7 @@ from app.practice.jobs import SetRunner, live_set_runner
 from app.practice.mastery import NOTICE_ES, STATUS_LABELS_ES, STATUSES, Thresholds, subject_dashboard
 from app.practice.routes import PracticeService, build_practice_router
 from app.writing.routes import WritingService, build_writing_router
+from app.writing.tutor import LOOPBACK, build_tutor_router
 from curriculum import db
 from curriculum.catalog import PracticeScope, SelectionError, list_objectives, open_catalog, select_objectives
 
@@ -64,7 +65,8 @@ class PracticeConfig(BaseModel):
 
 def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
                baseline: str = BASELINE_VERSION, dev_endpoints: bool | None = None,
-               llm_factory: LlmFactory | None = None, practice_runner: SetRunner | None = None) -> FastAPI:
+               llm_factory: LlmFactory | None = None, practice_runner: SetRunner | None = None,
+               tutor_token: str | None = None, tutor_hosts: frozenset[str] = LOOPBACK) -> FastAPI:
     app = FastAPI(title="Mentor Pro", version="0.4.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
     app.state.catalog_target = (database_url, schema)
 
@@ -162,6 +164,14 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
     # T022: Producción escrita (Español) reads stored exercises only; it never generates.
     app.state.writing = WritingService(lambda: database_url or db.database_url())
     app.include_router(build_writing_router(app.state.writing, ApiError))
+    # T026: tutor review exists only with a configured token (ADR-024); it is never linked from the student UI.
+    tutor_token = tutor_token if tutor_token is not None else (db.setting("MENTOR_PRO_TUTOR_TOKEN") or "")
+    if tutor_token:
+        app.include_router(build_tutor_router(app.state.writing, ApiError, tutor_token, tutor_hosts))
+
+        @app.get("/tutor", include_in_schema=False)
+        def tutor_page() -> FileResponse:
+            return FileResponse(STATIC_DIR / "tutor.html")
 
     if dev_endpoints is None:
         dev_endpoints = os.environ.get("MENTOR_PRO_DEV_ENDPOINTS", "").lower() in ("1", "true", "yes")

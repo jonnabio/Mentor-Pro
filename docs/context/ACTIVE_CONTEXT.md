@@ -5,7 +5,7 @@
 - **Last Updated:** 2026-10-24
 - **Active Role:** Architect (next: Developer)
 - **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T025)
+- **Session span:** 2026-10-22 to 2026-10-24 (T006 completion through T026)
 
 ## Current Objective
 
@@ -89,6 +89,10 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - **T025** — L2 (3 introductions) and L3 (2 development, 1 conclusion)
   inventory; checks W13–W18 for composed paragraphs; seeding command
   `seed_writing_l2_l3.py`; two editorial revisions.
+- **T026** — tutor review at `/tutor` (local code `MENTOR_PRO_TUTOR_TOKEN`
+  in `.env`): queue, official descriptors, partial save, single completion;
+  student sees scores and feedback, never the reference
+  ([ADR-024](../adr/ADR-024-tutor-writing-evaluation.md)).
 
 ### Current State
 
@@ -104,7 +108,7 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
   `generation.question_attempt`, `generation.practice_set`,
   `generation.practice_set_item`, `generation.bank_revalidation`,
   `practice.session`, `practice.item`, `practice.answer`.
-- Tests: 481 passing; browser (mocked) 335/335 and live 14/14 on
+- Tests: 489 passing; browser (mocked) 363/363 and live 14/14 on
   `mentor_pro_test`; ACE gate
   `VERIFY_RESULT=pass gate=all`.
 
@@ -170,5 +174,5 @@ This session (reports in `docs/progress/task_T0xx_result.md`):
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-023](../adr/ADR-023-l1-editor-and-editorial-revisions.md)
+  [ADR-024](../adr/ADR-024-tutor-writing-evaluation.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-003)

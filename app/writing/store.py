@@ -123,6 +123,11 @@ CREATE TABLE IF NOT EXISTS writing.exercise_revision (
     PRIMARY KEY (exercise_id, revision)
 );
 ALTER TABLE writing.submission ADD COLUMN IF NOT EXISTS exercise_revision INTEGER NOT NULL DEFAULT 1;
+-- T026 (ADR-024): one tutor evaluation per submission, saved partially and completed once.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_evaluation_submission ON writing.evaluation (submission_id);
+ALTER TABLE writing.evaluation ADD COLUMN IF NOT EXISTS exercise_revision INTEGER;
+ALTER TABLE writing.evaluation ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE writing.criterion_score ADD COLUMN IF NOT EXISTS descriptor_ref TEXT;
 """
 
 CURRENT_RECORD_SQL = """COALESCE((SELECT r.record FROM writing.exercise_revision r WHERE r.exercise_id = e.exercise_id
@@ -137,6 +142,10 @@ def word_count(text: str) -> int:
 
 def paragraph_count(text: str) -> int:
     return len([p for p in text.splitlines() if p.strip()])
+
+
+class EvaluationLocked(RuntimeError):
+    """The submission already has a completed evaluation (T026)."""
 
 
 class InvalidRecord(ValueError):
@@ -317,6 +326,67 @@ class WritingStore:
                                 word_count = EXCLUDED.word_count, updated_at = now()""",
                          (exercise_id, text_es, word_count(text_es)))
             return row, True
+
+    # ------------------------------------------------------------ tutor evaluation (T026)
+
+    def submission_by_id(self, submission_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.submission WHERE submission_id = %s",
+                                (submission_id,)).fetchone()
+
+    def tutor_queue(self) -> list[dict[str, Any]]:
+        """Every submission with its evaluation status (pending when no evaluation exists), oldest first."""
+        with self._connect() as conn:
+            return conn.execute(
+                """SELECT s.submission_id, s.exercise_id, s.exercise_revision, s.submitted_at, s.evidence_mode,
+                          e.level, COALESCE(v.status, 'pending') AS status, v.evaluated_at, v.updated_at
+                   FROM writing.submission s JOIN writing.exercise e USING (exercise_id)
+                   LEFT JOIN writing.evaluation v USING (submission_id)
+                   ORDER BY s.submitted_at""").fetchall()
+
+    def evaluation_for(self, submission_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.evaluation WHERE submission_id = %s",
+                                (submission_id,)).fetchone()
+
+    def save_evaluation(self, evaluation: dict[str, Any], exercise: dict[str, Any], exercise_revision: int) -> None:
+        """Insert or update the one evaluation of a submission; a completed evaluation is never changed."""
+        problems = contracts.validate_evaluation(evaluation, exercise)
+        if problems:
+            raise InvalidRecord(problems)
+        sid = evaluation["submission"]["submission_id"]
+        with self._connect() as conn, conn.transaction():
+            conn.execute("SELECT 1 FROM writing.submission WHERE submission_id = %s FOR UPDATE", (sid,))
+            existing = conn.execute("SELECT evaluation_id, status FROM writing.evaluation WHERE submission_id = %s",
+                                    (sid,)).fetchone()
+            if existing and existing["status"] == "completed":
+                raise EvaluationLocked(sid)
+            if existing and existing["evaluation_id"] != evaluation["evaluation_id"]:
+                evaluation = {**evaluation, "evaluation_id": existing["evaluation_id"]}
+            values = (evaluation["status"], evaluation["evaluator"]["role"], evaluation["rubric_id"],
+                      evaluation["rubric_sha256"], evaluation.get("evaluated_at"), Jsonb(evaluation["feedback_es"]),
+                      Jsonb(evaluation), exercise_revision)
+            if existing:
+                conn.execute(
+                    """UPDATE writing.evaluation SET status = %s, evaluator_role = %s, rubric_id = %s, rubric_sha256 = %s,
+                           evaluated_at = %s, feedback = %s, record = %s, exercise_revision = %s, updated_at = now()
+                       WHERE evaluation_id = %s""", values + (evaluation["evaluation_id"],))
+                conn.execute("DELETE FROM writing.criterion_score WHERE evaluation_id = %s",
+                             (evaluation["evaluation_id"],))
+            else:
+                conn.execute(
+                    """INSERT INTO writing.evaluation (status, evaluator_role, rubric_id, rubric_sha256, evaluated_at,
+                           feedback, record, exercise_revision, evaluation_id, submission_id)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    values + (evaluation["evaluation_id"], sid))
+            for score in evaluation["criterion_scores"]:
+                conn.execute(
+                    """INSERT INTO writing.criterion_score (evaluation_id, criterion_code, status, points,
+                           not_evaluable_reason, descriptor_ref) VALUES (%s, %s, %s, %s, %s, %s)""",
+                    (evaluation["evaluation_id"], score["criterion"], score["status"], score.get("points"),
+                     score.get("not_evaluable_reason"),
+                     f"{evaluation['rubric_id']}#{score['criterion']}@{score['points']}"
+                     if score.get("points") is not None else None))
 
     def generation_attempts(self) -> list[dict[str, Any]]:
         with self._connect() as conn:

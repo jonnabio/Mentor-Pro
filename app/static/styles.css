@@ -236,3 +236,25 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 /* ------------------------------------------------------------------ correction exercises (T023) */
 .source-text { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px dashed var(--border);
   border-radius: 8px; padding: 10px 12px; background: var(--surface); line-height: 1.6; }
+
+/* ------------------------------------------------------------------ tutor review (T026) */
+.feedback-scores li, .tutor-criterion { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+  margin-bottom: 8px; }
+.feedback-scores .objective-text, .feedback-scores .meta-line { display: block; overflow-wrap: anywhere; }
+.feedback-scores .meta-line { color: var(--muted); font-size: 0.9rem; }
+.feedback-points { display: block; margin: 4px 0; color: var(--accent); }
+.tutor-criterion legend { font-weight: 700; padding: 0 4px; }
+.tutor-option { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: start; padding: 6px 4px;
+  border-radius: 6px; cursor: pointer; }
+.tutor-option:has(input:checked) { background: var(--accent-soft); }
+.tutor-option .points { font-weight: 800; min-width: 1.2rem; }
+.tutor-option span { overflow-wrap: anywhere; }
+.tutor-badge { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 0.85rem; font-weight: 650;
+  border: 1px solid var(--border); }
+.tutor-badge.pending { color: var(--danger); border-color: var(--danger); }
+.tutor-badge.in_progress { color: #7a5300; border-color: #d9a400; }
+.tutor-badge.completed { color: var(--accent); border-color: var(--accent); }
+#tutor-view textarea, #tutor-token { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: inherit; }
+.tutor-reference { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px dashed var(--danger);
+  border-radius: 8px; padding: 10px 12px; }

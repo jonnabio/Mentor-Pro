@@ -817,6 +817,44 @@
       "result_file": "docs/progress/task_T025_result.md",
       "failures": [],
       "notes": "15 requests, 5 accepted, USD 0; two revisions; live 27/27; browser 335/335; suite 481."
+    },
+    {
+      "id": "T026",
+      "name": "Human tutor writing evaluation (PO task T026)",
+      "objective": "Tutor queue and evaluation with official descriptors, partial save, single completion; student feedback; local tutor boundary.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/adr/ADR-024-tutor-writing-evaluation.md",
+          "app/writing/tutor.py",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "tests/app/test_writing_tutor.py",
+          "docs/progress/task_T026_result.md",
+          "docs/progress/screenshots/T026/"
+        ],
+        "modify": [
+          "app/writing/store.py",
+          "app/writing/routes.py",
+          "app/main.py",
+          "curriculum/db.py",
+          "app/static/app.js",
+          "app/static/index.html",
+          "app/static/styles.css",
+          ".env.example",
+          "scripts/dev/practice_e2e.py"
+        ]
+      },
+      "depends_on": [
+        "T025"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T026_result.md",
+      "failures": [],
+      "notes": "Suite 489; browser 363/363; live boundary checked read-only."
     }
   ]
 }

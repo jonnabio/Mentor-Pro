@@ -72,6 +72,7 @@ L1_TITLES = ["El fútbol en mi comunidad", "Corrección de texto expositivo: El 
              "Corrección de un texto expositivo: La feria de la ciencia"]  # generated in T023
 REFERENCE_TUTOR_ID = "PE-L1-futbol-comunidad-f136a4"
 REFERENCE_SECRET = "Los entrenadores voluntarios enseñan"  # test-only tutor reference text (seeded below)
+TUTOR_TOKEN = "e2e-tutor-token-" + uuid.uuid4().hex  # T026: tutor review is enabled only for this run
 WRITING_TEXT = ("La alimentación saludable es muy importante para los estudiantes. Cuando comemos frutas, verduras "
                 "y granos tenemos más energía para aprender. Además, una buena alimentación ayuda a concentrarse en "
                 "clase y a convivir mejor con los compañeros.")
@@ -769,6 +770,109 @@ def scenario_writing(page: Page, report: Report, viewport: str, out: Path, url: 
     report.check(no_overflow(page) and not errors, f"[{name}] no overflow, no JavaScript errors {errors}")
 
 
+def tutor_complete(tutor: Page, scores: dict[str, int]) -> None:
+    for code, points in scores.items():
+        tutor.locator(f'fieldset[data-criterion="{code}"] input[value="{points}"]').check()
+    tutor.locator("#tutor-improvements").fill("Revisá la idea complementaria del segundo párrafo.")
+    tutor.get_by_role("button", name="Completar evaluación").click()
+    tutor.get_by_role("button", name="Completar", exact=True).click()
+    expect(tutor.locator("#tutor-locked")).to_be_visible()
+
+
+def scenario_tutor(tutor: Page, student: Page, report: Report, viewport: str, out: Path, url: str) -> None:
+    """T026: tutor review in its own browser context; the student sees scores and feedback, never the reference."""
+    name = f"{viewport}-tutor"
+    errors: list[str] = []
+    tutor.on("pageerror", lambda exc: errors.append(str(exc)))
+    l3 = writing_rows(url, "SELECT exercise_id FROM writing.exercise WHERE level = 'paragraph_writing' "
+                           "ORDER BY created_at LIMIT 1")[0][0]
+    student.goto(BASE)
+    student.evaluate("async (id) => fetch(`/api/writing/exercises/${id}/submit`, {method: 'POST', headers: "
+                     "{'Content-Type': 'application/json'}, body: JSON.stringify({text: 'Las causas son varias.\\n\\n"
+                     "Las consecuencias también.', client_request_id: 'e2e-l3-' + Date.now()})})", l3)
+
+    report.check(student.request.get(BASE + "api/tutor/queue").status == 403,
+                 f"[{name}] tutor API refuses requests without the tutor code")
+    tutor.goto(BASE + "tutor")
+    tutor.locator("#tutor-token").fill("codigo-incorrecto-123456")
+    tutor.get_by_role("button", name="Entrar").click()
+    expect(tutor.locator("#tutor-error")).to_be_visible()
+    report.check("incorrecto" in tutor.locator("#tutor-error").inner_text(), f"[{name}] wrong tutor code refused")
+    tutor.locator("#tutor-token").fill(TUTOR_TOKEN)
+    tutor.get_by_role("button", name="Entrar").click()
+    expect(tutor.locator(".exercise-choice").first).to_be_visible()
+    queue = tutor.locator(".exercise-choice").all_inner_texts()
+    report.check(len(queue) == 3 and all("Pendiente" in q for q in queue),
+                 f"[{name}] queue shows 3 pending submissions (L1, L2, L3)")
+    tutor.screenshot(path=str(out / f"{name}-queue.png"), full_page=True)
+
+    tutor.locator(".exercise-choice", has_text="El fútbol en mi comunidad").click()
+    expect(tutor.locator("#tutor-reference-block")).to_be_visible()
+    options = tutor.locator('fieldset[data-criterion="EE07"] .tutor-option').all_inner_texts()
+    from app.writing import contracts
+    official = contracts.criteria()["EE07"]["descriptors_es"]
+    report.check(REFERENCE_SECRET in tutor.locator("#tutor-reference").inner_text()
+                 and [o.split("\n", 1)[-1].strip() for o in options] == official,
+                 f"[{name}] L1: reference correction and the five official EE07 descriptors shown")
+    tutor.locator('fieldset[data-criterion="EE07"] input[value="3"]').check()
+    tutor.locator("#tutor-strengths").fill("Corregiste bien «los niños».")
+    tutor.get_by_role("button", name="Guardar evaluación parcial").click()
+    expect(tutor.locator("#tutor-saved")).to_contain_text("Evaluación parcial guardada")
+    tutor.reload()
+    tutor.locator(".exercise-choice", has_text="El fútbol en mi comunidad").click()
+    expect(tutor.locator("#tutor-detail")).to_be_visible()
+    report.check(tutor.locator('fieldset[data-criterion="EE07"] input[value="3"]').is_checked()
+                 and "los niños" in tutor.locator("#tutor-strengths").input_value(),
+                 f"[{name}] partial evaluation resumed after reload")
+    tutor.get_by_role("button", name="Completar evaluación").click()
+    report.check("EE08" in tutor.locator("#tutor-error").inner_text() and tutor.locator("#tutor-dialog").is_hidden(),
+                 f"[{name}] completion needs every criterion scored")
+    tutor.screenshot(path=str(out / f"{name}-evaluation.png"), full_page=True)
+    tutor_complete(tutor, {"EE08": 2})
+    report.check(tutor.locator("#tutor-complete").is_disabled() and tutor.locator("#tutor-save").is_disabled(),
+                 f"[{name}] completed evaluation is locked (no second completion)")
+    duplicate = tutor.evaluate("async ([sid, token]) => (await fetch(`/api/tutor/submissions/${sid}/evaluation`, "
+                               "{method: 'PUT', headers: {'Content-Type': 'application/json', 'X-Tutor-Token': token},"
+                               " body: JSON.stringify({scores: {EE07: 4, EE08: 4}, complete: true})})).status",
+                               [writing_rows(url, "SELECT submission_id FROM writing.submission WHERE exercise_id = %s",
+                                             REFERENCE_TUTOR_ID)[0][0], TUTOR_TOKEN])
+    report.check(duplicate == 409, f"[{name}] a second completion is refused by the server ({duplicate})")
+    tutor.get_by_role("button", name="Volver a las entregas").click()
+
+    for title, codes in (("La alimentación saludable", {"EE03": 3, "EE04": 2}), (None, None)):
+        if title:
+            tutor.locator(".exercise-choice", has_text=title).click()
+        else:  # the L3 entry, by title; read its criteria only once its screen has loaded
+            l3_title = writing_rows(url, "SELECT record->>'topic_es' FROM writing.exercise WHERE exercise_id = %s",
+                                    l3)[0][0]
+            tutor.locator(".exercise-choice", has_text=l3_title).click()
+            expect(tutor.locator("#tutor-title")).to_have_text(l3_title)
+            codes = {c: 2 for c in tutor.locator("#tutor-criteria fieldset").evaluate_all(
+                "(nodes) => nodes.map((n) => n.dataset.criterion)")}
+        expect(tutor.locator("#tutor-detail")).to_be_visible()
+        report.check(tutor.locator("#tutor-reference-block").is_hidden(), f"[{name}] {list(codes)}: no reference block")
+        tutor_complete(tutor, codes)
+        tutor.get_by_role("button", name="Volver a las entregas").click()
+    expect(tutor.locator(".tutor-badge", has_text="Completada")).to_have_count(3)  # refreshed queue
+    statuses = tutor.locator(".tutor-badge").all_inner_texts()
+    report.check(statuses == ["Completada"] * 3, f"[{name}] L1, L2 and L3 evaluations completed {statuses}")
+
+    student.goto(BASE)
+    student.get_by_role("button", name="Abrir Producción escrita").click()
+    student.locator('.level-choice[data-level="writing_conventions"]').click()
+    student.locator(".exercise-choice", has_text="El fútbol").click()
+    expect(student.locator("#writing-feedback")).to_be_visible()
+    fb = student.locator("#writing-feedback").inner_text()
+    html = student.content() + student.evaluate("JSON.stringify(sessionStorage) + JSON.stringify(localStorage)")
+    report.check("3 de 4" in fb and "2 de 4" in fb and "Corregiste bien" in fb and "Revisá la idea" in fb
+                 and "Revisado el" in fb and "Revisado por el tutor" in student.locator("#writing-pending").inner_text(),
+                 f"[{name}] student sees scores, feedback, improvements and date")
+    report.check(REFERENCE_SECRET not in html and "corrected_text" not in html and TUTOR_TOKEN not in html,
+                 f"[{name}] student page never contains the reference correction or the tutor code")
+    student.screenshot(path=str(out / f"{name}-student-feedback.png"), full_page=True)
+    report.check(no_overflow(tutor) and not errors, f"[{name}] tutor page: no overflow, no JavaScript errors {errors}")
+
+
 def scenario_dashboard(page: Page, report: Report, name: str, out: Path) -> None:
     """T014: learning dashboard from the main menu; every subject, objective and status is shown."""
     page.goto(BASE)
@@ -805,7 +909,7 @@ def run_mock(out: Path, url: str) -> Report:
     runner = ScriptedRunner()
     report = Report()
     prepare_database(url, seed_bank=True)
-    with serve(create_app(url, practice_runner=runner)), sync_playwright() as p:
+    with serve(create_app(url, practice_runner=runner, tutor_token=TUTOR_TOKEN)), sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome", headless=True)
         for viewport, size in (("desktop", DESKTOP), ("mobile", MOBILE)):
             context = browser.new_context(viewport=size, locale="es-CR", is_mobile=viewport == "mobile",
@@ -827,6 +931,10 @@ def run_mock(out: Path, url: str) -> Report:
             scenario_dashboard(page, report, viewport, out)
             scenario_dashboard_practice(page, runner, report, viewport, out)
             scenario_writing(page, report, viewport, out, url)
+            tutor_context = browser.new_context(viewport=size, locale="es-CR", is_mobile=viewport == "mobile",
+                                                has_touch=viewport == "mobile")
+            scenario_tutor(tutor_context.new_page(), page, report, viewport, out, url)
+            tutor_context.close()
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()

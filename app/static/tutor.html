@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es-CR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Mentor Pro · Revisión del tutor</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/tutor.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <p class="brand">Mentor Pro</p>
+      <h1>Revisión del tutor</h1>
+      <p class="lead">Producción escrita · Evaluación con la rúbrica MEP 2026</p>
+    </div>
+  </header>
+
+  <main class="wrap" id="tutor-view">
+    <p id="tutor-error" class="alert" role="alert" hidden></p>
+
+    <section id="tutor-login" class="card">
+      <h2>Acceso del tutor</h2>
+      <p class="muted">Ingresá el código de tutor configurado en este equipo.</p>
+      <label for="tutor-token" class="field-label">Código de tutor</label>
+      <input id="tutor-token" type="password" autocomplete="off">
+      <div class="actions">
+        <button type="button" id="tutor-enter" class="primary">Entrar</button>
+      </div>
+    </section>
+
+    <section id="tutor-queue" class="card" hidden>
+      <h2>Entregas</h2>
+      <p id="tutor-queue-empty" class="muted" hidden>No hay entregas para revisar.</p>
+      <ul id="tutor-list" class="plain-list writing-exercises"></ul>
+    </section>
+
+    <section id="tutor-detail" class="card" hidden>
+      <p id="tutor-meta" class="muted small"></p>
+      <h2 id="tutor-title"></h2>
+      <h3>Instrucciones del ejercicio</h3>
+      <p id="tutor-situation"></p>
+      <ol id="tutor-instructions"></ol>
+      <p id="tutor-deliverable" class="muted"></p>
+      <div id="tutor-source-block" hidden>
+        <h3>Texto original con errores</h3>
+        <p id="tutor-source" class="source-text"></p>
+      </div>
+      <h3>Respuesta del estudiante</h3>
+      <p id="tutor-student" class="submitted-text"></p>
+      <div id="tutor-reference-block" hidden>
+        <h3>Corrección de referencia (solo tutor)</h3>
+        <p id="tutor-reference" class="tutor-reference"></p>
+        <ul id="tutor-corrections"></ul>
+        <p id="tutor-ambiguities" class="muted small"></p>
+      </div>
+      <h3>Criterios de la rúbrica</h3>
+      <p id="tutor-note" class="muted small"></p>
+      <form id="tutor-form">
+        <div id="tutor-criteria"></div>
+        <label for="tutor-strengths" class="field-label">Comentarios para el estudiante (uno por línea)</label>
+        <textarea id="tutor-strengths" rows="3"></textarea>
+        <label for="tutor-improvements" class="field-label">Áreas para mejorar (una por línea)</label>
+        <textarea id="tutor-improvements" rows="3"></textarea>
+        <label for="tutor-next" class="field-label">Próximo paso (opcional)</label>
+        <textarea id="tutor-next" rows="2"></textarea>
+        <p id="tutor-saved" class="muted small" aria-live="polite"></p>
+        <div class="actions">
+          <button type="button" id="tutor-save" class="secondary">Guardar evaluación parcial</button>
+          <button type="button" id="tutor-complete" class="primary">Completar evaluación</button>
+        </div>
+      </form>
+      <p id="tutor-locked" class="choice-notice" hidden>Evaluación completada. Ya no se puede cambiar.</p>
+      <button type="button" id="tutor-back" class="secondary">Volver a las entregas</button>
+    </section>
+
+    <dialog id="tutor-dialog" aria-labelledby="tutor-dialog-title">
+      <h2 id="tutor-dialog-title">¿Completar la evaluación?</h2>
+      <p>Después de completarla, el estudiante verá los puntajes y comentarios, y ya no se podrá cambiar.</p>
+      <div class="actions">
+        <button type="button" id="tutor-dialog-stay" class="secondary">Seguir revisando</button>
+        <button type="button" id="tutor-dialog-confirm" class="primary">Completar</button>
+      </div>
+    </dialog>
+  </main>
+</body>
+</html>

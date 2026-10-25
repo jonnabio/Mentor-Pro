@@ -712,6 +712,7 @@ function renderWritingState() {
     $("writing-pending").textContent = `${data.submission.status_es}. Entregado el ` +
       `${new Date(data.submission.submitted_at).toLocaleString("es-CR")} (${data.submission.word_count} palabras).`;
     $("writing-submitted-text").textContent = data.draft ? data.draft.text : "";
+    renderWritingFeedback(data.feedback);
     return;
   }
   if (data.handwritten) return;
@@ -726,6 +727,26 @@ function renderWritingState() {
   $("writing-saved").textContent = data.draft
     ? ` · Borrador guardado ${new Date(data.draft.saved_at).toLocaleString("es-CR")}` : "";
   updateWordCount();
+}
+
+// T026: the completed tutor review. Scores use the official rubric descriptors; no grade is computed.
+function renderWritingFeedback(feedback) {
+  $("writing-feedback").hidden = !feedback;
+  if (!feedback) return;
+  $("writing-feedback-date").textContent =
+    `Revisado el ${new Date(feedback.evaluated_at).toLocaleString("es-CR")}`;
+  $("writing-feedback-scores").replaceChildren(...feedback.scores.map((s) => el("li", {},
+    el("span", { class: "objective-text" }, s.statement_es),
+    el("strong", { class: "feedback-points" }, s.status === "scored" ? `${s.points} de ${s.max_points}` : "No evaluable"),
+    el("span", { class: "meta-line" }, s.status === "scored" ? s.descriptor_es : s.note_es))));
+  for (const [key, title] of [["strengths", "writing-feedback-strengths"], ["improvements", "writing-feedback-improvements"]]) {
+    const items = feedback[`${key}_es`];
+    $(title).replaceChildren(...items.map((text) => el("li", {}, text)));
+    $(title).hidden = items.length === 0;
+    $(`${title}-title`).hidden = items.length === 0;
+  }
+  $("writing-feedback-next").textContent = feedback.next_step_es ? `Próximo paso: ${feedback.next_step_es}` : "";
+  $("writing-feedback-next").hidden = !feedback.next_step_es;
 }
 
 function updateWordCount() {

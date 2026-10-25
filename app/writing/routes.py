@@ -20,6 +20,7 @@ from app.writing.store import WritingStore, word_count
 
 MAX_TEXT = 20000
 PENDING_ES = "Pendiente de revisión del tutor"
+REVIEWED_ES = "Revisado por el tutor"
 LEVEL_TEXT_ES = {
     "writing_conventions": "Escribí oraciones cuidando la ortografía, la concordancia y la puntuación.",
     "idea_development": "Escribí un párrafo de introducción con una idea principal y dos ideas que la apoyen.",
@@ -85,7 +86,7 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
     def state(row: dict[str, Any]) -> str:
         if row.get("submission_id"):
             return "submitted"
-        return "draft" if row.get("draft_saved_at") else "new"
+        return "draft" if row.get("draft_saved_at") else "new"  # "submitted" covers pending and reviewed
 
     def load(exercise_id: str) -> tuple[WritingStore, dict[str, Any]]:
         if not EXERCISE_ID.match(exercise_id):
@@ -96,11 +97,30 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             raise api_error(404, "exercise_not_found", "No encontramos este ejercicio.")
         return store, row
 
-    def submission_view(sub: dict[str, Any] | None) -> dict[str, Any] | None:
+    def submission_view(sub: dict[str, Any] | None, evaluation: dict[str, Any] | None = None) -> dict[str, Any] | None:
         if sub is None:
             return None
+        reviewed = evaluation is not None and evaluation["status"] == "completed"
         return {"submitted_at": sub["submitted_at"].isoformat(), "word_count": sub["word_count"],
-                "status": "pending_review", "status_es": PENDING_ES}
+                "status": "reviewed" if reviewed else "pending_review", "status_es": REVIEWED_ES if reviewed else PENDING_ES}
+
+    def feedback_view(evaluation: dict[str, Any] | None) -> dict[str, Any] | None:
+        """T026: the completed tutor evaluation as the student sees it (never the reference correction)."""
+        if evaluation is None or evaluation["status"] != "completed":
+            return None
+        record, criteria = evaluation["record"], contracts.criteria()
+        scores = []
+        for s in record["criterion_scores"]:
+            item = {"statement_es": criteria[s["criterion"]]["statement_es"], "status": s["status"]}
+            if s["status"] == "scored":
+                item.update(points=s["points"], max_points=4,
+                            descriptor_es=criteria[s["criterion"]]["descriptors_es"][s["points"]])
+            else:
+                item["note_es"] = "No evaluable en un texto escrito en la computadora (se revisa la letra a mano)."
+            scores.append(item)
+        feedback = record["feedback_es"]
+        return {"evaluated_at": record["evaluated_at"], "scores": scores, "strengths_es": feedback["strengths"],
+                "improvements_es": feedback["improvements"], "next_step_es": feedback.get("next_step")}
 
     @router.get("/levels")
     def levels() -> dict[str, Any]:
@@ -127,6 +147,7 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
     def exercise(exercise_id: str) -> dict[str, Any]:
         store, row = load(exercise_id)
         submission = store.submission(exercise_id)
+        evaluation = store.evaluation_for(submission["submission_id"]) if submission else None
         # T024: a submitted answer keeps the exercise revision it answered; otherwise the latest revision.
         revision = submission["exercise_revision"] if submission else row["revision"]
         record = store.record(exercise_id, revision) if submission else row["record"]
@@ -152,7 +173,8 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             "draft": None if handwritten or draft is None else {"text": draft["text_es"],
                                                                 "word_count": draft["word_count"],
                                                                 "saved_at": draft["updated_at"].isoformat()},
-            "submission": submission_view(submission),
+            "submission": submission_view(submission, evaluation),
+            "feedback": feedback_view(evaluation),
         }
 
     def typed_only(row: dict[str, Any]) -> None:
@@ -176,6 +198,6 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
         if word_count(request.text) == 0:
             raise api_error(422, "empty_text", "Escribí tu texto antes de entregarlo.")
         sub, created = store.submit_typed(exercise_id, request.text, request.client_request_id)
-        return {"created": created, **submission_view(sub)}
+        return {"created": created, **submission_view(sub, store.evaluation_for(sub["submission_id"]))}
 
     return router

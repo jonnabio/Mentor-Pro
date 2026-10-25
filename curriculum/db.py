@@ -41,6 +41,11 @@ def _setting(name: str, env_file: Path) -> str | None:
     return os.environ.get(name) or _file_setting(name, env_file)
 
 
+def setting(name: str, env_file: Path = REPO_ROOT / ".env") -> str | None:
+    """A setting from the environment, else from `.env` (for example MENTOR_PRO_TUTOR_TOKEN)."""
+    return _setting(name, env_file)
+
+
 def database_url(env_file: Path = REPO_ROOT / ".env") -> str:
     """Return DATABASE_URL from the environment, else from `.env`."""
     url = _setting("DATABASE_URL", env_file)
