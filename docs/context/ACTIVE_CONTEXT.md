@@ -2,7 +2,7 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-25
+- **Last Updated:** 2026-10-26
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T031,
@@ -118,6 +118,13 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
   `ghcr.io/jonnabio/mentor-pro:testing` and
   `:sha-517a50283b7ac720c87e76f551f08f6ed55504a7` (digest
   `sha256:4ab51ff3…a787`); anonymously pullable (public).
+- **RCA-005** (2026-10-26, `dev`) — that image cannot start
+  (`jsonschema` only in `requirements-dev.txt`); found by the Stage 6.2
+  preview on macedonianserver. `jsonschema` moved to `requirements.txt`;
+  `docker-build` now builds once, smoke-tests `GET /` (HTTP 200 within
+  60 s) and pushes that same image only on `main`;
+  `tests/app/test_runtime_dependencies.py`; guard RCA-005
+  ([RCA-005](../rca/RCA-005-published-image-cannot-start.md)).
 
 ### Current State
 
@@ -163,6 +170,12 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
 
 ### Next Steps
 
+0. Deployment track: confirm the `dev` pipeline (smoke step green), merge
+   to `main`, pull the new digest on macedonianserver and rerun the
+   Stage 6.2 preview (`mentor-pro-preview`, `127.0.0.1:8081`, SSH
+   tunnel); record the evidence in RCA-005. Then Stage 6.3: curriculum
+   provisioning ADR (copy workbook, run the existing importer once).
+   SSH key login from this PC works; `jonnabio` is in the `docker` group.
 1. Receive and plan the next Product Owner task (ADR first). Named
    candidate: T032 L5 examination simulation (handwritten, 90 minutes,
    EE19/EE20); also reopening or correcting a completed evaluation.
@@ -249,4 +262,4 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
   [ADR-029](../adr/ADR-029-writing-review-fallback.md)
-- Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-004)
+- Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-005)

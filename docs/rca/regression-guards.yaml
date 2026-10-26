@@ -154,3 +154,31 @@ guards:
 
     review_triggers:
       - "Changes to the review call, avoid sets or route() fallback order"
+
+  - id: RCA-005
+    title: "Published Docker image could not start (runtime dependency only in dev requirements)"
+    severity: high
+    created: 2026-10-26
+    rca_file: docs/rca/RCA-005-published-image-cannot-start.md
+
+    guarded_files:
+      - requirements.txt
+      - requirements-dev.txt
+      - Dockerfile
+      - .github/workflows/ci.yml
+
+    invariants:
+      - "Every third-party module imported at runtime is installed by requirements.txt"
+      - "CI starts the built container and requires GET / to return HTTP 200 within a bounded timeout"
+      - "The image published to GHCR is the same local image that passed the smoke test, never a rebuild"
+      - "Nothing is pushed to GHCR when the tests or the smoke test fail"
+
+    tests:
+      - tests/app/test_runtime_dependencies.py
+      - .github/workflows/ci.yml (Smoke test container startup)
+
+    standard_rule: "RCA-005 Lessons Learned"
+
+    review_triggers:
+      - "New third-party imports in app/, curriculum/ or runtime-loaded .ace scripts"
+      - "Changes to the Dockerfile install step or the docker-build job"
