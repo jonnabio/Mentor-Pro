@@ -3,7 +3,7 @@
 > **Severity:** High (release blocker; no data affected, nothing deployed)
 > **Date:** 2026-10-26
 > **Task:** CI/CD Stage 6.2 (preview on macedonianserver)
-> **Status:** Fixed on `dev`; replacement image pending merge to `main`
+> **Status:** Fixed; replacement image published and verified on the server
 
 ---
 
@@ -97,9 +97,16 @@ checks).
 
 ### Corrected build evidence
 
-To be recorded after the `dev` pipeline run and the replacement image on
-`main`: smoke step output (`GET / -> HTTP 200`), new digest, and the
-preview check on macedonianserver.
+- `dev` run 40349885223 (commit `8626543`): smoke step
+  `GET / -> HTTP 200`; login and publish steps skipped.
+- `main` (PR #4, merge `7e45376`): smoke step `GET / -> HTTP 200`, then
+  `testing` and `sha-7e45376a43ac62693f109116dfb2217ea3766b3a` pushed with
+  digest
+  `sha256:486dcc0aaf6ba02addf3a9890f24613d4645dd8c4da25d62b7f64d17f2235e20`.
+- macedonianserver (2026-10-26): pulled by that digest (`linux/amd64`,
+  245 MB), `mentor-pro-preview` on `127.0.0.1:8081` is up,
+  `GET / -> HTTP 200`, title "Mentor Pro · Práctica PNE",
+  "Application startup complete".
 
 ---
 
