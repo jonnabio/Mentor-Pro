@@ -12,3 +12,4 @@ __pycache__
 .gitignore
 server-notes
 references/original/
+docs/
