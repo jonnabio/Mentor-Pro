@@ -65,12 +65,46 @@ jobs:
       contents: read
       packages: write
 
+    env:
+      CANDIDATE: mentor-pro:candidate
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      # Build once into the local Docker engine; the smoke test and the publish
+      # below use this same image, never a rebuild (RCA-005).
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: ${{ env.CANDIDATE }}
+
+      # Publication gate (RCA-005): the container must start and answer
+      # HTTP 200 on / within 60 s. Fails if it exits, never answers, or
+      # answers anything else. Proves startup only, not database readiness.
+      - name: Smoke test container startup
+        run: |
+          docker run -d --name smoke -p 127.0.0.1:8000:8000 "$CANDIDATE"
+          code=000
+          for _ in $(seq 1 30); do
+            if [ "$(docker inspect -f '{{.State.Running}}' smoke)" != "true" ]; then
+              echo "::error::container exited before answering"
+              break
+            fi
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8000/ || true)
+            [ "$code" = "200" ] && break
+            sleep 2
+          done
+          echo "GET / -> HTTP $code"
+          docker logs smoke
+          docker rm -f smoke >/dev/null
+          [ "$code" = "200" ] || { echo "::error::smoke test failed (HTTP $code)"; exit 1; }
 
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -80,11 +114,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and optionally publish image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          tags: |
-            ghcr.io/jonnabio/mentor-pro:testing
-            ghcr.io/jonnabio/mentor-pro:sha-${{ github.sha }}
+      - name: Publish smoke-tested image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          for tag in testing "sha-${GITHUB_SHA}"; do
+            docker tag "$CANDIDATE" "ghcr.io/jonnabio/mentor-pro:${tag}"
+            docker push "ghcr.io/jonnabio/mentor-pro:${tag}"
+          done
