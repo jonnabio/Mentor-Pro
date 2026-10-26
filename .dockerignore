@@ -11,3 +11,4 @@ __pycache__
 *.log
 .gitignore
 server-notes
+references/original/
