@@ -9,8 +9,17 @@
 Never paste passwords, `DATABASE_URL`, API keys or `docker compose config`
 output into logs, commits or chat. Use the redaction commands below.
 
-Placeholders: `DIGEST` = image digest to deploy (`sha256:…`), `WB` =
-`PNE-Tracker-2026-workbook.xlsx`.
+Set these shell variables first, in every server session (`DIGEST` is the
+digest being deployed):
+
+```bash
+set -o pipefail
+cd /opt/mentor-pro
+COMPOSE="sudo docker compose -f /opt/mentor-pro/compose.deploy.yml"
+WB=PNE-Tracker-2026-workbook.xlsx
+WB_SHA=cce57db40afacdb2f6d2492c39ba9df6c1bc398941c1c7fb9cff8ec28bcc19d3
+DIGEST=sha256:...   # e.g. the digest published by the main run
+```
 
 ---
 
@@ -20,7 +29,7 @@ Placeholders: `DIGEST` = image digest to deploy (`sha256:…`), `WB` =
 cd /opt/mentor-pro
 docker ps --format '{{.Names}} {{.ID}} {{.Status}}' | tee /tmp/pre-containers.txt
 systemctl is-active smbd nmbd | tee /tmp/pre-samba.txt
-sudo docker compose -f compose.deploy.yml exec -T postgres \
+$COMPOSE exec -T postgres \
   psql -U mentor_pro_admin -d mentor_pro -c '\dn' \
   -c "SELECT count(*) AS curriculum_tables FROM information_schema.tables WHERE table_schema='curriculum'"
 ```
@@ -32,27 +41,60 @@ Record the schemas that already exist. If `curriculum` already has a
 ## B. Backup
 
 ```bash
-sudo install -d -m 700 /var/backups/mentor-pro
-sudo docker compose -f compose.deploy.yml exec -T postgres \
-  pg_dump -U mentor_pro_admin -d mentor_pro -Fc \
-  | sudo tee /var/backups/mentor-pro/mentor_pro_$(date +%F_%H%M).dump >/dev/null
-sudo ls -l /var/backups/mentor-pro
+sudo install -d -m 700 -o root -g root /var/backups/mentor-pro
+DUMP=/var/backups/mentor-pro/mentor_pro_$(date +%F_%H%M%S).dump
+$COMPOSE exec -T postgres pg_dump -U mentor_pro_admin -d mentor_pro -Fc \
+  | sudo sh -c "umask 077 && cat > $DUMP" \
+  && sudo test -s "$DUMP" \
+  && sudo chmod 600 "$DUMP" \
+  && sudo cat "$DUMP" | $COMPOSE exec -T postgres pg_restore --list >/dev/null \
+  && echo "BACKUP OK $DUMP" || echo "BACKUP FAILED - STOP"
+sudo ls -l "$DUMP"
 ```
 
-Stop if the dump is empty or the command failed.
+**Gate:** continue only after `BACKUP OK`. With `pipefail`, a failed
+`pg_dump` fails the pipeline; the file must be non-empty, `0600`, and
+readable by `pg_restore --list`.
 
 ## C. Secrets (once)
 
-Move the values already in `compose.deploy.yml` (do not change them):
+Move the values already in `compose.deploy.yml` (do not change them).
+First look at what exists; never overwrite a file without reading it:
 
 ```bash
-sudo install -d -m 700 /etc/mentor-pro
-sudo cp compose.deploy.yml /opt/mentor-pro/compose.deploy.yml.pre-adr030
-sudoedit /etc/mentor-pro/postgres.env   # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
-sudoedit /etc/mentor-pro/app.env        # DATABASE_URL, OPENROUTER_API_KEY, MENTOR_PRO_TUTOR_TOKEN, ...
-sudo chmod 600 /etc/mentor-pro/*.env && sudo chown root:root /etc/mentor-pro/*.env
-sudo chmod 600 /opt/mentor-pro/compose.deploy.yml.pre-adr030 /opt/mentor-pro/compose.deploy.yml.bak
+sudo ls -la /etc/mentor-pro/ 2>/dev/null || echo "no /etc/mentor-pro yet"
+for f in /etc/mentor-pro/app.env /etc/mentor-pro/postgres.env; do
+  sudo test -f "$f" && { echo "$f exists, keys:"; sudo sed -E 's/=.*/=<set>/' "$f"; }
+done
+ls -la /opt/mentor-pro/
 ```
+
+Then:
+
+```bash
+sudo install -d -m 700 -o root -g root /etc/mentor-pro
+sudo cp -n compose.deploy.yml compose.deploy.yml.pre-adr030   # -n: never overwrite
+sudoedit /etc/mentor-pro/postgres.env   # add POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+sudoedit /etc/mentor-pro/app.env        # add/keep DATABASE_URL, OPENROUTER_API_KEY, ...
+for f in /etc/mentor-pro/*.env compose.deploy.yml.pre-adr030 compose.deploy.yml.bak; do
+  sudo test -f "$f" && sudo chown root:root "$f" && sudo chmod 600 "$f"
+done
+```
+
+`sudoedit` keeps existing content; add only the missing keys. The
+`.pre-adr030` and `.bak` copies contain the old inline secrets: root-only
+`0600`, deleted after the deployment is verified.
+
+After editing the compose file (below), prove the credentials still work
+before going further:
+
+```bash
+$COMPOSE run --rm --no-deps app python -c \
+  "import psycopg; from curriculum import db; psycopg.connect(db.database_url()).close(); print('DB OK')"
+```
+
+**Gate:** continue only after `DB OK`. Otherwise restore
+`compose.deploy.yml.pre-adr030` and stop.
 
 Target `compose.deploy.yml` (no secret values, no `${…}`):
 
@@ -61,7 +103,7 @@ name: mentor-pro
 
 services:
   app:
-    image: ghcr.io/jonnabio/mentor-pro@DIGEST
+    image: ghcr.io/jonnabio/mentor-pro@sha256:<digest>  # literal value, no ${}
     restart: unless-stopped
     env_file:
       - /etc/mentor-pro/app.env
@@ -113,9 +155,8 @@ scp .\PNE-Tracker-2026-workbook.xlsx jonnabio@100.64.84.15:/opt/mentor-pro/basel
 On the server:
 
 ```bash
-chmod 600 /opt/mentor-pro/baseline/WB
-echo "cce57db40afacdb2f6d2492c39ba9df6c1bc398941c1c7fb9cff8ec28bcc19d3  /opt/mentor-pro/baseline/WB" \
-  | sha256sum -c -
+chmod 600 "/opt/mentor-pro/baseline/$WB"
+echo "$WB_SHA  /opt/mentor-pro/baseline/$WB" | sha256sum -c -
 ```
 
 **Stop** unless the output is `…: OK`. Delete the copied file, keep the
@@ -124,12 +165,10 @@ database as it is, and check the source workbook on Windows.
 ## E. Import (one-time, idempotent)
 
 ```bash
-cd /opt/mentor-pro
-sudo docker compose -f compose.deploy.yml pull app
+$COMPOSE pull app
 run_import() {
-  sudo docker compose -f compose.deploy.yml run --rm --no-deps \
-    -v /opt/mentor-pro/baseline:/baseline:ro app \
-    python -m curriculum.importer --workbook /baseline/WB --version PNE2026-SUM-v1.0
+  $COMPOSE run --rm --no-deps -v /opt/mentor-pro/baseline:/baseline:ro app \
+    python -m curriculum.importer --workbook "/baseline/$WB" --version PNE2026-SUM-v1.0
 }
 run_import    # expect "status": "imported" (or "unchanged" if already present)
 run_import    # expect "status": "unchanged"
@@ -142,19 +181,19 @@ Keep the JSON output (it holds counts and checksums, no secrets).
 
 ```bash
 docker rm -f mentor-pro-preview 2>/dev/null
-sudo docker compose -f compose.deploy.yml up -d app
+$COMPOSE up -d app
 for p in / /api/subjects /api/dashboard /api/writing/levels; do
   printf '%s ' "$p"; curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:8080$p"
 done
-docker inspect mentor-pro-app-1 --format '{{.Config.Image}}'   # must show @DIGEST
-sudo docker compose -f compose.deploy.yml restart app            # then repeat the curl loop
-sudo docker compose -f compose.deploy.yml up -d --force-recreate app  # repeat loop + counts
+docker inspect mentor-pro-app-1 --format '{{.Config.Image}}'   # must show @$DIGEST
+$COMPOSE restart app            # then repeat the curl loop
+$COMPOSE up -d --force-recreate app  # repeat loop + counts
 ```
 
 Curriculum counts (before and after recreation must match):
 
 ```bash
-sudo docker compose -f compose.deploy.yml exec -T postgres psql -U mentor_pro_admin -d mentor_pro \
+$COMPOSE exec -T postgres psql -U mentor_pro_admin -d mentor_pro \
   -c "SELECT (SELECT count(*) FROM curriculum.assertion) AS assertions, (SELECT count(*) FROM curriculum.evidence) AS evidences"
 ```
 
@@ -171,25 +210,29 @@ Browser: `ssh -N -L 8080:127.0.0.1:8080 jonnabio@100.64.84.15`, then
 Record the release:
 
 ```bash
-echo "$(date -Is) DIGEST <git-commit> $(whoami) <result>" >> /opt/mentor-pro/RELEASES
+echo "$(date -Is) $DIGEST <git-commit> $(whoami) <result>" >> /opt/mentor-pro/RELEASES
 ```
 
 ## G. Rollback
 
 ```bash
-sudo sed -i 's#mentor-pro@sha256:[0-9a-f]*#mentor-pro@PREVIOUS_DIGEST#' compose.deploy.yml
-sudo docker compose -f compose.deploy.yml up -d app
+PREVIOUS_DIGEST=sha256:...   # from /opt/mentor-pro/RELEASES
+sudo sed -i "s#mentor-pro@sha256:[0-9a-f]*#mentor-pro@$PREVIOUS_DIGEST#" compose.deploy.yml
+$COMPOSE up -d app
 ```
 
-The database is not touched. If a release changed the schema, follow its
-ADR; last resort: restore the dump from section B with `pg_restore` into a
-new database after a review.
+**Limit:** this rolls back the application only. It is safe only when the
+earlier image is compatible with the current database (true while schema
+changes are additive). Database rollback is a separate, deliberate
+operation: follow the ADR of the release that changed the schema, or
+restore the dump from section B with `pg_restore` into a new database after
+a review. Never restore over the live database as part of an app rollback.
 
 ## H. Diagnostics without credentials
 
 ```bash
 docker logs --tail 100 mentor-pro-app-1 2>&1 | sed -E 's#(postgres(ql)?://)[^@ ]*@#\1<redacted>@#g'
-sudo docker compose -f compose.deploy.yml ps
+$COMPOSE ps
 sudo sed -E 's/=.*/=<set>/' /etc/mentor-pro/app.env    # which keys exist, never values
 ```
 

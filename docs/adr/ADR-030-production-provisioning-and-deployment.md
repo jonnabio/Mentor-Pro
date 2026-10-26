@@ -1,6 +1,6 @@
 # ADR-030: Production Curriculum Provisioning and Deployment Configuration
 
-> **Status:** Proposed (CI/CD Stage 6.3; review before any server change)
+> **Status:** Accepted (CI/CD Stage 6.3, 2026-10-26, with runbook corrections)
 > **Date:** 2026-10-26
 
 ---
@@ -108,12 +108,36 @@ What the code needs (verified in the repository):
 
 - Set `app.image` to the previous digest from `RELEASES`, then
   `docker compose up -d app`. The database is untouched.
-- Compatibility: valid while the schema changes stay additive (current
-  code). A release that changes the schema destructively must state its
-  rollback path in its own ADR; the `pg_dump` taken before the deployment
-  is the fallback.
+- This is an **application** rollback only. It is safe only when the
+  earlier image is compatible with the current database, which holds while
+  schema changes stay additive (current code). Database rollback is a
+  separate, deliberate operation: a release that changes the schema
+  destructively states its database rollback in its own ADR, and the
+  `pg_dump` taken before the deployment is restored only into a new
+  database after review, never over the live one.
 
-### 7. Scope and cleanup
+### 7. Initial content (minimum usable release)
+
+- Multiple choice uses on-demand generation (ADR-010 to ADR-013) with the
+  existing limits in `/etc/mentor-pro/app.env`: free models only
+  (`OPENROUTER_ALLOW_PAID=false`, `OPENROUTER_MAX_USD_PER_DAY=0`) and a
+  daily request cap. The OpenRouter key is checked before the practice
+  test. A larger pre-validated question bank is later work, not a
+  prerequisite.
+- Writing practice is offered only if at least one reviewed (eligible,
+  ADR-027) exercise is provisioned on the server; otherwise it is shown as
+  not yet available. How exercises are provisioned (generation on the
+  server or export from the local database) is decided when that step is
+  executed and recorded in the runbook; no further ADR.
+
+### 8. Tutor access
+
+- The loopback-only tutor boundary (ADR-024) is kept unchanged. Tutor
+  review through the published port is therefore unavailable for now; it
+  is a separate administrator-only follow-up and does not block student
+  practice.
+
+### 9. Scope and cleanup
 
 - The `mentor-pro-preview` container is removed when the compose `app`
   service passes its checks. Ports stay on `127.0.0.1` (8080); access is
@@ -137,8 +161,14 @@ What the code needs (verified in the repository):
    curriculum counts unchanged.
 7. `uptime-kuma` and Samba (`smbd`) are running before and after, with
    unchanged container IDs and service status.
+8. Stage 6.3 success: the student opens Mentor Pro from the student's own
+   computer, selects Matemáticas, completes a five-question practice,
+   sees the result, and finds the progress preserved after the app is
+   restarted.
 
-Procedure and failure path: `docs/runbooks/production-deployment.md`.
+Mandatory gates: backup (`BACKUP OK`), checksum (`sha256sum -c` OK) and
+secrets (`DB OK` after the move). Procedure and failure path:
+`docs/runbooks/production-deployment.md`.
 
 ---
 
@@ -148,15 +178,6 @@ Procedure and failure path: `docs/runbooks/production-deployment.md`.
   registered workbook and the two env files.
 - Secrets leave the compose file; the file can be reviewed and versioned.
 - Every compose command needs `sudo` (reads root-only env files).
-
-### Open items found while drafting (not solved by this ADR)
-
-- **Empty content banks.** The production database has no validated
-  questions and no writing exercises. Multiple choice can generate on
-  demand (needs `OPENROUTER_API_KEY` and budget); the writing levels will
-  list no exercises until they are generated on the server or migrated
-  from the local database. This needs its own Product Owner decision.
-- **Tutor review in a container.** `/tutor` accepts only loopback clients
-  (ADR-024). Inside the container the client is the Docker bridge gateway,
-  so tutor review will be refused through the published port. Changing
-  that boundary needs its own decision.
+- Criterion 8 needs access from the student's computer; the app is bound
+  to `127.0.0.1`, so that access path (SSH tunnel or another route) is
+  settled during execution without exposing the port to the network.
