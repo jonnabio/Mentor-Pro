@@ -3,15 +3,27 @@
 ## Session Metadata
 
 - **Last Updated:** 2026-10-25
-- **Active Role:** Architect (next: Developer)
-- **Mode:** PLANNING
-- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T031)
+- **Active Role:** Developer
+- **Mode:** EXECUTION
+- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T031,
+  then CI/CD stages: CI fixes 1–3 and GHCR publication)
 
 ## Current Objective
 
-No task in progress. Wait for the next Product Owner task; plan it with an
-ADR first. Do not start L5, 10–30 question sets or new features without
-approval.
+**Task 3 — CI maintenance** (CI/CD track; CI fixes and GHCR publication
+complete):
+
+- Upgrade `actions/checkout@v4` and `actions/setup-python@v5` (Node 20
+  deprecated) and review the `docker/*` actions.
+- Pin the runner (`ubuntu-24.04`) instead of `ubuntu-latest` (moving to
+  Ubuntu 26).
+- Optionally slim the image (`tests/`, `scripts/`, editor folders); keep
+  `.ace/schemas/` (loaded at runtime).
+- Keep `main` publishing and `dev`/PR build-only; do not touch
+  `macedonianserver`.
+
+Standing rule: plan each Product Owner task with an ADR first. Do not start
+L5, 10–30 question sets or new features without approval.
 
 ## Handoff Summary
 
@@ -92,6 +104,21 @@ Producción escrita (Español, written rubric EE01–EE20)
   defects; xing and gemma HTTP 429)
   ([ADR-029](../adr/ADR-029-writing-review-fallback.md)).
 
+CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
+
+- **CI Fix 1** (`c41e2d0`) — `QuestionBank` creates the generation tables
+  (`GenerationStore`) before its own.
+- **CI Fix 2** (`ecf7a31`, `6c6858b`) — both shared `catalog` fixtures skip
+  when the baseline workbook is absent (excluded from Git).
+- **CI Fix 3** (`e0f06e8`) — `validate_skills.py` accepts the excluded
+  `references/original/` when `references/MANIFEST.sha256` exists.
+- **GHCR** (`9f69f44`, `4a4014e`) — Docker job logs in and pushes only on
+  push to `main`; `.dockerignore` excludes `references/original/` and
+  `docs/`. First image published by run 40253896144:
+  `ghcr.io/jonnabio/mentor-pro:testing` and
+  `:sha-517a50283b7ac720c87e76f551f08f6ed55504a7` (digest
+  `sha256:4ab51ff3…a787`); anonymously pullable (public).
+
 ### Current State
 
 - `main` committed and pushed to `origin/main` (T027–T030 pushed at
@@ -126,6 +153,11 @@ Producción escrita (Español, written rubric EE01–EE20)
   `OPENROUTER_WRITING_REVIEW_MODELS=nvidia/nemotron-3.5-super-vl:free`
   (primary only); append a model only after it passes the benchmark.
   `minimax/minimax-m3.1-flash:free` is configured but no longer listed.
+- CI (GitHub Actions, `.github/workflows/ci.yml`): Python Tests on
+  PostgreSQL 17.6 service (434 passed, 102 skipped: no workbook in CI) and
+  Validate and Publish Docker Image; green on `dev`, PR #2 and `main`.
+- `macedonianserver` and its PostgreSQL: unchanged; no deployment
+  configured.
 - Tests: 536 passing (T031); browser (mocked, `mentor_pro_test`) 447/447; live
   draft restart check 4/4; ACE gate `VERIFY_RESULT=pass gate=all`.
 
@@ -147,6 +179,12 @@ Producción escrita (Español, written rubric EE01–EE20)
    suite about 80 s).
 
 ### Blockers/Issues
+
+- CI skips 102 tests (22 writing tests need the baseline workbook, which is
+  not in Git); a green CI run is not a full release gate. Curriculum
+  provisioning for CI and the deployed app is still to be decided.
+- The GHCR image is public; change it under Package settings if it should
+  be private (the server would then need a read-only token).
 
 - **One generator and one independent reviewer** (free models); a reviewer
   outage blocks new exercises and revalidations (reported as unavailable,
