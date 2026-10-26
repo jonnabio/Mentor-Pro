@@ -21,6 +21,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from app.generation.store import GenerationStore
 from app.generation.grounding import GroundingError, build_grounding
 from app.generation.validation import CHECKER_VERSION, deterministic_check, duplicate_reason
 
@@ -54,6 +55,9 @@ def revalidate(item: dict[str, Any], validation: dict[str, Any] | None, bundle: 
 class QuestionBank:
     def __init__(self, url: str):
         self.url = url
+        # Initialize prerequisite generation tables first.
+        GenerationStore(url)
+        # Create the question bank's own tables.
         with psycopg.connect(url, autocommit=True) as conn:
             conn.execute(SCHEMA_SQL)
 

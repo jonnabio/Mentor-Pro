@@ -121,8 +121,18 @@ def validate(root: Path) -> list[str]:
             target = ref.split("#", 1)[0].rstrip("/")
             if any(ch in target for ch in "*<>{}"):
                 continue
+            # Original curriculum documents are intentionally excluded
+            # from Git. Their SHA-256 manifest must still exist.
+            if target == "references/original":
+                if not (root / "references/MANIFEST.sha256").is_file():
+                    problems.append(
+                        "references/MANIFEST.sha256 is missing"
+                    )
+                continue
             if not (root / target).exists():
-                problems.append(f"{rel}: referenced path does not exist: {ref}")
+                problems.append(
+                    f"{rel}: referenced path does not exist: {ref}"
+                )
 
         sections = h2_sections(text)
         missing = [s for s in REQUIRED_SECTIONS if s not in sections]

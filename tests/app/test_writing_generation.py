@@ -79,8 +79,17 @@ def client_for(fake, **overrides):
 
 @pytest.fixture(scope="module")
 def catalog():
+    # Real baseline workbook is intentionally excluded from Git.
+    # Skip workbook-dependent tests when the source is unavailable.
+    if WORKBOOK is None:
+        pytest.skip("Real curriculum workbook unavailable in CI")
     target = new_target()
-    importer.import_workbook(WORKBOOK, target.url, "PNE2026-SUM-v1.0", schema=target.schema)
+    importer.import_workbook(
+        WORKBOOK,
+        target.url,
+        "PNE2026-SUM-v1.0",
+        schema=target.schema,
+    )
     conn = db.connect(target.url, target.schema, read_only=True)
     yield conn
     conn.close()
