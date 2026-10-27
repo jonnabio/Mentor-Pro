@@ -141,9 +141,33 @@ What the code needs (verified in the repository):
 
 - The `mentor-pro-preview` container is removed when the compose `app`
   service passes its checks. Ports stay on `127.0.0.1` (8080); access is
-  through the SSH tunnel.
+  through the SSH tunnel. Superseded for the student by section 10.
 - Stage 6.4 (automated promotion, post-deployment health checks, tested
   rollback) builds on this ADR and is not part of it.
+
+### 10. Amendment 2026-10-27: access from the home Wi-Fi
+
+Context: the SSH tunnel ties practice to a computer where an administrator
+has opened it; the student must be able to use the app from any device
+on the house Wi-Fi without help.
+
+- The app is also published on the server's Wi-Fi address only:
+  `192.168.50.229:8080` (`wlo1`, DHCP reservation in the router), in
+  addition to `127.0.0.1:8080`. Never `0.0.0.0`, never the wired
+  `192.168.100.x` network, never a router port forward.
+- Address for devices: `http://192.168.50.229:8080/` or
+  `http://macedonianserver.local:8080/` (mDNS, `avahi-daemon`).
+- `net.ipv4.ip_nonlocal_bind=1` (`/etc/sysctl.d/99-mentor-pro.conf`) lets
+  Docker publish on the Wi-Fi address even when `wlo1` comes up after
+  Docker at boot; otherwise the app would fail to start after a reboot.
+- Accepted risks (Product Owner, 2026-10-27): no login; anyone on the
+  house Wi-Fi can use the app and see learning progress. Only family
+  devices use that network. Plain HTTP inside the house. Docker-published
+  ports bypass `ufw`, so the binding to one address is the control.
+- Unchanged: tutor review answers only to loopback clients (ADR-024,
+  section 8); `MENTOR_PRO_DEV_ENDPOINTS=false`.
+- Revisit if guests or other people join the Wi-Fi, or before any access
+  from outside the house (that needs authentication and its own ADR).
 
 ---
 

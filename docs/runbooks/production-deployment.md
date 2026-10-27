@@ -112,6 +112,7 @@ services:
       MENTOR_PRO_DEV_ENDPOINTS: "false"
     ports:
       - "127.0.0.1:8080:8000"
+      - "192.168.50.229:8080:8000"   # house Wi-Fi only (ADR-030 section 10)
     depends_on:
       postgres:
         condition: service_healthy
@@ -204,8 +205,22 @@ docker ps --format '{{.Names}} {{.ID}} {{.Status}}' | grep -v '^mentor-pro' ; gr
 systemctl is-active smbd nmbd
 ```
 
-Browser: `ssh -N -L 8080:127.0.0.1:8080 jonnabio@100.64.84.15`, then
-`http://127.0.0.1:8080/`.
+Browser: any device on the house Wi-Fi opens `http://192.168.50.229:8080/`
+or `http://macedonianserver.local:8080/` (ADR-030 section 10). The SSH
+tunnel (`ssh -N -L 8080:127.0.0.1:8080 jonnabio@100.64.84.15`, then
+`http://127.0.0.1:8080/`) remains for administrators away from home.
+
+Wi-Fi publication (once), then confirm the bindings:
+
+```bash
+echo 'net.ipv4.ip_nonlocal_bind=1' | sudo tee /etc/sysctl.d/99-mentor-pro.conf
+sudo sysctl --system | grep ip_nonlocal_bind
+$COMPOSE up -d app
+docker port mentor-pro-app-1   # 127.0.0.1:8080 and 192.168.50.229:8080 only
+```
+
+After a server reboot, check `curl -I http://192.168.50.229:8080/` from
+another Wi-Fi device.
 
 Record the release:
 
