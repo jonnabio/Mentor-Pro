@@ -22,7 +22,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import create_app
-from app.tutor_main import UVICORN_OPTIONS, TutorConfigurationError, create_tutor_app, parse_allowed_hosts
+from app.tutor_main import EX_CONFIG, UVICORN_OPTIONS, TutorConfigurationError, create_tutor_app, parse_allowed_hosts
 from app.writing.store import WritingStore
 from conftest import SYNTHETIC
 
@@ -179,3 +179,28 @@ def test_real_server_ignores_forwarded_headers():
     finally:
         proc.terminate()
         proc.wait(timeout=10)
+
+
+def test_authorised_request_without_database_is_a_defined_503(monkeypatch):
+    unreachable = create_tutor_app("postgresql://127.0.0.1:1/x_test?connect_timeout=2", TOKEN, GATEWAY)
+    response = call(unreachable, GATEWAY, "/api/tutor/queue", GOOD)
+    assert response.status_code == 503 and response.json()["error"] == "database_unavailable"
+    from curriculum import db as cdb
+
+    def missing():
+        raise cdb.ConfigurationError("DATABASE_URL is not set")
+    monkeypatch.setattr(cdb, "database_url", missing)
+    unconfigured = create_tutor_app(None, TOKEN, GATEWAY)
+    response = call(unconfigured, GATEWAY, "/api/tutor/queue", GOOD)
+    assert response.status_code == 503 and response.json()["error"] == "database_unavailable"
+    assert call(unconfigured, "192.168.50.23", "/api/tutor/queue", GOOD).status_code == 403  # boundary first
+
+
+@pytest.mark.parametrize("env_override", [{"MENTOR_PRO_TUTOR_TOKEN": ""},
+                                          {"MENTOR_PRO_TUTOR_ALLOWED_HOSTS": "172.19.0.0/16"}])
+def test_refused_start_exits_with_the_configuration_code(env_override, tmp_path):
+    env = {**os.environ, "MENTOR_PRO_TUTOR_TOKEN": TOKEN, "MENTOR_PRO_TUTOR_ALLOWED_HOSTS": GATEWAY, **env_override}
+    proc = subprocess.run([sys.executable, "-m", "app.tutor_main"], cwd=tmp_path, env={
+        **env, "PYTHONPATH": str(REPO)}, capture_output=True, text=True, timeout=60)
+    assert proc.returncode == EX_CONFIG and proc.stderr.startswith("tutor configuration rejected: ")
+    assert TOKEN not in proc.stderr + proc.stdout

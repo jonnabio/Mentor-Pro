@@ -78,7 +78,8 @@ student app:
   request routed from the LAN to the container address keeps its LAN
   source and is refused), and the token is compared in constant time.
 - The token is never in Git, compose files, logs or reports; the browser
-  keeps it only in the tutor page's memory (ADR-024).
+  keeps it in `sessionStorage` for that one tab and the `127.0.0.1:8081`
+  origin (cleared when the tab closes or on a 403), never in logs.
 
 ## Amendments (Product Owner, 2026-10-27) and Implementation
 
