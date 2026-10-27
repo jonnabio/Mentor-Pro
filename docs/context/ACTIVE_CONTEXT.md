@@ -14,10 +14,13 @@
 **T032 — Producción escrita usable in production** (awaiting Product
 Owner approval). Code verified on `dev`: `python -m app.writing.bank`
 exports the 11 eligible exercises (quarantined skipped) and imports them
-idempotently (runbook section H). Tutor access in production needs
-[ADR-031](../adr/ADR-031-tutor-access-in-production.md) (Proposed): a
-separate `tutor` service on `127.0.0.1:8081` reached by SSH tunnel.
-Nothing deployed or imported in production yet.
+idempotently (runbook section H). PR #6 merged to `main`
+(`5615eeb`, CI 40519852040, image `sha256:c5a49d17…b58a`). Bank import
+approved (runbook section H, administrator-run). Tutor access:
+[ADR-031](../adr/ADR-031-tutor-access-in-production.md) accepted with
+amendments, implemented in T033 (`app/tutor_main.py`, runbook section J,
+branch `feature/T033-tutor-service` → `dev`). Nothing deployed or
+imported in production yet.
 
 **Stage 6.3 closing / Stage 6.4 next** (deployment track). Mentor Pro runs
 in production on macedonianserver and is reachable from the house Wi-Fi.
@@ -229,7 +232,7 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   PostgreSQL 17.6 service (102 skipped: no workbook in CI), then Validate
   and Publish Docker Image: build once, smoke test `GET /` (HTTP 200 within
   60 s), push that same image to GHCR only on push to `main` (RCA-005).
-- Tests: 545 passing (T032 bank tests added); browser (mocked,
+- Tests: 579 passing (T032 bank, T033 tutor service); browser (mocked,
   `mentor_pro_test`) 447/447; live
   draft restart check 4/4; ACE gate `VERIFY_RESULT=pass gate=all`.
 
