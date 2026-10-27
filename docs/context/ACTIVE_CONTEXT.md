@@ -128,6 +128,26 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
 
 ### Current State
 
+- **Production (ADR-030, 2026-10-27):** macedonianserver runs
+  `mentor-pro-app-1` from
+  `ghcr.io/jonnabio/mentor-pro@sha256:486dcc0a…5e20` (`7e45376`) on
+  `127.0.0.1:8080` with `mentor-pro-postgres-1` (volume
+  `mentor-pro_postgres_data`). Curriculum `PNE2026-SUM-v1.0` imported
+  (98 assertions, 344 evidences; second run `unchanged`). Secrets in
+  `/etc/mentor-pro/app.env` and `postgres.env` (root `0600`); compose file
+  has no secrets or interpolation; old copies `*.pre-adr030` (root/0600 or
+  `jonnabio` 0600) to delete once stable. Backup
+  `/var/backups/mentor-pro/mentor_pro_2026-10-26_223101.dump`. Release log
+  `/opt/mentor-pro/RELEASES`. Compose commands need `sudo`; `jonnabio` is
+  in the `docker` group and this PC has SSH key login.
+- Production checks: `/`, `/api/subjects`, `/api/dashboard`,
+  `/api/writing/levels` 200 before and after `docker restart`; API practice
+  test (Matemáticas, 5 asked) returned 4 questions (`partial`) after about
+  5.5 min, graded and persisted across a restart; session
+  `0cd5fb94…` classified `automated_test` (audit `ADR030-2026-10-27`).
+  21 OpenRouter requests used (daily cap 200, free only). No writing
+  exercises on the server yet. Uptime Kuma unchanged; `smbd` active,
+  `nmbd` was already inactive before the deployment.
 - `main` committed and pushed to `origin/main` (T027–T030 pushed at
   handoff); working tree clean; no task in progress, no lock files; no
   server, browser or generation job left running.
