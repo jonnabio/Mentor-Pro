@@ -1074,6 +1074,35 @@
       "result_file": "docs/progress/task_T032_result.md",
       "failures": [],
       "notes": "Bank: 11 exported, quarantined skipped; rehearsal imported 11, rerun unchanged 11. ADR-031 tutor access Proposed. Not deployed. Suite 545; browser 447/447."
+    },
+    {
+      "id": "T033",
+      "name": "Tutor service for production review (ADR-031, PO-approved with amendments)",
+      "objective": "Dedicated loopback-only tutor container reached by SSH tunnel; fail-closed configuration; isolation tests.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/tutor_main.py",
+          "tests/app/test_tutor_service.py",
+          "docs/progress/task_T033_result.md"
+        ],
+        "modify": [
+          "docs/adr/ADR-031-tutor-access-in-production.md",
+          "docs/runbooks/production-deployment.md",
+          ".env.example",
+          "docs/context/ACTIVE_CONTEXT.md"
+        ]
+      },
+      "depends_on": [
+        "T032"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T033_result.md",
+      "failures": [],
+      "notes": "34 security tests; suite 579. Not deployed."
     }
   ]
 }
