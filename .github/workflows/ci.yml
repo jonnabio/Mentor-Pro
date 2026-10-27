@@ -108,9 +108,9 @@ jobs:
 
       # T033 (ADR-031): the same image must start the tutor-only app. Test
       # credentials only. Checks, through Docker's published-port proxy like
-      # production: no token -> refuses to start; allowed host not the
+      # production: no token -> configuration rejection (exit 78); allowed host not the
       # gateway -> 403; gateway allowed -> /tutor 200, API 403 without the
-      # token and 200 with it; no student routes; forged forwarding refused.
+      # token, and 503 database_unavailable with it (no database in CI); no student routes; forged forwarding refused.
       - name: Smoke test tutor entrypoint
         run: |
           set -u
@@ -125,8 +125,12 @@ jobs:
             fail "tutor app never answered"
           }
           TOKEN="ci-test-token-$(openssl rand -hex 16)"
-          rc=0; timeout 30 docker run --rm "$CANDIDATE" python -m app.tutor_main >/dev/null 2>&1 || rc=$?
-          case "$rc" in 0|124) fail "tutor app did not refuse to start without a token (exit $rc)";; esac
+          # Missing token: must be the configuration rejection (exit 78, EX_CONFIG, with its message),
+          # not any other failure.
+          rc=0; out=$(timeout 30 docker run --rm "$CANDIDATE" python -m app.tutor_main 2>&1) || rc=$?
+          echo "$out" | tail -3
+          [ "$rc" = "78" ] || fail "missing token: expected exit 78 (configuration rejected), got $rc"
+          echo "$out" | grep -q '^tutor configuration rejected: MENTOR_PRO_TUTOR_TOKEN must have at least 32 characters$'             || fail "missing token: configuration rejection message not found"
           GW=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}')
           echo "bridge gateway: $GW"
           docker run -d --name tutor -p 127.0.0.1:8001:8000 -e MENTOR_PRO_TUTOR_TOKEN="$TOKEN"             -e MENTOR_PRO_TUTOR_ALLOWED_HOSTS=10.255.255.1 "$CANDIDATE" python -m app.tutor_main >/dev/null
@@ -142,10 +146,13 @@ jobs:
           for p in / /api/writing/levels /api/subjects /api/openapi.json /static/../main.py; do
             [ "$(get "http://127.0.0.1:8001$p")" = "404" ] || fail "tutor app serves $p"
           done
-          # With the right token the API passes the boundary; no database here, so 5xx is expected, never 403.
-          code=$(get -H "X-Tutor-Token: $TOKEN" http://127.0.0.1:8001/api/tutor/queue)
-          case "$code" in 403|000) fail "valid token from the gateway refused (HTTP $code)";; esac
-          echo "authorised request passed the boundary (HTTP $code without a database)"
+          # With the right token the request passes the boundary; there is no database here, so the only
+          # accepted answer is the defined 503 database_unavailable.
+          body=$(curl -s --max-time 5 -w '\n%{http_code}' -H "X-Tutor-Token: $TOKEN" http://127.0.0.1:8001/api/tutor/queue || true)
+          code=$(echo "$body" | tail -1)
+          [ "$code" = "503" ] || fail "authorised request: expected HTTP 503, got $code"
+          echo "$body" | head -1 | grep -q '"error":"database_unavailable"'             || fail "authorised request: expected database_unavailable body"
+          echo "authorised request passed the boundary: HTTP 503 database_unavailable"
           docker logs tutor 2>&1 | grep -q "$TOKEN" && fail "token appears in the logs"
           docker rm -f tutor >/dev/null
           echo "tutor entrypoint smoke test passed"

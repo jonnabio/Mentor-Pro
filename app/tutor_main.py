@@ -14,6 +14,9 @@ gateway). Uvicorn runs with forwarded headers disabled, so the client address is
 from __future__ import annotations
 
 import ipaddress
+import sys
+
+import psycopg
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -26,6 +29,7 @@ from curriculum import db
 
 MIN_SERVICE_TOKEN = 32
 PORT = 8000
+EX_CONFIG = 78  # sysexits.h: configuration error; the exit code of a refused start
 # Forwarded headers off: X-Forwarded-For can never change the client address the tutor check reads.
 UVICORN_OPTIONS = {"host": "0.0.0.0", "port": PORT, "proxy_headers": False, "server_header": False}
 
@@ -64,6 +68,13 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
         return JSONResponse(status_code=exc.status, content={"error": exc.code, "message_es": exc.message_es})
 
+    # Only reached after the tutor check passed: the database is down or not configured.
+    @app.exception_handler(psycopg.OperationalError)
+    @app.exception_handler(db.ConfigurationError)
+    async def database_unavailable(_: Request, __: Exception) -> JSONResponse:
+        return JSONResponse(status_code=503, content={
+            "error": "database_unavailable", "message_es": "La base de datos no está disponible. Intentá más tarde."})
+
     service = WritingService(lambda: database_url or db.database_url())
     app.include_router(build_tutor_router(service, ApiError, token, hosts))
 
@@ -80,4 +91,9 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(create_tutor_app(), **UVICORN_OPTIONS)
+    try:
+        tutor_app = create_tutor_app()
+    except TutorConfigurationError as exc:  # never prints the token itself
+        print(f"tutor configuration rejected: {exc}", file=sys.stderr)
+        raise SystemExit(EX_CONFIG) from None
+    uvicorn.run(tutor_app, **UVICORN_OPTIONS)
