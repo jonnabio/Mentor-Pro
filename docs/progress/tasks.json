@@ -1073,7 +1073,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T032_result.md",
       "failures": [],
-      "notes": "Bank: 11 exported, quarantined skipped; rehearsal imported 11, rerun unchanged 11. ADR-031 tutor access Proposed. Not deployed. Suite 545; browser 447/447."
+      "notes": "Bank: 11 exported, quarantined skipped; rehearsal imported 11, rerun unchanged 11. ADR-031 tutor access Proposed. Not deployed. Suite 545; browser 447/447. Published 2026-10-27: main 2f6a4b3, CI 40582892305, ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137. Not deployed."
     },
     {
       "id": "T033",
@@ -1102,7 +1102,27 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T033_result.md",
       "failures": [],
-      "notes": "34 security tests; suite 579. Not deployed."
+      "notes": "34 security tests; suite 579. Not deployed. Published 2026-10-27: main 2f6a4b3, CI 40582892305, ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137. Not deployed."
+    },
+    {
+      "id": "T034",
+      "name": "Deterministic test_transient_failure_then_success_completes (maintenance)",
+      "objective": "Remove the timing dependence in tests/app/test_practice_set.py::test_transient_failure_then_success_completes without changing the practice engine.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": [
+          "tests/app/test_practice_set.py"
+        ]
+      },
+      "depends_on": [],
+      "complexity": "XS",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T034_result.md",
+      "failures": [],
+      "notes": "Observed: dev CI run 40534292823 attempt 1 failed, rerun passed (2026-10-27). Cause: FlakyLlm keeps one shared counter of 6 forced 502s under the FakeLlm lock; parallel slots draw from it in scheduling order, so slot 0 may receive no failure and the assertion slots[0].requests[0]['status']=='unavailable' fails. Repro: run the test in a loop (pytest --count / for loop) under CPU load. Proposed fix: assert that some slot recorded an 'unavailable' request and that the 6 failures are all accounted for across slots, or key the failures to slot 0's prompt. Out of scope: practice-engine changes; CI pull_request trigger for dev is a separate improvement."
     }
   ]
 }
