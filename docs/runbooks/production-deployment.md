@@ -243,7 +243,55 @@ operation: follow the ADR of the release that changed the schema, or
 restore the dump from section B with `pg_restore` into a new database after
 a review. Never restore over the live database as part of an app rollback.
 
-## H. Diagnostics without credentials
+## H. Writing exercise bank (administrative, repeatable)
+
+Provisions the approved (eligible, ADR-027) Producción escrita exercises
+from the local database (ADR-030 section 7) with `python -m app.writing.bank`
+(T032). Never run at startup or from a student page. The bundle carries
+exercises, editorial revisions, tutor-only references, the accepted
+generation attempt, eligibility history, independent validations and the
+usage rows that name generator and reviewer (RCA-004). Quarantined
+exercises, drafts, submissions and evaluations are never exported.
+
+Requires an image that contains `app/writing/bank.py` (T032 or later).
+
+On Windows (local database):
+
+```powershell
+.venv/Scripts/python.exe -m app.writing.bank inventory
+.venv/Scripts/python.exe -m app.writing.bank export --out writing-bank.json
+scp writing-bank.json jonnabio@100.64.84.15:/tmp/writing-bank.json
+```
+
+On the server (after section B gives `BACKUP OK`):
+
+```bash
+sudo install -m 600 -o root -g root /tmp/writing-bank.json /opt/mentor-pro/baseline/writing-bank.json
+rm /tmp/writing-bank.json
+bank() {
+  $COMPOSE run --rm --no-deps -v /opt/mentor-pro/baseline:/baseline:ro app     python -m app.writing.bank "$@"
+}
+bank inventory                                    # before: expect 0 eligible
+bank import /baseline/writing-bank.json --dry-run # expect imported 11, rejected []
+bank import /baseline/writing-bank.json           # expect imported 11
+bank import /baseline/writing-bank.json           # expect imported [], unchanged 11
+bank inventory                                    # L1 3, L2 3, L3 3, L4 2; quarantined []
+curl -s http://127.0.0.1:8080/api/writing/levels | grep -o '"exercise_count":[0-9]*'
+```
+
+**Gates:** stop on any `rejected` entry (exit code 1) or
+`student_records_untouched: false`. The import is one transaction: a
+failure writes nothing. Existing exercises are never overwritten; a
+different record with the same id is rejected. Keep the printed report
+(no secrets, no student data).
+
+**Rollback:** imported exercises have no student work at first. Before any
+student has used them, restore is not needed; afterwards they must stay
+(submissions reference them). Never delete exercises by hand; restore the
+section B dump into a new database for review if the import must be
+undone.
+
+## I. Diagnostics without credentials
 
 ```bash
 docker logs --tail 100 mentor-pro-app-1 2>&1 | sed -E 's#(postgres(ql)?://)[^@ ]*@#\1<redacted>@#g'
