@@ -1045,6 +1045,35 @@
       "result_file": "docs/progress/task_T031_result.md",
       "failures": [],
       "notes": "No candidate qualified (dots 4/8 defects; xing, gemma HTTP 429). Suite 536; 91 benchmark calls; $0."
+    },
+    {
+      "id": "T032",
+      "name": "Make Producción escrita usable in production: writing bank provisioning (PO task)",
+      "objective": "Controlled, idempotent transfer of the eligible writing exercises to production; tutor access design.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/writing/bank.py",
+          "tests/app/test_writing_bank.py",
+          "docs/adr/ADR-031-tutor-access-in-production.md",
+          "docs/progress/task_T032_result.md"
+        ],
+        "modify": [
+          "docs/runbooks/production-deployment.md",
+          "docs/context/ACTIVE_CONTEXT.md"
+        ]
+      },
+      "depends_on": [
+        "T029",
+        "T031"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T032_result.md",
+      "failures": [],
+      "notes": "Bank: 11 exported, quarantined skipped; rehearsal imported 11, rerun unchanged 11. ADR-031 tutor access Proposed. Not deployed. Suite 545; browser 447/447."
     }
   ]
 }

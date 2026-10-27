@@ -11,6 +11,14 @@
 
 ## Current Objective
 
+**T032 — Producción escrita usable in production** (awaiting Product
+Owner approval). Code verified on `dev`: `python -m app.writing.bank`
+exports the 11 eligible exercises (quarantined skipped) and imports them
+idempotently (runbook section H). Tutor access in production needs
+[ADR-031](../adr/ADR-031-tutor-access-in-production.md) (Proposed): a
+separate `tutor` service on `127.0.0.1:8081` reached by SSH tunnel.
+Nothing deployed or imported in production yet.
+
 **Stage 6.3 closing / Stage 6.4 next** (deployment track). Mentor Pro runs
 in production on macedonianserver and is reachable from the house Wi-Fi.
 Remaining for Stage 6.3: the student's first real practice from the
@@ -128,6 +136,16 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
   Merged by PR #4 (`7e45376`); replacement image
   `sha256:486dcc0a…5e20` published after a passing smoke test.
 
+Producción escrita in production (T032, 2026-10-27, `dev`, not deployed)
+
+- **T032** — `app/writing/bank.py` (export, import with `--dry-run`,
+  inventory) and `tests/app/test_writing_bank.py` (7); rehearsal with the
+  real curriculum imported 11, rerun 11 unchanged; runbook section H.
+  Tutor root cause: in Docker every request (loopback and Wi-Fi) arrives
+  from the bridge gateway `172.19.0.1` and production has no tutor token
+  (`/tutor` 404) → ADR-031 Proposed
+  ([result](../progress/task_T032_result.md)).
+
 Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 - **Stage 6.1** — server pulls the image by digest (`linux/amd64`).
@@ -211,12 +229,16 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   PostgreSQL 17.6 service (102 skipped: no workbook in CI), then Validate
   and Publish Docker Image: build once, smoke test `GET /` (HTTP 200 within
   60 s), push that same image to GHCR only on push to `main` (RCA-005).
-- Tests: 538 passing (T031 + RCA-005 dependency test); browser (mocked,
+- Tests: 545 passing (T032 bank tests added); browser (mocked,
   `mentor_pro_test`) 447/447; live
   draft restart check 4/4; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
+0. T032 approvals: (a) merge `dev` → `main` and deploy the new digest;
+   (b) import the writing bank in production (runbook section H, after a
+   backup); (c) accept or amend ADR-031, then implement
+   `MENTOR_PRO_TUTOR_ALLOWED_HOSTS`, the `tutor` service and its tests.
 1. Stage 6.3 close: the student completes a five-question Matemáticas
    practice from the student's own device at `http://192.168.50.229:8080/`,
    sees the result, and the progress survives an app restart (ADR-030
@@ -240,8 +262,7 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 - Production practice generation takes about 5 minutes per new set and
   may return `partial` (4 of 5 in the test) until the bank fills.
-- No writing exercises in production; the writing levels show no
-  exercises.
+- No writing exercises in production until the T032 import is approved.
 - Tutor review is unavailable through the published ports (loopback only,
   ADR-024 kept by ADR-030 section 8); tutor access is a separate
   administrator-only follow-up.
