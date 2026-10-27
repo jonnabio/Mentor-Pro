@@ -1,7 +1,8 @@
 # ADR-031: Tutor Review Access in Production
 
-> **Status:** Proposed (awaiting Product Owner approval; changes the ADR-024
-> tutor boundary as deployed by ADR-030)
+> **Status:** Accepted with security amendments (Product Owner,
+> 2026-10-27); implemented in T033. Changes the ADR-024 tutor boundary as
+> deployed by ADR-030.
 > **Date:** 2026-10-27
 
 ---
@@ -77,7 +78,39 @@ student app:
   request routed from the LAN to the container address keeps its LAN
   source and is refused), and the token is compared in constant time.
 - The token is never in Git, compose files, logs or reports; the browser
-  keeps it only in the tutor page's memory (ADR-024).
+  keeps it in `sessionStorage` for that one tab and the `127.0.0.1:8081`
+  origin (cleared when the tab closes or on a 403), never in logs.
+
+## Amendments (Product Owner, 2026-10-27) and Implementation
+
+- **Dedicated entrypoint** `app.tutor_main` (`python -m app.tutor_main`):
+  only `/tutor`, `/static` and `/api/tutor/*`; no student, practice,
+  development or OpenAPI routes. The page `/tutor` also requires an
+  allowed client address.
+- **The student app never reads `MENTOR_PRO_TUTOR_ALLOWED_HOSTS`**: it keeps
+  the fixed ADR-024 loopback set, so the setting cannot widen it even if
+  it leaks into `app.env`.
+- **Fails closed at startup** (`TutorConfigurationError`): token shorter
+  than 32 characters; allowed hosts empty, a range, a name, a wildcard, an
+  unspecified, multicast or broadcast address, or any malformed entry. A
+  valid but wrong gateway answers 403 to everything.
+- **Forwarded headers disabled** in the tutor server
+  (`proxy_headers=False`). uvicorn otherwise trusts `X-Forwarded-For`
+  from `127.0.0.1`; a real-socket test proves a forged header is ignored
+  and fails when proxy headers are enabled (negative control run).
+- **Isolation is tested at the application layer, not inferred from the
+  port binding** (`tests/app/test_tutor_service.py`): LAN addresses
+  (`192.168.50.x`, `192.168.100.x`), other containers (`172.19.0.2`,
+  `172.19.0.3`, `172.17.0.1`), loopback inside the container and Tailscale
+  addresses are refused on every tutor route even with the token; absent,
+  truncated, extended or wrongly placed tokens are refused from the
+  gateway; spoofed `X-Forwarded-For`, `X-Real-IP` and `Forwarded` are
+  refused.
+- Residual risk: a process on the server, or a container with host
+  networking, reaches `127.0.0.1:8081` as the gateway and still needs the
+  token. None uses host networking on 2026-10-27 (checked); the runbook
+  pre-check stops if one appears. Server shell access is administrator
+  access already.
 
 ## Acceptance Criteria
 

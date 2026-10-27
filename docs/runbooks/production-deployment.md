@@ -301,3 +301,82 @@ sudo sed -E 's/=.*/=<set>/' /etc/mentor-pro/app.env    # which keys exist, never
 
 Do not share `docker compose config`, `docker inspect` (`.Config.Env`) or
 `env` output: they contain the secrets.
+
+## J. Tutor service (ADR-031)
+
+The student service (`app`) never holds the tutor token. A separate
+`tutor` service runs `python -m app.tutor_main` (tutor routes only) from
+the same digest, published on the server's loopback only. It refuses to
+start without a token of at least 32 characters or with an allowed-hosts
+value that is not a list of exact IP addresses.
+
+Pre-checks (read-only):
+
+```bash
+sudo sed -E 's/=.*/=<set>/' /etc/mentor-pro/app.env | grep -c MENTOR_PRO_TUTOR   # expect 0
+GW=$(docker network inspect mentor-pro_default --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}')
+echo "$GW"                                                                        # 172.19.0.1 on 2026-10-27
+docker ps -q | xargs docker inspect --format '{{.Name}} {{.HostConfig.NetworkMode}}' | grep -w host  # expect none
+```
+
+**Stop** if `app.env` holds a tutor key (remove it first) or a container
+uses host networking (it could reach `127.0.0.1:8081` as the gateway; it
+would still need the token, but the design assumes none).
+
+Token file (once; the token is never printed, logged or committed):
+
+```bash
+sudo sh -c "umask 077 && { printf 'MENTOR_PRO_TUTOR_TOKEN=%s\n' \"\$(openssl rand -hex 24)\"; \
+  printf 'MENTOR_PRO_TUTOR_ALLOWED_HOSTS=%s\n' '$GW'; } > /etc/mentor-pro/tutor.env"
+sudo chmod 600 /etc/mentor-pro/tutor.env && sudo sed -E 's/=.*/=<set>/' /etc/mentor-pro/tutor.env
+```
+
+The parent reads the token once with `sudo cat /etc/mentor-pro/tutor.env`
+over SSH and keeps it in a password manager.
+
+Add to `compose.deploy.yml` (same digest as `app`):
+
+```yaml
+  tutor:
+    image: ghcr.io/jonnabio/mentor-pro@sha256:<digest>  # same literal as app
+    command: ["python", "-m", "app.tutor_main"]
+    restart: unless-stopped
+    env_file:
+      - /etc/mentor-pro/app.env     # database settings; no tutor key
+      - /etc/mentor-pro/tutor.env   # token and allowed hosts (tutor only)
+    environment:
+      MENTOR_PRO_DEV_ENDPOINTS: "false"
+    ports:
+      - "127.0.0.1:8081:8000"       # never the Wi-Fi or wired address
+    depends_on:
+      postgres:
+        condition: service_healthy
+```
+
+Start and verify:
+
+```bash
+$COMPOSE up -d tutor
+docker port mentor-pro-tutor-1                       # 127.0.0.1:8081 only
+for p in /api/tutor/queue /tutor; do printf '%s ' "$p"; curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:8081$p"; done
+                                                     # /api/tutor/queue 403 (no token), /tutor 200
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/api/tutor/queue   # 404: student service
+docker logs --tail 5 mentor-pro-tutor-1 2>&1 | grep -c "$GW"                     # requests come from the gateway
+```
+
+From another device on the house Wi-Fi: `http://192.168.50.229:8081/`
+must be refused and `http://192.168.50.229:8080/api/tutor/queue` must
+answer 404.
+
+Tutor use (from the parent's computer):
+
+```bash
+ssh -N -L 8081:127.0.0.1:8081 jonnabio@100.64.84.15
+# then open http://127.0.0.1:8081/tutor and enter the token
+```
+
+A start failure with `TutorConfigurationError` means the token or the
+allowed hosts are wrong; fix `tutor.env` (never widen it to a range). If
+the compose network is recreated, recheck the gateway: a wrong address
+answers 403 to everything. `docker compose stop tutor` disables review
+without affecting students.
