@@ -1,26 +1,26 @@
-# Active Context: Session Handoff 2026-10-25
+# Active Context: Session Handoff 2026-10-27
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-26
+- **Last Updated:** 2026-10-27
 - **Active Role:** Developer
 - **Mode:** EXECUTION
-- **Session span:** 2026-10-22 to 2026-10-25 (T006 completion through T031,
-  then CI/CD stages: CI fixes 1–3 and GHCR publication)
+- **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
+  GHCR) and 2026-10-26 to 2026-10-27 (deployment Stages 6.1–6.3: RCA-005,
+  ADR-030, production on macedonianserver, home Wi-Fi access)
 
 ## Current Objective
 
-**Task 3 — CI maintenance** (CI/CD track; CI fixes and GHCR publication
-complete):
+**Stage 6.3 closing / Stage 6.4 next** (deployment track). Mentor Pro runs
+in production on macedonianserver and is reachable from the house Wi-Fi.
+Remaining for Stage 6.3: the student's first real practice from the
+student's own device (criterion 8 of ADR-030) and the initial-content
+decisions below. Stage 6.4: controlled promotion of approved images to the
+server with health checks and a tested rollback.
 
-- Upgrade `actions/checkout@v4` and `actions/setup-python@v5` (Node 20
-  deprecated) and review the `docker/*` actions.
-- Pin the runner (`ubuntu-24.04`) instead of `ubuntu-latest` (moving to
-  Ubuntu 26).
-- Optionally slim the image (`tests/`, `scripts/`, editor folders); keep
-  `.ace/schemas/` (loaded at runtime).
-- Keep `main` publishing and `dev`/PR build-only; do not touch
-  `macedonianserver`.
+Still queued: **Task 3 — CI maintenance** (`actions/checkout@v4` and
+`actions/setup-python@v5` upgrades, review `docker/*` actions, pin
+`ubuntu-24.04`, optional image slimming keeping `.ace/schemas/`).
 
 Standing rule: plan each Product Owner task with an ADR first. Do not start
 L5, 10–30 question sets or new features without approval.
@@ -125,9 +125,56 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
   60 s) and pushes that same image only on `main`;
   `tests/app/test_runtime_dependencies.py`; guard RCA-005
   ([RCA-005](../rca/RCA-005-published-image-cannot-start.md)).
+  Merged by PR #4 (`7e45376`); replacement image
+  `sha256:486dcc0a…5e20` published after a passing smoke test.
+
+Deployment on macedonianserver (2026-10-26 to 2026-10-27)
+
+- **Stage 6.1** — server pulls the image by digest (`linux/amd64`).
+- **Stage 6.2** — preview exposed RCA-005; the corrected image serves `/`.
+- **ADR-030** (accepted, with runbook corrections)
+  ([ADR-030](../adr/ADR-030-production-provisioning-and-deployment.md),
+  [runbook](../runbooks/production-deployment.md)): workbook copied under
+  its manifest name and checked (`sha256sum -c`), one-time idempotent
+  import through the pinned image (`imported`, then `unchanged`), secrets
+  moved to `/etc/mentor-pro/app.env` and `postgres.env` (root `0600`; app
+  uses `DATABASE_URL` without password plus `PGPASSWORD`), compose file
+  without secrets or `${}` interpolation, image pinned by digest, backup
+  gate, release log.
+- **Stage 6.3 checks** — `/`, `/api/subjects`, `/api/dashboard`,
+  `/api/writing/levels` 200 after start, `docker restart` and
+  `--force-recreate`; curriculum 98 assertions / 344 evidences unchanged;
+  Uptime Kuma and `smbd` unaffected; API practice test (Matemáticas)
+  graded and persisted, then classified `automated_test`.
+- **ADR-030 section 10** (`5f3843d`) — app also published on the server's
+  Wi-Fi address `192.168.50.229:8080` (DHCP reservation), with
+  `net.ipv4.ip_nonlocal_bind=1`; verified HTTP 200 from another Wi-Fi
+  device, wired address refused. No login (accepted: family-only Wi-Fi).
 
 ### Current State
 
+- **Production (ADR-030):** macedonianserver runs `mentor-pro-app-1`
+  from `ghcr.io/jonnabio/mentor-pro@sha256:486dcc0a…5e20` (`7e45376`) and
+  `mentor-pro-postgres-1` (`postgres:17.6`, volume
+  `mentor-pro_postgres_data`), project `mentor-pro`,
+  `/opt/mentor-pro/compose.deploy.yml`. Ports: `127.0.0.1:8080` and
+  `192.168.50.229:8080` only. Students open `http://192.168.50.229:8080/`.
+- Production data: curriculum `PNE2026-SUM-v1.0` (98/344); one practice
+  session (`0cd5fb94…`, `automated_test`, audit `ADR030-2026-10-27`);
+  no student sessions yet; no writing exercises; the question bank holds
+  only the questions of that test. 21 OpenRouter requests used in the test
+  (free only, daily cap 200).
+- Server files: secrets `/etc/mentor-pro/{app,postgres}.env`; old copies
+  `/etc/mentor-pro/app.env.pre-adr030`,
+  `/opt/mentor-pro/compose.deploy.yml.{bak,pre-adr030,pre-wifi}` (all
+  `0600`; delete once stable); workbook
+  `/opt/mentor-pro/baseline/PNE-Tracker-2026-workbook.xlsx` (`0600`);
+  backup `/var/backups/mentor-pro/mentor_pro_2026-10-26_223101.dump`
+  (taken before the import, empty database); release log
+  `/opt/mentor-pro/RELEASES`; `/etc/sysctl.d/99-mentor-pro.conf`.
+- Server access: SSH key login from this PC (`jonnabio@100.64.84.15`);
+  `jonnabio` is in the `docker` group (root-equivalent); compose commands
+  need `sudo` (root-only env files); the agent cannot use `sudo`.
 - `main` committed and pushed to `origin/main` (T027–T030 pushed at
   handoff); working tree clean; no task in progress, no lock files; no
   server, browser or generation job left running.
@@ -161,43 +208,54 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
   (primary only); append a model only after it passes the benchmark.
   `minimax/minimax-m3.1-flash:free` is configured but no longer listed.
 - CI (GitHub Actions, `.github/workflows/ci.yml`): Python Tests on
-  PostgreSQL 17.6 service (434 passed, 102 skipped: no workbook in CI) and
-  Validate and Publish Docker Image; green on `dev`, PR #2 and `main`.
-- `macedonianserver` and its PostgreSQL: unchanged; no deployment
-  configured.
-- Tests: 536 passing (T031); browser (mocked, `mentor_pro_test`) 447/447; live
+  PostgreSQL 17.6 service (102 skipped: no workbook in CI), then Validate
+  and Publish Docker Image: build once, smoke test `GET /` (HTTP 200 within
+  60 s), push that same image to GHCR only on push to `main` (RCA-005).
+- Tests: 538 passing (T031 + RCA-005 dependency test); browser (mocked,
+  `mentor_pro_test`) 447/447; live
   draft restart check 4/4; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-0. Deployment track: confirm the `dev` pipeline (smoke step green), merge
-   to `main`, pull the new digest on macedonianserver and rerun the
-   Stage 6.2 preview (`mentor-pro-preview`, `127.0.0.1:8081`, SSH
-   tunnel); record the evidence in RCA-005. Then Stage 6.3: curriculum
-   provisioning ADR (copy workbook, run the existing importer once).
-   SSH key login from this PC works; `jonnabio` is in the `docker` group.
-1. Receive and plan the next Product Owner task (ADR first). Named
-   candidate: T032 L5 examination simulation (handwritten, 90 minutes,
-   EE19/EE20); also reopening or correcting a completed evaluation.
-2. Rerun `scripts/dev/benchmark_writing_reviewers.py --discover` then
-   `--primary --out FILE` when the free listing changes (T031: none
-   qualified). Possible separate task: review prompt for ambiguous
-   corrections and L4 plan order (all reviewers missed them).
-3. Retry the revalidation of `PE-L1-feria-ciencia-escuela-c9576f`:
-   `.venv/Scripts/python.exe scripts/dev/remediate_writing_review.py --out FILE`
-   (idempotent; never re-quarantines a reinstated exercise).
-4. Follow-up from T018: `fail_interrupted()` fails every queued or running
-   practice in the shared test database on app start.
-5. Investigate the suite slowdown (about 110 ms per PostgreSQL connection;
-   suite about 80 s).
+1. Stage 6.3 close: the student completes a five-question Matemáticas
+   practice from the student's own device at `http://192.168.50.229:8080/`,
+   sees the result, and the progress survives an app restart (ADR-030
+   criterion 8). Record it in ACTIVE_CONTEXT.
+2. Initial content decisions (ADR-030 section 7, no new ADR): pre-generate
+   a small Matemáticas bank so practice does not wait about 5 minutes; for
+   writing, provision one eligible exercise or label it "not yet
+   available" (UI change).
+3. Stage 6.4: controlled image promotion to the server (pull by digest,
+   backup, `up -d`, health check of the four URLs, `RELEASES` entry,
+   tested rollback to the previous digest). Plan with an ADR first.
+4. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
+   `.pre-wifi` copies.
+5. Task 3 — CI maintenance (see Current Objective).
+6. Earlier backlog: T032 L5 examination simulation candidate; reopening a
+   completed evaluation; rerun `benchmark_writing_reviewers.py` when the
+   free listing changes; revalidate `PE-L1-feria-ciencia-escuela-c9576f`
+   (local database); `fail_interrupted()` follow-up (T018); suite slowdown.
 
 ### Blockers/Issues
 
+- Production practice generation takes about 5 minutes per new set and
+  may return `partial` (4 of 5 in the test) until the bank fills.
+- No writing exercises in production; the writing levels show no
+  exercises.
+- Tutor review is unavailable through the published ports (loopback only,
+  ADR-024 kept by ADR-030 section 8); tutor access is a separate
+  administrator-only follow-up.
+- No login on the app; anyone on the house Wi-Fi can use it and see
+  progress (accepted; revisit if guests join or for outside access).
+- `macedonianserver.local` did not resolve for `curl` on this Windows PC;
+  use the IP address unless a browser resolves the name.
+- After a server reboot, Wi-Fi publication relies on `ip_nonlocal_bind`;
+  not yet tested with a real reboot.
 - CI skips 102 tests (22 writing tests need the baseline workbook, which is
   not in Git); a green CI run is not a full release gate. Curriculum
   provisioning for CI and the deployed app is still to be decided.
-- The GHCR image is public; change it under Package settings if it should
-  be private (the server would then need a read-only token).
+- The GHCR image is public (kept public by decision: no token on the
+  server).
 
 - **One generator and one independent reviewer** (free models); a reviewer
   outage blocks new exercises and revalidations (reported as unavailable,
@@ -216,7 +274,8 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
 - Property detection (T009) is keyword-based.
 - Local `pg_hba.conf` uses `trust`; `mentor_pro_admin` has no password.
 - Edge cannot start under automation; browser tests use installed Chrome.
-- Docker not installed; `docker-compose.yml` untested.
+- Docker not installed on this PC; the repository's `docker-compose.yml`
+  is untested (production uses the server's `compose.deploy.yml`).
 - Student first name in pushed commit `42adbe7`; rewrite needs approval.
 - Remote branch `origin/copilot/clean-repository` (merged PR #1) remains.
 - Framework markdown lint debt (`docs/TODO-markdown-lint.md`).
@@ -244,6 +303,15 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
 - Backups before real-database changes:
   `%USERPROFILE%\mentor-pro-backups\mentor_pro_pre_T029_2026-10-25.dump`
   (`writing`, `llm`); `pg_dump` is in `C:\Program Files\PostgreSQL\17\bin`.
+- Production runbook: `docs/runbooks/production-deployment.md`
+  (variables `COMPOSE`, `WB`, `WB_SHA`, `DIGEST`; gates `BACKUP OK`,
+  `sha256sum -c` OK, `DB OK`). Diagnostics only with redaction; never
+  share `docker compose config`, `docker inspect` env or `env` output.
+- Server checks without sudo: over `ssh jonnabio@100.64.84.15`, `curl`
+  `/`, `/api/subjects`, `/api/dashboard`, `/api/writing/levels` on
+  `http://127.0.0.1:8080` (all 200), and `docker port mentor-pro-app-1`.
+- Test sessions in production must be classified `automated_test`
+  (`practice.session_classification` + `classification_audit`, ADR-017).
 - Gate: `bash .ace/scripts/verify.sh`; check its exit code (not a piped
   `tail`) before committing; logs in `.ace/logs/verify/<run>/`.
 - Key settings: `OPENROUTER_FREE_MODELS`, `OPENROUTER_GENERATION_MAX_TOKENS`,
