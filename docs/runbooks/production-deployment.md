@@ -43,7 +43,7 @@ Record the schemas that already exist. If `curriculum` already has a
 ```bash
 sudo install -d -m 700 -o root -g root /var/backups/mentor-pro
 DUMP=/var/backups/mentor-pro/mentor_pro_$(date +%F_%H%M%S).dump
-$COMPOSE exec -T postgres pg_dump -U mentor_pro_admin -d mentor_pro -Fc \
+$COMPOSE exec -T postgres pg_dump -U mentor_pro_admin -d mentor_pro -Fc </dev/null \
   | sudo sh -c "umask 077 && cat > $DUMP" \
   && sudo test -s "$DUMP" \
   && sudo chmod 600 "$DUMP" \
@@ -266,10 +266,11 @@ scp writing-bank.json jonnabio@100.64.84.15:/tmp/writing-bank.json
 On the server (after section B gives `BACKUP OK`):
 
 ```bash
-sudo install -m 600 -o root -g root /tmp/writing-bank.json /opt/mentor-pro/baseline/writing-bank.json
+# owner uid 1000 = the container user `mentor` (like the workbook); root-owned fails with Permission denied
+sudo install -m 600 -o 1000 -g 1000 /tmp/writing-bank.json /opt/mentor-pro/baseline/writing-bank.json
 rm /tmp/writing-bank.json
 bank() {
-  $COMPOSE run --rm --no-deps -v /opt/mentor-pro/baseline:/baseline:ro app     python -m app.writing.bank "$@"
+  $COMPOSE run --rm --no-deps -T -v /opt/mentor-pro/baseline:/baseline:ro app     python -m app.writing.bank "$@" </dev/null
 }
 bank inventory                                    # before: expect 0 eligible
 bank import /baseline/writing-bank.json --dry-run # expect imported 11, rejected []
@@ -375,7 +376,9 @@ ssh -N -L 8081:127.0.0.1:8081 jonnabio@100.64.84.15
 # then open http://127.0.0.1:8081/tutor and enter the token
 ```
 
-A start failure with `TutorConfigurationError` means the token or the
+A refused start exits 78 (`tutor configuration rejected: …`); a token of 1–15
+characters currently exits 1 with `ValueError` from the student module
+import (still refused; T035). A start failure with `TutorConfigurationError` means the token or the
 allowed hosts are wrong; fix `tutor.env` (never widen it to a range). If
 the compose network is recreated, recheck the gateway: a wrong address
 answers 403 to everything. `docker compose stop tutor` disables review

@@ -1073,7 +1073,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T032_result.md",
       "failures": [],
-      "notes": "Bank: 11 exported, quarantined skipped; rehearsal imported 11, rerun unchanged 11. ADR-031 tutor access Proposed. Not deployed. Suite 545; browser 447/447. Published 2026-10-27: main 2f6a4b3, CI 40582892305, ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137. Not deployed."
+      "notes": "Bank: 11 exported, quarantined skipped; rehearsal imported 11, rerun unchanged 11. ADR-031 tutor access Proposed. Not deployed. Suite 545; browser 447/447. Published 2026-10-27: main 2f6a4b3, CI 40582892305, ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137. Not deployed. Deployed 2026-10-28 (server time): backup mentor_pro_2026-10-28_002257.dump (BACKUP OK, 127791 B, 600 root); app on sha256:5d69fe6c…1137 (endpoints 200, tutor routes 404 on both student addresses). Bank imported: dry run 11/0 rejected, import 11, re-import 11 unchanged, student records untouched; L1 3, L2 3, L3 3, L4 2."
     },
     {
       "id": "T033",
@@ -1102,7 +1102,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T033_result.md",
       "failures": [],
-      "notes": "34 security tests; suite 579. Not deployed. Published 2026-10-27: main 2f6a4b3, CI 40582892305, ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137. Not deployed."
+      "notes": "34 security tests; suite 579. Not deployed. Published 2026-10-27: main 2f6a4b3, CI 40582892305, ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137. Not deployed. Deployed 2026-10-28 (server time): backup mentor_pro_2026-10-28_002257.dump (BACKUP OK, 127791 B, 600 root); app on sha256:5d69fe6c…1137 (endpoints 200, tutor routes 404 on both student addresses). Tutor service up on 127.0.0.1:8081 only; refused on Wi-Fi/Tailscale/wired; no token/wrong/forged XFF 403, valid token 200; token not in logs. Defect: token of 1-15 chars exits 1 not 78 (T035)."
     },
     {
       "id": "T034",
@@ -1123,6 +1123,29 @@
       "result_file": "docs/progress/task_T034_result.md",
       "failures": [],
       "notes": "Observed: dev CI run 40534292823 attempt 1 failed, rerun passed (2026-10-27). Cause: FlakyLlm keeps one shared counter of 6 forced 502s under the FakeLlm lock; parallel slots draw from it in scheduling order, so slot 0 may receive no failure and the assertion slots[0].requests[0]['status']=='unavailable' fails. Repro: run the test in a loop (pytest --count / for loop) under CPU load. Proposed fix: assert that some slot recorded an 'unavailable' request and that the 6 failures are all accounted for across slots, or key the failures to slot 0's prompt. Out of scope: practice-engine changes; CI pull_request trigger for dev is a separate improvement."
+    },
+    {
+      "id": "T035",
+      "name": "Tutor entrypoint: exit 78 for every refused start (tokens of 1-15 characters)",
+      "objective": "app.tutor_main must reject any token shorter than 32 characters with TutorConfigurationError and exit 78; today importing app.main builds the student app first, whose 16-character check raises ValueError (exit 1).",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": [
+          "app/tutor_main.py",
+          "tests/app/test_tutor_service.py"
+        ]
+      },
+      "depends_on": [
+        "T033"
+      ],
+      "complexity": "XS",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T035_result.md",
+      "failures": [],
+      "notes": "Found in production Stage 4 (2026-10-28): MENTOR_PRO_TUTOR_TOKEN=short -> exit 1. Fails closed (no listener), not a security exposure. Fix: remove the module-level create_app() import side effect (move STATIC_DIR/ApiError to a side-effect-free module) or validate before importing app.main; subprocess tests for 5, 16 and 31-character tokens; optional short-token case in the CI smoke."
     }
   ]
 }

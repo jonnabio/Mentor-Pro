@@ -11,28 +11,41 @@
 
 ## Current Objective
 
-**T032 + T033 release — published, not deployed.** PR #9 (`dev` → `main`)
-merged as `2f6a4b3` (2026-10-27); CI
+**T032 + T033 release — deployed; awaiting real-user acceptance.** PR #9
+merged as `2f6a4b3`; CI
 [40582892305](https://github.com/jonnabio/Mentor-Pro/actions/runs/40582892305)
-green on first attempt (480 passed, 102 skipped; ACE skills; `GET /` 200;
-tutor entrypoint smoke passed). Release image:
-`ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137`
-(tags `testing`, `sha-2f6a4b3…`; confirmed in GHCR from the server).
+green. Image
+`ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137`.
+
+Production rollout (administrator-run, PO-authorized, 2026-10-28 server
+time), observed results:
+
+1. Backup: `mentor_pro_2026-10-28_002257.dump`, `BACKUP OK`, 127791 bytes,
+   `600 root`, `pg_restore --list` passed.
+2. App: digest updated (only the image line changed); `/`,
+   `/api/subjects`, `/api/dashboard`, `/api/writing/levels` 200 and
+   `/tutor`, `/api/tutor/queue` 404 on `127.0.0.1:8080` and
+   `192.168.50.229:8080`; PostgreSQL healthy.
+3. Bank: dry run 11 imported / 0 rejected; import 11; re-import 0
+   imported / 11 unchanged; student records untouched; L1 3, L2 3, L3 3,
+   L4 2, L5 0; no references in student API; quarantined 404.
+4. Tutor: pre-checks passed (no tutor key in `app.env`, gateway
+   `172.19.0.1`, no host networking); `tutor.env` root `600`, token 48
+   characters (never displayed); bound to `127.0.0.1:8081` only; refused on
+   Wi-Fi, Tailscale and wired addresses; no token / wrong token / forged
+   `X-Forwarded-For` 403, valid token 200; student routes 404; token absent
+   from logs; requests from the gateway. Defect T035: a 1–15 character
+   token exits 1 instead of 78 (still refused to start).
 
 | State | T032 writing bank | T033 tutor service |
 | --- | --- | --- |
-| Implemented | yes | yes |
-| Verified by tests | yes (7 + rehearsal 11/11) | yes (37 + CI smoke) |
-| Published | yes (digest above) | yes (same digest) |
-| Deployed | no (server still `486dcc0a…5e20`) | no (no `tutor` service) |
-| Production data | not imported (0 exercises) | no token provisioned |
+| Implemented / tested / published | yes | yes |
+| Deployed | yes (11 exercises) | yes (`127.0.0.1:8081`) |
 | Validated by real users | no | no |
 
-Next operational gates, each needing separate PO authorization and run by
-an administrator: runbook B (backup) → app digest update → H (bank import,
-expect 11 imported, 0 rejected) → J (tutor service) → acceptance test
-(student writes and submits, parent reviews through the SSH tunnel,
-feedback survives `docker restart mentor-pro-app-1`).
+Remaining: the acceptance test (student draft, reload, submit; parent
+review through the SSH tunnel; feedback survives an app restart), then
+the `RELEASES` entry on the server.
 
 **Stage 6.3 closing / Stage 6.4 next** (deployment track). Mentor Pro runs
 in production on macedonianserver and is reachable from the house Wi-Fi.
@@ -252,10 +265,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. Production release of `sha256:5d69fe6c…1137` (PO authorization per
-   step): backup (B), app digest update, writing bank import (H), tutor
-   service (J), then the writing acceptance test. Record in `RELEASES`.
-   T034: make the flaky practice-set test deterministic (maintenance).
+0. Writing acceptance test in production (student and parent), then
+   append the `RELEASES` entry. Maintenance: T034 (flaky practice-set
+   test), T035 (tutor exit code for short tokens).
 1. Stage 6.3 close: the student completes a five-question Matemáticas
    practice from the student's own device at `http://192.168.50.229:8080/`,
    sees the result, and the progress survives an app restart (ADR-030
@@ -279,8 +291,8 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 - Production practice generation takes about 5 minutes per new set and
   may return `partial` (4 of 5 in the test) until the bank fills.
-- No writing exercises in production until the T032 import is run
-  (authorized via runbook H, not yet executed).
+- Writing exercises in production since 2026-10-28 (11); not yet used
+  by the student.
 - Tutor review is unavailable through the published ports (loopback only,
   ADR-024 kept by ADR-030 section 8); tutor access is a separate
   administrator-only follow-up.
