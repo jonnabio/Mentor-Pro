@@ -5,3 +5,5 @@
 *.yaml text eol=lf
 *.md text eol=lf
 *.pdf binary
+deploy/mentorpro text eol=lf
+deploy/*.yml text eol=lf

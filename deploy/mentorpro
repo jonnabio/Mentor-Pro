@@ -1,11 +1,14 @@
 #!/bin/sh
-# Mentor Pro deployment commands (ADR-033). Increment I1: read-only only.
+# Mentor Pro deployment commands (ADR-033). I1: status, smoke (read-only); I2: backup.
 #
 #   deploy/mentorpro status   what is running: images, health, schema, releases, backups;
 #                             exit 0 HEALTHY, 1 UNHEALTHY, 3 INCOMPLETE (something unknown)
 #   deploy/mentorpro smoke    HTTP checks of the student and tutor services; exit 1 on any FAIL
+#   deploy/mentorpro backup   new dump, restored and compared in a disposable PostgreSQL; BACKUP OK
+#   deploy/mentorpro verify-backup <dump>   re-check an earlier dump against its record
 #
-# Both commands change nothing and can be rerun at any time. Output is
+# status and smoke change nothing and can be rerun at any time; backup only
+# adds a new dump and its record. Output is
 # codes, digests and counts; never env files, tokens or student data.
 # Run with sudo on the server so the backup folder and RELEASES are readable.
 #
@@ -137,8 +140,231 @@ status() {
   echo "STATUS HEALTHY"
 }
 
+# ---------------------------------------------------------------- backup (ADR-033 increment I2)
+#
+# backup: pg_dump -Fc of the live database into a new, never-overwritten file.
+# The live data is fingerprinted before and after the dump (per table: row
+# count and an md5 of all rows in a collation-independent order); the dump is
+# restored into a disposable PostgreSQL and fingerprinted again. BACKUP OK
+# only when the restore succeeds and the fingerprints match. The record
+# <dump>.verify holds counts and digests, never row data.
+#
+# Disposable instance (MENTORPRO_PROVIDER):
+#   docker  container, internal network and volume, all named
+#           mentorpro-verify-<id>; nothing published; removed afterwards
+#   local   tests only: initdb cluster in a temporary directory on
+#           127.0.0.1:$MENTORPRO_VERIFY_PORT; the live database must be a
+#           *_test database given by MENTORPRO_LIVE_URL
+SCHEMAS=${MENTORPRO_BACKUP_SCHEMAS:-curriculum practice generation llm writing}
+PROVIDER=${MENTORPRO_PROVIDER:-docker}
+PG_CONTAINER=${MENTORPRO_POSTGRES_CONTAINER:-mentor-pro-postgres-1}
+PG_USER=${MENTORPRO_POSTGRES_USER:-mentor_pro_admin}
+PG_DB=${MENTORPRO_POSTGRES_DB:-mentor_pro}
+VERIFY_IMAGE=${MENTORPRO_VERIFY_IMAGE:-postgres:17.6}
+LIVE_URL=${MENTORPRO_LIVE_URL:-}
+VERIFY_PORT=${MENTORPRO_VERIFY_PORT:-}
+VNAME="mentorpro-verify-$(date +%s)$$"
+SCRATCH_DIR=""
+PSQL_OPTS="-X -q -A -t -v ON_ERROR_STOP=1"
+export PGCLIENTENCODING=UTF8  # same text, same digest, on any client
+RESTORE_OPTS="--exit-on-error --single-transaction --no-owner --no-privileges -U postgres -d verify"
+
+# Text rendering is pinned so the same rows give the same digest on any server.
+FINGERPRINT_SQL=$(cat <<'SQL'
+SET TimeZone = 'UTC'; SET DateStyle = 'ISO, YMD'; SET IntervalStyle = 'postgres';
+SET extra_float_digits = 1;
+SELECT format('SELECT %L, count(*), md5(coalesce(string_agg(t::text, E''\n'' ORDER BY t::text COLLATE "C"), '''')) FROM %I.%I t',
+              n.nspname || '.' || c.relname, n.nspname, c.relname)
+FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r', 'p') AND n.nspname = ANY (string_to_array(:'schemas', ' '))
+ORDER BY 1 \gexec
+SQL
+)
+
+# shellcheck disable=SC2086
+live_psql() {
+  if [ "$PROVIDER" = local ]; then
+    psql "$LIVE_URL" $PSQL_OPTS "$@"
+  else
+    "$DOCKER" exec -i "$PG_CONTAINER" psql -U "$PG_USER" -d "$PG_DB" $PSQL_OPTS "$@"
+  fi
+}
+
+live_dump() {
+  if [ "$PROVIDER" = local ]; then
+    pg_dump "$LIVE_URL" -Fc
+  else
+    "$DOCKER" exec "$PG_CONTAINER" pg_dump -U "$PG_USER" -d "$PG_DB" -Fc
+  fi
+}
+
+# shellcheck disable=SC2086
+scratch_psql() {
+  if [ "$PROVIDER" = local ]; then
+    psql -h 127.0.0.1 -p "$VERIFY_PORT" -U postgres -d verify $PSQL_OPTS "$@"
+  else
+    "$DOCKER" exec -i "$VNAME" psql -h 127.0.0.1 -U postgres -d verify $PSQL_OPTS "$@"
+  fi
+}
+
+# shellcheck disable=SC2086
+scratch_restore() {  # scratch_restore <dump>
+  if [ "$PROVIDER" = local ]; then
+    pg_restore -h 127.0.0.1 -p "$VERIFY_PORT" $RESTORE_OPTS "$1" 2>/dev/null
+  else
+    "$DOCKER" exec -i "$VNAME" pg_restore -h 127.0.0.1 $RESTORE_OPTS <"$1" 2>/dev/null
+  fi
+}
+
+scratch_start() {
+  if [ "$PROVIDER" = local ]; then
+    [ -n "$VERIFY_PORT" ] || return 1
+    SCRATCH_DIR=$(mktemp -d "${TMPDIR:-/tmp}/mentorpro-verify-XXXXXX") || return 1
+    : >"$SCRATCH_DIR/.mentorpro-verify"
+    initdb -D "$SCRATCH_DIR/data" -U postgres -A trust -E UTF8 >/dev/null 2>&1 &&
+      pg_ctl -D "$SCRATCH_DIR/data" -l "$SCRATCH_DIR/server.log" -w \
+        -o "-p $VERIFY_PORT -c listen_addresses=127.0.0.1" start >/dev/null 2>&1 &&
+      psql -h 127.0.0.1 -p "$VERIFY_PORT" -U postgres -d postgres -X -q -c "CREATE DATABASE verify" >/dev/null
+    return
+  fi
+  "$DOCKER" network create --internal "$VNAME" >/dev/null &&
+    "$DOCKER" volume create "$VNAME" >/dev/null &&
+    "$DOCKER" run -d --name "$VNAME" --network "$VNAME" -v "$VNAME:/var/lib/postgresql/data" \
+      -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=verify "$VERIFY_IMAGE" >/dev/null || return 1
+  # TCP readiness: the image's first-start initialisation server listens on the socket only.
+  for _ in $(seq 1 60); do
+    "$DOCKER" exec "$VNAME" pg_isready -h 127.0.0.1 -U postgres -d verify >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+
+# Removes only what this run created, then proves it is gone.
+scratch_cleanup() {
+  if [ "$PROVIDER" = local ]; then
+    [ -n "$SCRATCH_DIR" ] || return 0
+    [ -f "$SCRATCH_DIR/.mentorpro-verify" ] || { echo "CLEANUP REFUSED: $SCRATCH_DIR is not a verify directory"; return 1; }
+    pg_ctl -D "$SCRATCH_DIR/data" -m fast -w stop >/dev/null 2>&1
+    rm -rf "$SCRATCH_DIR"
+    if [ -e "$SCRATCH_DIR" ]; then echo "CLEANUP FAILED: $SCRATCH_DIR remains"; return 1; fi
+    echo "cleanup verified: disposable instance removed"
+    return 0
+  fi
+  case "$VNAME" in
+    mentorpro-verify-[0-9]*) ;;
+    *) echo "CLEANUP REFUSED: $VNAME"; return 1 ;;
+  esac
+  "$DOCKER" rm -f "$VNAME" >/dev/null 2>&1
+  "$DOCKER" volume rm "$VNAME" >/dev/null 2>&1
+  "$DOCKER" network rm "$VNAME" >/dev/null 2>&1
+  left="$("$DOCKER" ps -aq --filter "name=^/$VNAME\$")$("$DOCKER" volume ls -q --filter "name=^$VNAME\$")"
+  left="$left$("$DOCKER" network ls -q --filter "name=^$VNAME\$")"
+  if [ -n "$left" ]; then echo "CLEANUP FAILED: $VNAME resources remain"; return 1; fi
+  echo "cleanup verified: container, volume and network $VNAME removed"
+}
+
+fingerprint() { printf '%s\n' "$FINGERPRINT_SQL" | "$@" -v schemas="$SCHEMAS"; }
+digest() { printf '%s\n' "$1" | sha256sum | cut -d' ' -f1; }
+rows() { printf '%s\n' "$1" | awk -F'|' '{s += $2} END {print s + 0}'; }
+tables() { printf '%s\n' "$1" | grep -c '|'; }
+now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+# Restore <dump> into a disposable instance and compare with the expected
+# fingerprint digest. The last line is the cleanup result; a failure reason
+# comes before it. Never prints row data.
+restore_check() {  # restore_check <dump> <expected digest>
+  trap 'scratch_cleanup >/dev/null; exit 130' INT TERM
+  reason=""
+  if ! scratch_start; then
+    reason="disposable PostgreSQL did not start"
+  elif ! scratch_restore "$1"; then
+    reason="dump is not restorable"
+  elif ! restored=$(fingerprint scratch_psql); then
+    reason="restored database could not be read"
+  elif [ "$(digest "$restored")" != "$2" ]; then
+    reason="restored data differs from the source ($(tables "$restored") tables, $(rows "$restored") rows)"
+  fi
+  [ -z "$reason" ] || echo "$reason"
+  scratch_cleanup || reason="${reason:-cleanup failed}"
+  trap - INT TERM
+  [ -z "$reason" ]
+}
+
+backup() {
+  umask 077
+  if [ "$PROVIDER" = local ]; then
+    case "${LIVE_URL%%\?*}" in
+      *_test) ;;
+      *) echo "BACKUP REFUSED: the local provider only reads a *_test database"; return 1 ;;
+    esac
+  fi
+  { mkdir -p "$BACKUPS" && chmod 700 "$BACKUPS"; } || { echo "BACKUP FAILED: cannot create $BACKUPS"; return 1; }
+  dump="$BACKUPS/mentor_pro_$(date +%Y-%m-%d_%H%M%S).dump"
+  record="$dump.verify"
+  # noclobber: an existing dump is never overwritten.
+  if ! (set -C; : >"$dump") 2>/dev/null; then echo "BACKUP FAILED: $dump already exists"; return 1; fi
+  printf 'dump %s\ncreated %s\noperator %s\nschemas %s\n' "$(basename "$dump")" "$(now)" "$(id -un)" "$SCHEMAS" >"$record"
+
+  if ! before=$(fingerprint live_psql); then reason="live database not readable"
+  elif ! live_dump >"$dump"; then reason="pg_dump failed"
+  elif ! after=$(fingerprint live_psql); then reason="live database not readable"
+  elif [ "$before" != "$after" ]; then reason="the data changed during the dump; retry, or stop app and tutor first"
+  elif [ ! -s "$dump" ]; then reason="dump is empty"
+  else reason=""
+  fi
+  if [ -z "$reason" ]; then
+    expected=$(digest "$before")
+    {
+      echo "bytes $(wc -c <"$dump" | tr -d ' ')"
+      echo "sha256 $(sha256sum "$dump" | cut -d' ' -f1)"
+      echo "tables $(tables "$before")"
+      echo "rows $(rows "$before")"
+      echo "fingerprint $expected"
+      printf '%s\n' "$before" | awk -F'|' 'NF == 3 {print "table " $1 " " $2}'
+    } >>"$record"
+    out=$(restore_check "$dump" "$expected") || reason=$(printf '%s\n' "$out" | sed -n '1p')
+    printf '%s\n' "$out" | grep -E '^(cleanup|CLEANUP)'
+  fi
+  if [ -n "$reason" ]; then
+    echo "result BACKUP FAILED: $reason" >>"$record"
+    echo "BACKUP FAILED: $reason ($dump)"
+    return 1
+  fi
+  printf 'restore pass\nresult BACKUP OK\n' >>"$record"
+  echo "dump: $(tables "$before") tables, $(rows "$before") rows, $(wc -c <"$dump" | tr -d ' ') bytes"
+  echo "BACKUP OK $dump sha256:$(sha256sum "$dump" | cut -d' ' -f1)"
+}
+
+# Re-check an earlier dump against its record: file checksum, then a full restore.
+verify_backup() {  # verify_backup <dump>
+  dump=$1
+  record="$dump.verify"
+  { [ -r "$dump" ] && [ -r "$record" ]; } || { echo "VERIFY FAILED: $dump or its .verify record is missing"; return 1; }
+  want_sha=$(sed -n 's/^sha256 //p' "$record")
+  expected=$(sed -n 's/^fingerprint //p' "$record")
+  { [ -n "$want_sha" ] && [ -n "$expected" ]; } || { echo "VERIFY FAILED: the record is incomplete"; return 1; }
+  if [ "$(sha256sum "$dump" | cut -d' ' -f1)" != "$want_sha" ]; then
+    echo "reverified $(now) FAILED checksum" >>"$record"
+    echo "VERIFY FAILED: file checksum differs from the record (corrupted or incomplete)"
+    return 1
+  fi
+  if ! out=$(restore_check "$dump" "$expected"); then
+    printf '%s\n' "$out" | grep -E '^(cleanup|CLEANUP)'
+    echo "reverified $(now) FAILED restore" >>"$record"
+    echo "VERIFY FAILED: $(printf '%s\n' "$out" | sed -n '1p')"
+    return 1
+  fi
+  printf '%s\n' "$out"
+  echo "reverified $(now) OK" >>"$record"
+  echo "VERIFY OK $dump"
+}
+
 case "${1:-}" in
   status) status ;;
   smoke) smoke ;;
-  *) echo "usage: mentorpro status|smoke" >&2; exit 2 ;;
+  backup) backup ;;
+  verify-backup)
+    [ $# -eq 2 ] || { echo "usage: mentorpro verify-backup <dump>" >&2; exit 2; }
+    verify_backup "$2" ;;
+  *) echo "usage: mentorpro status|smoke|backup|verify-backup <dump>" >&2; exit 2 ;;
 esac
