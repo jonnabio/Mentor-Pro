@@ -1182,7 +1182,7 @@
       "id": "T037",
       "name": "Guided writing revision: student \"Mejorar mi respuesta\" workflow (ADR-032)",
       "objective": "Additive attempt-scoped student API (start revision, attempt draft, attempt submit, revision_attempt view) and the student revision flow in the existing L1-L4 editor; attempt 1 compatibility, ordered autosave, submission immutability; no quarantined revisions; no tutor, progress or deployment changes. Released only together with T038.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1206,7 +1206,39 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T037_result.md",
       "failures": [],
-      "notes": "Registered 2026-10-28 after PO approval of the T037 plan, the ADR-032 amendment, quarantine rule (no revision) and joint release with T038. Not merged; not deployed. Verified 2026-10-28: 13 API tests, gate 621 passed, browser 473/473."
+      "notes": "Registered 2026-10-28 after PO approval of the T037 plan, the ADR-032 amendment, quarantine rule (no revision) and joint release with T038. Not merged; not deployed. Verified 2026-10-28: 13 API tests, gate 621 passed, browser 473/473. Merged to dev as 6ed9703 (PR #13); dev CI 40745285425 green (519 passed, 102 skipped; image built and smoke-tested, not published)."
+    },
+    {
+      "id": "T038",
+      "name": "Guided writing revision: tutor re-evaluation (ADR-032)",
+      "objective": "Tutor queue and detail identify revision submissions and show the original response with its completed evaluation, the revised response and the official rubric; the new evaluation attaches only to the revision; previous evaluations immutable; the student sees the new review through the existing feedback view. ADR-031 isolation and token unchanged. No progress changes (T039).",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_writing_tutor_revision.py",
+          "scripts/dev/revision_restart_check.py",
+          "docs/progress/task_T038_result.md"
+        ],
+        "modify": [
+          "app/writing/tutor.py",
+          "app/static/tutor.js",
+          "app/static/tutor.html",
+          "app/static/app.js",
+          "app/static/index.html",
+          "scripts/dev/practice_e2e.py",
+          "docs/adr/ADR-032-guided-writing-revision-attempts.md"
+        ]
+      },
+      "depends_on": [
+        "T037"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T038_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-28 after PO approval; ID reserved by ADR-032. Released only together with T037; T039 progress semantics required before release. Verified 2026-10-28: 5 API tests, gate 626 passed, browser 481/481, live restart 10/10. PR to dev open; not merged."
     },
     {
       "id": "T040",

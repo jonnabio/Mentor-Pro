@@ -2,7 +2,7 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (T037 implementation, PR to `dev`)
+- **Last Updated:** 2026-10-28 (T037 merged; T038 implementation, PR to `dev`)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -27,17 +27,26 @@ push CI); (5) production migration, deployment, merge to `main`,
 infrastructure — NOT AUTHORIZED. Details:
 [T036 result](../progress/task_T036_result.md).
 
-**T037 — "Mejorar mi respuesta": implemented, PR to `dev` open, not
-merged, not deployed.** PO approved the plan, the ADR-032 amendment, no
-revision while quarantined, and release only together with T038. Branch
-`feature/T037-student-revision`; gate `VERIFY_RESULT=pass gate=all` (621
-passed); browser 473/473. [T037 result](../progress/task_T037_result.md).
-PR #12 (T036 closure docs) merged as `273100b`.
+**T037 — "Mejorar mi respuesta": merged into `dev`, not deployed.** PR #13
+merged as `6ed9703`; `dev` CI
+[40745285425](https://github.com/jonnabio/Mentor-Pro/actions/runs/40745285425)
+green (519 passed, 102 skipped; image built and smoke-tested; GHCR publish
+skipped). [T037 result](../progress/task_T037_result.md).
+
+**T038 — tutor re-evaluation: implemented, PR to `dev` open, awaiting PO
+merge approval.** Branch `feature/T038-tutor-reevaluation`; gate
+`VERIFY_RESULT=pass gate=all` (626 passed); browser 481/481; live restart
+check 10/10 (student app and tutor service as real processes on
+`mentor_pro_test`). [T038 result](../progress/task_T038_result.md).
+
+**Release constraints (PO):** T037 and T038 only together; T039 must fix
+progress counting of repeated attempts first; the T036 migration needs a
+verified backup, isolated restore rehearsal, approved procedure and
+explicit production authorization.
 
 **T040 — deployment simplification and repeatability assessment:
-registered, pending** (after T037 review; assessment only, no
-infrastructure or production change). T038/T039 stay reserved for
-ADR-032.
+registered, pending; approved to start once T038 is reviewable**
+(assessment only, no infrastructure or production change).
 
 Milestones: learning — Write → Tutor Feedback → Revise → Resubmit → Tutor
 Re-evaluation (needs T038); operational — a predictable, reproducible,
@@ -380,9 +389,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **T037 PR review and merge authorization (PO)**; then T038 (tutor
-   re-evaluation) and a joint T037+T038 release decision; then T040
-   assessment. Do not start an image containing T036 in production; a production
+0. **T038 PR merge approval (PO)**; T040 assessment (approved, starts
+   now that T038 is reviewable); T039 before any T037+T038 release.
+   Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).
 1. **Real-user acceptance test.** On the student's own device
    (`http://192.168.50.229:8080`): Producción escrita → an exercise → type

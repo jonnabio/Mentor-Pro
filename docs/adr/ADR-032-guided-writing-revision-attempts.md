@@ -1,6 +1,6 @@
 # ADR-032: Guided Writing Revision with Student Attempts
 
-> **Status:** Accepted for T036 (data foundation) and T037 (student revision API, amendment approved 2026-10-28); principles approved 2026-10-28; T036 merged to `dev`; production migration, deployment, GHCR publication, merge to `main` and infrastructure changes NOT authorized
+> **Status:** Accepted for T036 (data foundation) and T037/T038 (student revision API, tutor re-evaluation; amendments approved 2026-10-28); principles approved 2026-10-28; T036 merged to `dev`; production migration, deployment, GHCR publication, merge to `main` and infrastructure changes NOT authorized
 > **Date:** 2026-10-28
 > **Scope:** Producción escrita L1–L4; separate from editorial exercise revisions
 > **First ACE task:** T036 (registered 2026-10-28, data foundation only)
@@ -175,6 +175,25 @@ student service only, additive:
   independently and released together; T037 is never deployed alone.
   Without T038 the tutor sees a revision as an ordinary submission, and
   the student page does not yet show the review of the improved version.
+
+### T038 amendment: tutor re-evaluation (PO approved 2026-10-28)
+
+Tutor service only (ADR-031 boundary, token and loopback checks
+unchanged); additive fields, no new route:
+
+| Endpoint | Addition |
+| --- | --- |
+| `GET /api/tutor/queue` | `attempt_number` per submission; a revision is labelled "Mejora (versión 2)" |
+| `GET /api/tutor/submissions/{id}` | `attempt_number`; `previous`: `null` for attempt 1, otherwise the previous attempt's `submission_id`, `submitted_at`, `student_text`, `sections` and its completed `evaluation` (scores with official descriptors, feedback) |
+| `PUT /api/tutor/submissions/{id}/evaluation` | unchanged: the evaluation attaches to the revision submission only; the previous completed evaluation stays locked (409) |
+
+- The revision is scored with the same rubric and the same pinned exercise
+  revision as the first attempt.
+- The student sees the completed review of the improved version through
+  the existing feedback view (`revision_attempt.attempt.feedback`, same
+  shape as `feedback`), below "Mi nueva versión".
+- Progress comparison stays in T039. **Before release** (PO): T039 must
+  stop repeated attempts from being counted as additional exercises.
 
 ## Progress semantics
 

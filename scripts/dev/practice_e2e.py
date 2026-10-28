@@ -1142,8 +1142,9 @@ def scenario_quarantine(page: Page, report: Report, viewport: str, url: str) -> 
     report.check(True, f"[{name}] reinstated exercise listed again")
 
 
-def scenario_revision(page: Page, report: Report, viewport: str, out: Path, url: str) -> None:
-    """T037 (ADR-032): "Mejorar mi respuesta" on the L2, L1 and L4 exercises the tutor reviewed above."""
+def scenario_revision(page: Page, tutor: Page, report: Report, viewport: str, out: Path, url: str) -> None:
+    """T037 (ADR-032): "Mejorar mi respuesta" on the L2, L1 and L4 exercises the tutor reviewed above.
+    T038: the tutor reviews the L2 improvement next to the first response; the student sees the new review."""
     name = f"{viewport}-revision"
     errors: list[str] = []
     page.on("pageerror", lambda exc: errors.append(str(exc)))
@@ -1203,6 +1204,42 @@ def scenario_revision(page: Page, report: Report, viewport: str, out: Path, url:
     report.check(len(subs) == 1 and "desayunar" in subs[0][0] and first_text(HEALTHY) == before,
                  f"[{name}] one revision submission; the first submission is unchanged")
     page.screenshot(path=str(out / f"{name}-submitted.png"), full_page=True)
+
+    # T038: tutor re-evaluation of the L2 improvement.
+    tutor.goto(BASE + "tutor")
+    tutor.locator("#tutor-token").fill(TUTOR_TOKEN)
+    tutor.get_by_role("button", name="Entrar").click()
+    entry = tutor.locator(".exercise-choice", has=tutor.locator(".tutor-badge.revision")).filter(
+        has_text="La alimentación saludable")
+    expect(entry).to_have_count(1)
+    report.check("Mejora (versión 2)" in entry.inner_text() and "Pendiente" in entry.inner_text(),
+                 f"[{name}] tutor queue marks the improvement «Mejora (versión 2)», pending")
+    entry.click()
+    expect(tutor.locator("#tutor-previous-block")).to_be_visible()
+    previous = tutor.locator("#tutor-previous-block").inner_text()
+    report.check(before in previous and "3 de 4" in previous and "2 de 4" in previous
+                 and "Revisá la idea complementaria" in previous
+                 and "desayunar" in tutor.locator("#tutor-student").inner_text()
+                 and "Mejora (versión 2)" in tutor.locator("#tutor-meta").inner_text()
+                 and tutor.locator("#tutor-previous-block input, #tutor-previous-block textarea").count() == 0,
+                 f"[{name}] tutor sees the first response, its locked evaluation and the improved version")
+    tutor.screenshot(path=str(out / f"{name}-tutor.png"), full_page=True)
+    tutor_complete(tutor, {"EE03": 4, "EE04": 3})
+    first_eval = writing_rows(url, "SELECT v.status, c.criterion_code, c.points FROM writing.evaluation v JOIN "
+                                   "writing.criterion_score c USING (evaluation_id) JOIN writing.submission s USING "
+                                   "(submission_id) JOIN writing.student_attempt a USING (attempt_id) WHERE "
+                                   "s.exercise_id = %s ORDER BY a.attempt_number, 2", HEALTHY)
+    report.check(first_eval == [("completed", "EE03", 3), ("completed", "EE04", 2),
+                                ("completed", "EE03", 4), ("completed", "EE04", 3)],
+                 f"[{name}] new evaluation stored for the improvement; the first is unchanged {first_eval}")
+    page.reload()
+    expect(page.locator("#writing-revision-feedback")).to_be_visible()
+    review_text = page.locator("#writing-revision-feedback").inner_text()
+    report.check("4 de 4" in review_text and "3 de 4" in review_text
+                 and page.locator("#writing-revision-status").inner_text().startswith("Mi mejora: Revisado por el tutor")
+                 and "2 de 4" in page.locator("#writing-feedback").inner_text(),
+                 f"[{name}] student sees the review of the improvement; the first review stays")
+    page.screenshot(path=str(out / f"{name}-reviewed.png"), full_page=True)
 
     # L1: starts from the student's correction; no restore; failed save, retry; tab hidden flushes the draft.
     open_reviewed("writing_conventions", REFERENCE_TUTOR_ID)
@@ -1414,7 +1451,10 @@ def run_mock(out: Path, url: str) -> Report:
             scenario_guided(page, tutor_context.new_page(), report, viewport, out, url)
             tutor_context.close()
             scenario_quarantine(page, report, viewport, url)
-            scenario_revision(page, report, viewport, out, url)
+            tutor_context = browser.new_context(viewport=size, locale="es-CR", is_mobile=viewport == "mobile",
+                                                has_touch=viewport == "mobile")
+            scenario_revision(page, tutor_context.new_page(), report, viewport, out, url)
+            tutor_context.close()
             if viewport == "desktop":
                 scenario_drafts(context.new_page(), report, out, url)  # closes its own page
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")

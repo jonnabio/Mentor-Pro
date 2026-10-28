@@ -254,6 +254,8 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 .tutor-badge.pending { color: var(--danger); border-color: var(--danger); }
 .tutor-badge.in_progress { color: #7a5300; border-color: #d9a400; }
 .tutor-badge.completed { color: var(--accent); border-color: var(--accent); }
+.tutor-badge.revision { color: #3b4a8c; border-color: #6c7bc4; margin-right: 6px; }
+.tutor-previous { border-left: 4px solid var(--border, #ccd6d0); padding-left: 12px; margin: 12px 0; }
 #tutor-view textarea, #tutor-token { width: 100%; box-sizing: border-box; padding: 8px 10px; font: inherit;
   border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: inherit; }
 .tutor-reference { white-space: pre-wrap; overflow-wrap: anywhere; border: 1px dashed var(--danger);

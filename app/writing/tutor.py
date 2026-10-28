@@ -10,6 +10,8 @@ Scores use the official 0-4 descriptors of curriculum/writing/MEP-RUBRICA-PE-202
 partial evaluation can be saved and resumed; completion needs every evaluable criterion scored and locks
 the evaluation. No examination grade is computed. T028 (ADR-026): guided compositions also show the
 planning notes and each paragraph; their optional EE07-EE18 may be scored and are never required.
+T038 (ADR-032): a revision submission ("Mejora") shows the previous attempt's response and its completed
+evaluation; the new evaluation attaches to the revision only and the earlier one stays locked.
 """
 
 from __future__ import annotations
@@ -72,6 +74,30 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
     def optional(record: dict[str, Any]) -> set[str]:
         return contracts.optional_criteria(record)
 
+    def sections_view(sub: dict[str, Any]) -> list[dict[str, str]] | None:
+        if not sub.get("sections"):
+            return None
+        return [{"key": k, "label_es": SECTION_LABEL_ES[k], "text_es": sub["sections"].get(k, "")}
+                for k in GUIDED_SECTIONS]
+
+    def previous_view(store: Any, attempt: dict[str, Any]) -> dict[str, Any] | None:
+        """T038: the response this revision improves and its completed evaluation (read-only)."""
+        if not attempt["previous_attempt_id"]:
+            return None
+        sub = store.attempt_submission(attempt["previous_attempt_id"])
+        evaluation = store.evaluation_for(sub["submission_id"])
+        criteria = contracts.criteria()
+        scores = [{"criterion": s["criterion"], "statement_es": criteria[s["criterion"]]["statement_es"],
+                   "status": s["status"], "points": s.get("points"),
+                   "descriptor_es": criteria[s["criterion"]]["descriptors_es"][s["points"]]
+                   if s["status"] == "scored" else None}
+                  for s in evaluation["record"]["criterion_scores"]] if evaluation else []
+        return {"submission_id": sub["submission_id"], "submitted_at": sub["submitted_at"].isoformat(),
+                "student_text": sub["text_es"], "sections": sections_view(sub),
+                "evaluation": None if evaluation is None else {
+                    "status": evaluation["status"], "evaluated_at": evaluation["record"].get("evaluated_at"),
+                    "scores": scores, "feedback_es": evaluation["record"]["feedback_es"]}}
+
     @router.get("/queue")
     def queue() -> dict[str, Any]:
         store = service.get()
@@ -81,7 +107,8 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
             items.append({"submission_id": row["submission_id"], "exercise_id": row["exercise_id"],
                           "title_es": record.get("title_es") or record["topic_es"], "level_es": _level_label(record),
                           "submitted_at": row["submitted_at"].isoformat(), "status": row["status"],
-                          "target_criteria": record["target_criteria"], "evidence_mode": row["evidence_mode"]})
+                          "target_criteria": record["target_criteria"], "evidence_mode": row["evidence_mode"],
+                          "attempt_number": row["attempt_number"]})
         return {"submissions": items}
 
     @router.get("/submissions/{submission_id}")
@@ -91,13 +118,13 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
         kinds = applicability(record, sub)
         reference = store.reference_correction(sub["exercise_id"], sub["exercise_revision"])
         evaluation = store.evaluation_for(submission_id)
+        attempt = store.attempt(sub["attempt_id"])
         return {
             "submission_id": submission_id, "exercise_id": sub["exercise_id"],
             "exercise_revision": sub["exercise_revision"], "submitted_at": sub["submitted_at"].isoformat(),
             "evidence_mode": sub["evidence_mode"], "student_text": sub["text_es"],
-            "sections": None if not sub.get("sections") else [
-                {"key": k, "label_es": SECTION_LABEL_ES[k], "text_es": sub["sections"].get(k, "")}
-                for k in GUIDED_SECTIONS],
+            "sections": sections_view(sub),
+            "attempt_number": attempt["attempt_number"], "previous": previous_view(store, attempt),
             "exercise": {"title_es": record.get("title_es"), "topic_es": record["topic_es"],
                          "level_es": _level_label(record), "exercise_type": record["exercise_type"],
                          "communicative_situation_es": record["communicative_situation_es"],
