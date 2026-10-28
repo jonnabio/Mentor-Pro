@@ -68,6 +68,8 @@ async function openQueue() {
       el("span", { class: "level-label" }, s.title_es),
       el("span", { class: "meta-line" }, `${s.level_es} · Entregado el ${new Date(s.submitted_at).toLocaleString("es-CR")}`),
       el("span", { class: "meta-line" }, `Criterios: ${s.target_criteria.join(", ")}`),
+      ...(s.attempt_number > 1 ? [el("span", { class: "tutor-badge revision" },
+        `Mejora (versión ${s.attempt_number})`)] : []),
       el("span", { class: `tutor-badge ${s.status}` }, STATUS_ES[s.status]));
     button.addEventListener("click", () => openSubmission(s.submission_id));
     return el("li", {}, button);
@@ -83,7 +85,9 @@ async function openSubmission(id) {
   const ex = data.exercise;
   showPanel("detail");
   $("tutor-meta").textContent = `${ex.level_es} · ${LEVEL_TYPE[ex.exercise_type] || ex.exercise_type} · ` +
-    `revisión ${data.exercise_revision} · entregado el ${new Date(data.submitted_at).toLocaleString("es-CR")}`;
+    `revisión ${data.exercise_revision} · ` + (data.attempt_number > 1 ? `Mejora (versión ${data.attempt_number}) · ` : "") +
+    `entregado el ${new Date(data.submitted_at).toLocaleString("es-CR")}`;
+  renderPrevious(data.previous);
   $("tutor-title").textContent = ex.title_es || ex.topic_es;
   $("tutor-situation").textContent = ex.communicative_situation_es;
   $("tutor-instructions").replaceChildren(...ex.instructions_es.map((t) => el("li", {}, t)));
@@ -95,10 +99,8 @@ async function openSubmission(id) {
   $("tutor-plan").replaceChildren(...ex.scaffolding_es.map((t) => el("li", {}, t)));
   $("tutor-plan-block").hidden = ex.scaffolding_es.length === 0;
   $("tutor-sections-block").hidden = !data.sections;
-  $("tutor-student-title").hidden = Boolean(data.sections);
-  $("tutor-sections").replaceChildren(...(data.sections || []).map((s) => el("div", { class: "tutor-section",
-    "data-section": s.key }, el("h4", {}, s.label_es),
-    el("p", { class: "submitted-text" }, s.text_es || "(sin notas)"))));
+  $("tutor-student-title").hidden = Boolean(data.sections) || Boolean(data.previous); // T038: titled above
+  $("tutor-sections").replaceChildren(...sectionNodes(data.sections));
   const ref = data.reference;
   $("tutor-reference-block").hidden = !ref;
   if (ref) {
@@ -147,6 +149,28 @@ async function openSubmission(id) {
   $("tutor-locked").hidden = !locked;
   $("tutor-saved").textContent = data.evaluation && !locked
     ? `Evaluación parcial guardada ${new Date(data.evaluation.updated_at).toLocaleString("es-CR")}` : "";
+}
+
+const sectionNodes = (sections) => (sections || []).map((s) => el("div", { class: "tutor-section",
+  "data-section": s.key }, el("h4", {}, s.label_es), el("p", { class: "submitted-text" }, s.text_es || "(sin notas)")));
+
+// T038: the response this revision improves, with its completed (locked) evaluation; nothing here is editable.
+function renderPrevious(previous) {
+  $("tutor-previous-block").hidden = !previous;
+  if (!previous) return;
+  $("tutor-previous-meta").textContent = `Entregada el ${new Date(previous.submitted_at).toLocaleString("es-CR")}`;
+  $("tutor-previous-sections").replaceChildren(...sectionNodes(previous.sections));
+  $("tutor-previous-text").textContent = previous.student_text;
+  const evaluation = previous.evaluation || { scores: [], feedback_es: { strengths: [], improvements: [] } };
+  $("tutor-previous-scores").replaceChildren(...evaluation.scores.map((s) => el("li", { "data-criterion": s.criterion },
+    el("span", { class: "objective-text" }, `${s.criterion}. ${s.statement_es}`),
+    el("strong", { class: "feedback-points" }, s.status === "scored" ? `${s.points} de 4` : "No evaluable"),
+    ...(s.descriptor_es ? [el("span", { class: "meta-line" }, s.descriptor_es)] : []))));
+  $("tutor-previous-strengths").replaceChildren(...evaluation.feedback_es.strengths.map((t) => el("li", {}, t)));
+  $("tutor-previous-improvements").replaceChildren(...evaluation.feedback_es.improvements.map((t) => el("li", {}, t)));
+  $("tutor-previous-next").textContent = evaluation.feedback_es.next_step
+    ? `Próximo paso: ${evaluation.feedback_es.next_step}` : "";
+  $("tutor-previous-next").hidden = !evaluation.feedback_es.next_step;
 }
 
 function payload(complete) {

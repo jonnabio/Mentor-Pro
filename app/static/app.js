@@ -972,6 +972,7 @@ function renderRevisionEntry(revising) {
       `${new Date(attempt.submission.submitted_at).toLocaleString("es-CR")} (${attempt.submission.word_count} palabras).`;
     $("writing-revision-text").textContent = attempt.draft ? attempt.draft.text : "";
   }
+  renderWritingFeedback(done ? attempt.feedback : null, "writing-revision-feedback");
 }
 
 function enterRevision(attempt) {
@@ -984,23 +985,25 @@ function enterRevision(attempt) {
 }
 
 // T026: the completed tutor review. Scores use the official rubric descriptors; no grade is computed.
-function renderWritingFeedback(feedback) {
-  $("writing-feedback").hidden = !feedback;
+// T038: the same card shows the review of the improved version (`prefix` "writing-revision-feedback").
+function renderWritingFeedback(feedback, prefix = "writing-feedback") {
+  $(prefix).hidden = !feedback;
   if (!feedback) return;
-  $("writing-feedback-date").textContent =
+  $(`${prefix}-date`).textContent =
     `Revisado el ${new Date(feedback.evaluated_at).toLocaleString("es-CR")}`;
-  $("writing-feedback-scores").replaceChildren(...feedback.scores.map((s) => el("li", {},
+  $(`${prefix}-scores`).replaceChildren(...feedback.scores.map((s) => el("li", {},
     el("span", { class: "objective-text" }, s.statement_es),
     el("strong", { class: "feedback-points" }, s.status === "scored" ? `${s.points} de ${s.max_points}` : "No evaluable"),
     el("span", { class: "meta-line" }, s.status === "scored" ? s.descriptor_es : s.note_es))));
-  for (const [key, title] of [["strengths", "writing-feedback-strengths"], ["improvements", "writing-feedback-improvements"]]) {
+  for (const key of ["strengths", "improvements"]) {
     const items = feedback[`${key}_es`];
-    $(title).replaceChildren(...items.map((text) => el("li", {}, text)));
-    $(title).hidden = items.length === 0;
-    $(`${title}-title`).hidden = items.length === 0;
+    const list = $(`${prefix}-${key}`);
+    list.replaceChildren(...items.map((text) => el("li", {}, text)));
+    list.hidden = items.length === 0;
+    $(`${prefix}-${key}-title`).hidden = items.length === 0;
   }
-  $("writing-feedback-next").textContent = feedback.next_step_es ? `Próximo paso: ${feedback.next_step_es}` : "";
-  $("writing-feedback-next").hidden = !feedback.next_step_es;
+  $(`${prefix}-next`).textContent = feedback.next_step_es ? `Próximo paso: ${feedback.next_step_es}` : "";
+  $(`${prefix}-next`).hidden = !feedback.next_step_es;
 }
 
 function updateWordCount() {
