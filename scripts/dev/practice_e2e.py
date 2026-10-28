@@ -1142,6 +1142,120 @@ def scenario_quarantine(page: Page, report: Report, viewport: str, url: str) -> 
     report.check(True, f"[{name}] reinstated exercise listed again")
 
 
+def scenario_revision(page: Page, report: Report, viewport: str, out: Path, url: str) -> None:
+    """T037 (ADR-032): "Mejorar mi respuesta" on the L2, L1 and L4 exercises the tutor reviewed above."""
+    name = f"{viewport}-revision"
+    errors: list[str] = []
+    page.on("pageerror", lambda exc: errors.append(str(exc)))
+    l4 = json.loads(L4_FIXTURE.read_text(encoding="utf-8"))["exercise_id"]
+
+    def revision_rows(eid: str, sql: str) -> list[tuple]:
+        return writing_rows(url, f"SELECT {sql} FROM writing.student_attempt a LEFT JOIN writing.draft d USING "
+                                 "(attempt_id) LEFT JOIN writing.submission s USING (attempt_id) "
+                                 "WHERE a.exercise_id = %s AND a.attempt_number = 2", eid)
+
+    def first_text(eid: str) -> str:
+        return writing_rows(url, "SELECT s.text_es FROM writing.submission s JOIN writing.student_attempt a USING "
+                                 "(attempt_id) WHERE a.exercise_id = %s AND a.attempt_number = 1", eid)[0][0]
+
+    def open_reviewed(level: str, eid: str) -> None:
+        page.goto(BASE)
+        page.evaluate("sessionStorage.clear()")
+        page.goto(BASE)
+        page.get_by_role("button", name="Abrir Producción escrita").click()
+        page.locator(f'.level-choice[data-level="{level}"]').click()
+        page.locator(f'.exercise-choice[data-exercise="{eid}"]').click()
+        expect(page.locator("#writing-feedback")).to_be_visible()
+
+    # L2: start (double click), edit, reload, submit.
+    before = first_text(HEALTHY)
+    open_reviewed("idea_development", HEALTHY)
+    report.check(page.locator("#writing-revise").inner_text() == "Mejorar mi respuesta"
+                 and page.locator("#writing-editor").is_hidden(),
+                 f"[{name}] reviewed L2 offers «Mejorar mi respuesta»")
+    page.locator("#writing-revise").dblclick()
+    expect(page.locator("#writing-new-title")).to_be_visible()
+    report.check(len(revision_rows(HEALTHY, "a.attempt_id")) == 1
+                 and page.locator("#writing-submitted-title").inner_text() == "Mi primera respuesta"
+                 and page.locator("#writing-feedback").is_visible()
+                 and page.locator("#writing-text").input_value() == before
+                 and page.locator("#writing-submit").inner_text() == "Entregar mi mejora",
+                 f"[{name}] double click opens one revision seeded with the first text; first response and review "
+                 "stay visible")
+    page.locator("#writing-text").fill(before + " Por eso conviene desayunar todos los días.")
+    expect(page.locator("#writing-saved")).to_contain_text("Guardado", timeout=5000)
+    page.reload()
+    expect(page.locator("#writing-new-title")).to_be_visible()
+    report.check("desayunar" in page.locator("#writing-text").input_value()
+                 and "desayunar" not in page.locator("#writing-submitted-text").inner_text(),
+                 f"[{name}] reload returns to the improved version with its saved text")
+    page.screenshot(path=str(out / f"{name}-editing.png"), full_page=True)
+    page.locator("#writing-submit").click()
+    page.locator("#writing-dialog-confirm").dblclick()
+    expect(page.locator("#writing-revision-status")).to_be_visible()
+    status = page.locator("#writing-revision-status").inner_text()
+    report.check(status.startswith("Mi mejora: Pendiente de revisión del tutor")
+                 and page.locator("#writing-editor").is_hidden() and page.locator("#writing-revise").is_hidden()
+                 and page.locator("#writing-feedback").is_visible()
+                 and "desayunar" in page.locator("#writing-revision-text").inner_text(),
+                 f"[{name}] improved version submitted and pending; first review still shown")
+    subs = revision_rows(HEALTHY, "s.text_es")
+    report.check(len(subs) == 1 and "desayunar" in subs[0][0] and first_text(HEALTHY) == before,
+                 f"[{name}] one revision submission; the first submission is unchanged")
+    page.screenshot(path=str(out / f"{name}-submitted.png"), full_page=True)
+
+    # L1: starts from the student's correction; no restore; failed save, retry; tab hidden flushes the draft.
+    open_reviewed("writing_conventions", REFERENCE_TUTOR_ID)
+    page.locator("#writing-revise").click()
+    expect(page.locator("#writing-editor")).to_be_visible()
+    report.check(page.locator("#writing-text").input_value() == first_text(REFERENCE_TUTOR_ID)
+                 and page.locator("#writing-restore").is_hidden(),
+                 f"[{name}] L1 revision starts from the submitted correction, without «Restaurar texto original»")
+    page.route("**/api/writing/attempts/*/draft", lambda route: route.abort())
+    page.locator("#writing-text").fill("Corrección mejorada sin conexión.")
+    page.get_by_role("button", name="Guardar borrador").click()
+    expect(page.locator("#writing-retry")).to_be_visible()
+    report.check("No se pudo guardar" in page.locator("#writing-saved").inner_text()
+                 and page.locator("#writing-text").input_value() == "Corrección mejorada sin conexión.",
+                 f"[{name}] failed save keeps the text and offers «Reintentar»")
+    page.unroute("**/api/writing/attempts/*/draft")
+    page.locator("#writing-retry").click()
+    expect(page.locator("#writing-saved")).to_contain_text("Guardado")
+    report.check(revision_rows(REFERENCE_TUTOR_ID, "d.text_es")[0][0] == "Corrección mejorada sin conexión.",
+                 f"[{name}] «Reintentar» stores the revision draft")
+    page.locator("#writing-text").fill("Corrección mejorada antes de cerrar.")
+    page.evaluate("window.dispatchEvent(new Event('pagehide'))")
+    stored = False
+    for _ in range(30):
+        if revision_rows(REFERENCE_TUTOR_ID, "d.text_es")[0][0] == "Corrección mejorada antes de cerrar.":
+            stored = True
+            break
+        page.wait_for_timeout(100)
+    report.check(stored, f"[{name}] leaving the page sends the pending revision draft")
+    page.get_by_role("button", name="Volver a los ejercicios").click()
+    page.locator(f'.exercise-choice[data-exercise="{REFERENCE_TUTOR_ID}"]').click()
+    expect(page.locator("#writing-revise")).to_have_text("Seguir mejorando")
+    report.check(page.locator("#writing-editor").is_hidden(), f"[{name}] an open revision offers «Seguir mejorando»")
+
+    # L4: the five stages restored from the first composition; submitted by sections.
+    open_reviewed("guided_composition", l4)
+    page.locator("#writing-revise").click()
+    expect(page.locator("#writing-guided")).to_be_visible()
+    fields = {k: page.locator(f'#writing-guided textarea[data-section="{k}"]').input_value() for k in GUIDED_TEXT}
+    report.check(fields == GUIDED_TEXT and page.locator(".guided-step[aria-current='step']").get_attribute(
+                 "data-stage") == "plan", f"[{name}] L4 revision restores the five sections, from the first stage")
+    page.locator(".guided-step[data-stage='conclusion']").click()
+    page.locator("#guided-conclusion").fill(GUIDED_TEXT["conclusion"] + " Además, cada grado puede ayudar.")
+    page.locator(".guided-step[data-stage='review']").click()
+    page.get_by_role("button", name="Entregar mi mejora").click()
+    page.locator("#writing-dialog-confirm").click()
+    expect(page.locator("#writing-revision-status")).to_be_visible()
+    sub = revision_rows(l4, "s.sections->>'conclusion', s.paragraph_count")
+    report.check(sub[0][0].endswith("cada grado puede ayudar.") and sub[0][1] == 4,
+                 f"[{name}] L4 improved composition submitted by sections")
+    report.check(no_overflow(page) and not errors, f"[{name}] no overflow, no JavaScript errors {errors}")
+
+
 LATEST_SCORES_SQL = """SELECT DISTINCT ON (c.criterion_code) c.criterion_code, c.points
     FROM writing.criterion_score c JOIN writing.evaluation v USING (evaluation_id)
     WHERE v.status = 'completed' AND c.status = 'scored'
@@ -1300,6 +1414,7 @@ def run_mock(out: Path, url: str) -> Report:
             scenario_guided(page, tutor_context.new_page(), report, viewport, out, url)
             tutor_context.close()
             scenario_quarantine(page, report, viewport, url)
+            scenario_revision(page, report, viewport, out, url)
             if viewport == "desktop":
                 scenario_drafts(context.new_page(), report, out, url)  # closes its own page
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")

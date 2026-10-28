@@ -663,11 +663,15 @@ $("dashboard-menu").addEventListener("click", () => backToMenu());
 // submitted once, then "Pendiente de revisión del tutor". Handwritten (L5) work shows its conditions only.
 // The editor disables spell checking and autocorrection so spelling errors stay visible to the tutor.
 
-const writing = { level: null, exercise: null, savedText: "", requestId: null, busy: false, view: 0 };
+// T037 (ADR-032): while the student improves a reviewed answer, `attempt` is that revision attempt; drafts and the
+// submission then go to its own routes. Otherwise everything addresses the exercise (attempt 1).
+const writing = { level: null, exercise: null, attempt: null, savedText: "", requestId: null, busy: false, view: 0 };
+const work = () => writing.attempt || writing.exercise;
+const REVISION_MARK = "#mejora"; // exercise ids never contain "#"
 
-function rememberWriting(exerciseId) {
+function rememberWriting(exerciseId, revising = false) {
   try {
-    if (exerciseId) sessionStorage.setItem(WRITING_KEY, exerciseId);
+    if (exerciseId) sessionStorage.setItem(WRITING_KEY, revising ? exerciseId + REVISION_MARK : exerciseId);
     else sessionStorage.removeItem(WRITING_KEY);
   } catch {
     // Without storage a reload returns to the main menu; the draft is still in PostgreSQL.
@@ -685,7 +689,7 @@ function rememberedWriting() {
 const countWords = (text) => (text.trim() ? text.trim().split(/\s+/).length : 0);
 const difficultyLabel = (code) => ({ easy: "Fácil", medium: "Intermedia", hard: "Difícil" })[code] || code;
 const writingDirty = () =>
-  Boolean(writing.exercise) && !writing.exercise.submission && !writing.exercise.handwritten &&
+  Boolean(writing.exercise) && !work().submission && !writing.exercise.handwritten &&
   (writing.exercise.guided ? JSON.stringify(guidedSections()) !== writing.savedSections
     : $("writing-text").value !== writing.savedText);
 
@@ -706,18 +710,21 @@ function guidedComposition(sections) {
   return writing.exercise.guided.paragraphs.map((key) => sections[key].trim()).filter(Boolean).join("\n\n");
 }
 
+// The improved version keeps its own stage, apart from the first composition.
+const stageOwner = () => work().attempt_id || writing.exercise.exercise_id;
+
 function rememberStage(index) {
   try {
-    sessionStorage.setItem(GUIDED_STAGE_KEY, `${writing.exercise.exercise_id}:${index}`);
+    sessionStorage.setItem(GUIDED_STAGE_KEY, `${stageOwner()}:${index}`);
   } catch {
     // The stage is only a convenience; the sections themselves are in PostgreSQL.
   }
 }
 
-function rememberedStage(exerciseId) {
+function rememberedStage(owner) {
   try {
     const [id, index] = (sessionStorage.getItem(GUIDED_STAGE_KEY) || "").split(":");
-    return id === exerciseId ? Number(index) || 0 : 0;
+    return id === owner ? Number(index) || 0 : 0;
   } catch {
     return 0;
   }
@@ -725,7 +732,8 @@ function rememberedStage(exerciseId) {
 
 function renderGuided() {
   const data = writing.exercise;
-  const saved = (data.draft && data.draft.sections) || {};
+  const draft = work().draft;
+  const saved = (draft && draft.sections) || {};
   for (const field of guidedFields()) field.value = saved[field.dataset.section] || "";
   writing.savedSections = JSON.stringify(guidedSections());
   $("guided-steps").replaceChildren(...data.guided.stages.map((stage, index) => {
@@ -733,9 +741,9 @@ function renderGuided() {
     button.addEventListener("click", () => goToStage(index));
     return el("li", {}, button);
   }));
-  if (data.draft) saveSeq = Math.max(saveSeq, data.draft.client_seq || 0);
-  saveStatus(data.draft ? "saved" : null, data.draft && data.draft.saved_at);
-  renderStage(rememberedStage(data.exercise_id));
+  if (draft) saveSeq = Math.max(saveSeq, draft.client_seq || 0);
+  saveStatus(draft ? "saved" : null, draft && draft.saved_at);
+  renderStage(rememberedStage(stageOwner()));
 }
 
 function renderStage(index) {
@@ -817,6 +825,7 @@ async function openWriting() {
   show("writing-view");
   writingPanel("levels");
   writing.exercise = null;
+  writing.attempt = null;
   rememberWriting(null);
   const list = $("writing-levels");
   list.replaceChildren(el("li", { class: "muted" }, "Cargando niveles…"));
@@ -868,7 +877,7 @@ async function openWritingLevel(level) {
   }
 }
 
-async function openWritingExercise(exerciseId) {
+async function openWritingExercise(exerciseId, revising = false) {
   let data;
   try {
     data = await api(`/api/writing/exercises/${encodeURIComponent(exerciseId)}`);
@@ -880,6 +889,7 @@ async function openWritingExercise(exerciseId) {
   show("writing-view");
   writingPanel("exercise");
   writing.exercise = data;
+  writing.attempt = null;
   writing.requestId = null;
   if (!writing.level || writing.level.code !== data.level) {
     writing.level = { code: data.level, label_es: data.level_label_es }; // after a reload
@@ -901,37 +911,76 @@ async function openWritingExercise(exerciseId) {
   $("writing-handwritten").textContent = data.handwritten_es || "";
   $("writing-handwritten").hidden = !data.handwritten;
   renderWritingState();
+  // After a reload the student returns to the improved version they were writing.
+  const attempt = data.revision_attempt && data.revision_attempt.attempt;
+  if (revising && attempt && attempt.editable) enterRevision(attempt);
 }
 
 function renderWritingState() {
   const data = writing.exercise;
-  const submitted = Boolean(data.submission);
-  $("writing-editor").hidden = data.handwritten || submitted || Boolean(data.guided);
-  $("writing-guided").hidden = data.handwritten || submitted || !data.guided;
-  $("writing-submitted").hidden = !submitted;
-  if (submitted) {
+  const target = work();
+  const revising = Boolean(writing.attempt);
+  const editing = !data.handwritten && !target.submission;
+  $("writing-editor").hidden = !editing || Boolean(data.guided);
+  $("writing-guided").hidden = !editing || !data.guided;
+  $("writing-new-title").hidden = !revising;
+  $("writing-submit").textContent = revising ? "Entregar mi mejora" : "Entregar texto";
+  $("guided-submit").textContent = revising ? "Entregar mi mejora" : "Entregar composición";
+  $("writing-submitted").hidden = !data.submission;
+  if (data.submission) {
     $("writing-pending").textContent = `${data.submission.status_es}. Entregado el ` +
       `${new Date(data.submission.submitted_at).toLocaleString("es-CR")} (${data.submission.word_count} palabras).`;
+    const later = revising || Boolean(data.revision_attempt && data.revision_attempt.attempt);
+    $("writing-submitted-title").textContent = later ? "Mi primera respuesta" : "Tu texto entregado";
     $("writing-submitted-text").textContent = data.draft ? data.draft.text : "";
     renderWritingFeedback(data.feedback);
-    return;
+    renderRevisionEntry(revising);
   }
-  if (data.handwritten) return;
+  if (!editing) return;
   if (data.guided) {
     renderGuided();
     return;
   }
   // T024: L1 correction exercises start from a copy of the text with errors; a saved draft always wins.
-  // L2-L5 start empty. The copy is not "unsaved work" until the student changes it.
-  const text = data.draft ? data.draft.text : (data.editable_source ? data.source_text_es : "");
+  // L2-L5 start empty. The copy is not "unsaved work" until the student changes it. An improved version
+  // (T037) always has a draft: it starts from the student's own submitted text, never the text with errors.
+  const text = target.draft ? target.draft.text : (data.editable_source ? data.source_text_es : "");
   $("writing-text").value = text;
   writing.savedText = text;
-  $("writing-restore").hidden = !data.editable_source;
+  $("writing-restore").hidden = !data.editable_source || revising;
   $("writing-text").placeholder = data.source_text_es
     ? "Corregí aquí el texto completo." : "";
-  if (data.draft) saveSeq = Math.max(saveSeq, data.draft.client_seq || 0);
-  saveStatus(data.draft ? "saved" : null, data.draft && data.draft.saved_at);
+  if (target.draft) saveSeq = Math.max(saveSeq, target.draft.client_seq || 0);
+  saveStatus(target.draft ? "saved" : null, target.draft && target.draft.saved_at);
   updateWordCount();
+}
+
+// T037: below the reviewed first response, "Mejorar mi respuesta" (or "Seguir mejorando" for an open draft), or
+// the submitted improved version and its status.
+function renderRevisionEntry(revising) {
+  const revision = writing.exercise.revision_attempt || { available: false, attempt: null };
+  const attempt = revision.attempt;
+  const done = Boolean(attempt && attempt.submission);
+  const open = Boolean(attempt && !attempt.submission && attempt.editable);
+  $("writing-revision").hidden = revising || !(revision.available || open || done);
+  $("writing-revision-done").hidden = !done;
+  $("writing-revise").hidden = !(revision.available || open);
+  $("writing-revise").disabled = false;
+  $("writing-revise").textContent = open ? "Seguir mejorando" : "Mejorar mi respuesta";
+  if (done) {
+    $("writing-revision-status").textContent = `Mi mejora: ${attempt.submission.status_es}. Entregada el ` +
+      `${new Date(attempt.submission.submitted_at).toLocaleString("es-CR")} (${attempt.submission.word_count} palabras).`;
+    $("writing-revision-text").textContent = attempt.draft ? attempt.draft.text : "";
+  }
+}
+
+function enterRevision(attempt) {
+  writing.attempt = attempt;
+  writing.requestId = null;
+  rememberWriting(writing.exercise.exercise_id, true);
+  showError($("writing-error"), "");
+  renderWritingState();
+  window.scrollTo({ top: $("writing-new-title").offsetTop - 8 });
 }
 
 // T026: the completed tutor review. Scores use the official rubric descriptors; no grade is computed.
@@ -971,7 +1020,10 @@ const KEEPALIVE_LIMIT = 60000; // bytes; browsers cap keepalive bodies at 64 KiB
 let saveSeq = 0;
 let autosaveTimer = null;
 const nextSeq = () => (saveSeq = Math.max(Date.now(), saveSeq + 1));
-const draftUrl = (exercise) => `/api/writing/exercises/${encodeURIComponent(exercise.exercise_id)}/draft`;
+const workUrl = (target) => (target.attempt_id
+  ? `/api/writing/attempts/${encodeURIComponent(target.attempt_id)}`
+  : `/api/writing/exercises/${encodeURIComponent(target.exercise_id)}`);
+const draftUrl = (target) => `${workUrl(target)}/draft`;
 
 function saveStatus(state, savedAt) {
   const guided = Boolean(writing.exercise && writing.exercise.guided);
@@ -991,31 +1043,32 @@ function currentDraft() {
   return { guided, sections, text, key: guided ? JSON.stringify(sections) : text, body };
 }
 
-function markSaved(exercise, draft, saved) {
-  if (writing.exercise !== exercise) return; // the student opened another exercise meanwhile
+// `target` is the exercise, or the revision attempt being improved (T037).
+function markSaved(target, draft, saved) {
+  if (work() !== target) return; // the student opened another exercise meanwhile
   if (draft.guided) writing.savedSections = draft.key;
   else writing.savedText = draft.text;
-  exercise.draft = { text: draft.text, sections: draft.sections, word_count: saved.word_count,
+  target.draft = { text: draft.text, sections: draft.sections, word_count: saved.word_count,
     saved_at: saved.saved_at, client_seq: saved.client_seq };
   saveStatus(writingDirty() ? "dirty" : "saved", saved.saved_at);
 }
 
 async function sendDraft() {
-  const exercise = writing.exercise;
+  const target = work();
   const draft = currentDraft();
   saveStatus("saving");
   try {
-    markSaved(exercise, draft, await api(draftUrl(exercise), { method: "PUT", body: draft.body }));
+    markSaved(target, draft, await api(draftUrl(target), { method: "PUT", body: draft.body }));
     return true;
   } catch {
-    if (writing.exercise === exercise) saveStatus("error");
+    if (work() === target) saveStatus("error");
     return false;
   }
 }
 
 async function saveWritingDraft() {
-  const exercise = writing.exercise;
-  if (!exercise || exercise.submission || exercise.handwritten) return true;
+  const target = writing.exercise && work();
+  if (!target || target.submission || writing.exercise.handwritten) return true;
   clearTimeout(autosaveTimer);
   if (writing.saving) {
     writing.saveAgain = true;
@@ -1048,14 +1101,14 @@ function scheduleAutosave() {
 function flushDraft() {
   if (!writingDirty()) return;
   clearTimeout(autosaveTimer);
-  const exercise = writing.exercise;
+  const target = work();
   const draft = currentDraft();
   try {
-    fetch(draftUrl(exercise), { method: "PUT", headers: { "Content-Type": "application/json" }, body: draft.body,
+    fetch(draftUrl(target), { method: "PUT", headers: { "Content-Type": "application/json" }, body: draft.body,
       keepalive: new Blob([draft.body]).size < KEEPALIVE_LIMIT })
       .then((response) => (response.ok ? response.json() : Promise.reject(response)))
-      .then((saved) => markSaved(exercise, draft, saved))
-      .catch(() => { if (writing.exercise === exercise && writingDirty()) saveStatus("error"); });
+      .then((saved) => markSaved(target, draft, saved))
+      .catch(() => { if (work() === target && writingDirty()) saveStatus("error"); });
   } catch {
     saveStatus("error");
   }
@@ -1073,12 +1126,14 @@ async function leaveWriting(target) {
   if (target === "list" && writing.level) {
     rememberWriting(null);
     writing.exercise = null;
+    writing.attempt = null;
     openWritingLevel(writing.level);
   } else if (target === "levels" || target === "list") {
     openWriting();
   } else {
     rememberWriting(null);
     writing.exercise = null;
+    writing.attempt = null;
     backToMenu();
   }
 }
@@ -1102,6 +1157,23 @@ $("writing-submit").addEventListener("click", () => {
   writingDialog.showModal();
 });
 $("writing-dialog-stay").addEventListener("click", () => writingDialog.close());
+// T037: opens (or reopens) the one improved version; the server returns the same attempt on repeated clicks.
+$("writing-revise").addEventListener("click", async () => {
+  const button = $("writing-revise");
+  const exercise = writing.exercise;
+  if (button.disabled || !exercise) return;
+  button.disabled = true;
+  try {
+    const attempt = await api(`/api/writing/exercises/${encodeURIComponent(exercise.exercise_id)}/revision`,
+      { method: "POST" });
+    if (writing.exercise !== exercise) return; // the student left meanwhile
+    exercise.revision_attempt = { available: false, attempt };
+    enterRevision(attempt);
+  } catch (error) {
+    if (writing.exercise === exercise) showError($("writing-error"), error.message);
+    button.disabled = false;
+  }
+});
 const restoreDialog = $("writing-restore-dialog");
 $("writing-restore").addEventListener("click", () => restoreDialog.showModal());
 $("writing-restore-stay").addEventListener("click", () => restoreDialog.close());
@@ -1122,15 +1194,21 @@ $("writing-dialog-confirm").addEventListener("click", async () => {
   writing.requestId = writing.requestId || newRequestId();
   const sections = writing.exercise.guided ? guidedSections() : null;
   const text = sections ? guidedComposition(sections) : $("writing-text").value;
+  const target = work();
   try {
-    const submission = await api(`/api/writing/exercises/${encodeURIComponent(writing.exercise.exercise_id)}/submit`,
+    const submission = await api(`${workUrl(target)}/submit`,
       { method: "POST", body: JSON.stringify(sections ? { sections, client_request_id: writing.requestId }
         : { text, client_request_id: writing.requestId }) });
-    writing.exercise.submission = submission;
-    writing.exercise.draft = { text, sections, word_count: submission.word_count, saved_at: submission.submitted_at };
+    target.submission = submission;
+    target.draft = { text, sections, word_count: submission.word_count, saved_at: submission.submitted_at };
     writing.savedText = text;
     if (sections) writing.savedSections = JSON.stringify(sections);
     writingDialog.close();
+    if (writing.attempt === target) {
+      // T037: back to the exercise, which now shows the improved version as pending review.
+      writing.attempt = null;
+      rememberWriting(writing.exercise.exercise_id);
+    }
     renderWritingState();
   } catch (error) {
     showError($("writing-dialog-error"), error.message);
@@ -1153,7 +1231,8 @@ async function resume() {
   const sessionId = storedSession();
   const writingId = rememberedWriting();
   if (!sessionId && writingId) {
-    openWritingExercise(writingId);
+    const revising = writingId.endsWith(REVISION_MARK);
+    openWritingExercise(revising ? writingId.slice(0, -REVISION_MARK.length) : writingId, revising);
     return;
   }
   if (!sessionId) return;
