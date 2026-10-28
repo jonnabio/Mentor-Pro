@@ -1,26 +1,58 @@
-# Active Context: Session Handoff 2026-10-27
+# Active Context: Session Handoff 2026-10-28
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-27
+- **Last Updated:** 2026-10-28 (session closure)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
   GHCR) and 2026-10-26 to 2026-10-27 (deployment Stages 6.1–6.3: RCA-005,
-  ADR-030, production on macedonianserver, home Wi-Fi access)
+  ADR-030, production on macedonianserver, home Wi-Fi access) and
+  2026-10-27 to 2026-10-28 (T032 writing bank, T033 tutor service,
+  ADR-031, production rollout of both)
 
 ## Current Objective
 
-**T032 — Producción escrita usable in production** (awaiting Product
-Owner approval). Code verified on `dev`: `python -m app.writing.bank`
-exports the 11 eligible exercises (quarantined skipped) and imports them
-idempotently (runbook section H). PR #6 merged to `main`
-(`5615eeb`, CI 40519852040, image `sha256:c5a49d17…b58a`). Bank import
-approved (runbook section H, administrator-run). Tutor access:
-[ADR-031](../adr/ADR-031-tutor-access-in-production.md) accepted with
-amendments, implemented in T033 (`app/tutor_main.py`, runbook section J,
-branch `feature/T033-tutor-service` → `dev`). Nothing deployed or
-imported in production yet.
+**T032 + T033 release — deployed; awaiting real-user acceptance.** PR #9
+merged as `2f6a4b3`; CI
+[40582892305](https://github.com/jonnabio/Mentor-Pro/actions/runs/40582892305)
+green. Image
+`ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137`.
+
+Production rollout (administrator-run, PO-authorized, 2026-10-28 server
+time), observed results:
+
+1. Backup: `mentor_pro_2026-10-28_002257.dump`, `BACKUP OK`, 127791 bytes,
+   `600 root`, `pg_restore --list` passed.
+2. App: digest updated (only the image line changed); `/`,
+   `/api/subjects`, `/api/dashboard`, `/api/writing/levels` 200 and
+   `/tutor`, `/api/tutor/queue` 404 on `127.0.0.1:8080` and
+   `192.168.50.229:8080`; PostgreSQL healthy.
+3. Bank: dry run 11 imported / 0 rejected; import 11; re-import 0
+   imported / 11 unchanged; student records untouched; L1 3, L2 3, L3 3,
+   L4 2, L5 0; no references in student API; quarantined 404.
+4. Tutor: pre-checks passed (no tutor key in `app.env`, gateway
+   `172.19.0.1`, no host networking); `tutor.env` root `600`, token 48
+   characters (never displayed); bound to `127.0.0.1:8081` only; refused on
+   Wi-Fi, Tailscale and wired addresses; no token / wrong token / forged
+   `X-Forwarded-For` 403, valid token 200; student routes 404; token absent
+   from logs; requests from the gateway. Defect T035: a 1–15 character
+   token exits 1 instead of 78 (still refused to start).
+
+| State | T032 writing bank | T033 tutor service |
+| --- | --- | --- |
+| Implemented / tested / published | yes | yes |
+| Deployed | yes (11 exercises) | yes (`127.0.0.1:8081`) |
+| Validated by real users | no | no |
+
+Release entry written to `/opt/mentor-pro/RELEASES`
+(`2026-10-28T01:10:25+00:00`); temporary stage scripts and bank reports
+removed from `/tmp` (both checked over SSH).
+
+**T032/T033 are implemented, tested and deployed, but have not yet passed
+the real-user production acceptance test.** Remaining: the student writes,
+reloads and submits; the parent reviews through the SSH tunnel; the
+feedback survives an app restart (Next Steps 1–4).
 
 **Stage 6.3 closing / Stage 6.4 next** (deployment track). Mentor Pro runs
 in production on macedonianserver and is reachable from the house Wi-Fi.
@@ -139,15 +171,46 @@ CI/CD (branch `dev`, merged to `main` by PR #2, merge commit `517a502`)
   Merged by PR #4 (`7e45376`); replacement image
   `sha256:486dcc0a…5e20` published after a passing smoke test.
 
-Producción escrita in production (T032, 2026-10-27, `dev`, not deployed)
+Producción escrita release (T032 + T033, 2026-10-27 to 2026-10-28,
+`main` `2f6a4b3`, deployed `sha256:5d69fe6c…1137`; real-user acceptance
+pending)
 
 - **T032** — `app/writing/bank.py` (export, import with `--dry-run`,
   inventory) and `tests/app/test_writing_bank.py` (7); rehearsal with the
   real curriculum imported 11, rerun 11 unchanged; runbook section H.
   Tutor root cause: in Docker every request (loopback and Wi-Fi) arrives
   from the bridge gateway `172.19.0.1` and production has no tutor token
-  (`/tutor` 404) → ADR-031 Proposed
-  ([result](../progress/task_T032_result.md)).
+  (`/tutor` 404) → ADR-031 (later accepted; T033)
+  ([result](../progress/task_T032_result.md)). Import checks: current
+  revision contracts, rubric hash and curriculum baseline match, accepted
+  generation attempt, RCA-004 independence (or a passed revalidation),
+  L1 references, quarantine excluded; one transaction, advisory lock,
+  existing records never overwritten, student tables counted before and
+  after. PR #6 merged to `main` (`5615eeb`, CI 40519852040).
+- **T033** — `app/tutor_main.py` (tutor-only routes; token of at least 32
+  characters; allowed hosts exact IPs; fails closed with exit 78;
+  `proxy_headers=False`; defined 503 `database_unavailable`) and
+  `tests/app/test_tutor_service.py` (37: LAN, other containers, Tailscale,
+  absent or wrong tokens, forged forwarding headers, wrong gateway)
+  ([ADR-031](../adr/ADR-031-tutor-access-in-production.md) accepted with PO
+  security amendments; [result](../progress/task_T033_result.md)). PR #7
+  (`5ba650e`) and PR #8 (`079387d`: CI step "Smoke test tutor entrypoint"
+  on the same candidate image before publication; RCA-005 gates kept).
+- **PR #9** `dev` → `main` merged at approved head `079387d` as `2f6a4b3`;
+  CI 40582892305 green on the first attempt (480 passed, 102 skipped; ACE
+  skills; `GET /` 200; tutor smoke passed); one build; published
+  `ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137`
+  (tags `testing`, `sha-2f6a4b3…`; confirmed in GHCR).
+- **Production rollout** (PO-authorized per stage, administrator-run with
+  `sudo`, each result checked over SSH; details in Current Objective):
+  backup `BACKUP OK`; app digest updated; 11 exercises imported and the
+  re-import unchanged; tutor service provisioned and verified; `RELEASES`
+  entry; `/tmp` cleaned.
+- **Runbook corrections** (PR #10): section B `pg_dump … </dev/null`
+  (compose `exec` read the pasted script and hung); section H bundle owned
+  by uid 1000 (container user `mentor`; root-owned gave Permission denied)
+  and `run -T … </dev/null`; section J notes T035. Tracker: T034 and T035
+  added (pending).
 
 Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
@@ -174,31 +237,47 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Current State
 
-- **Production (ADR-030):** macedonianserver runs `mentor-pro-app-1`
-  from `ghcr.io/jonnabio/mentor-pro@sha256:486dcc0a…5e20` (`7e45376`) and
-  `mentor-pro-postgres-1` (`postgres:17.6`, volume
-  `mentor-pro_postgres_data`), project `mentor-pro`,
-  `/opt/mentor-pro/compose.deploy.yml`. Ports: `127.0.0.1:8080` and
-  `192.168.50.229:8080` only. Students open `http://192.168.50.229:8080/`.
-- Production data: curriculum `PNE2026-SUM-v1.0` (98/344); one practice
-  session (`0cd5fb94…`, `automated_test`, audit `ADR030-2026-10-27`);
-  no student sessions yet; no writing exercises; the question bank holds
-  only the questions of that test. 21 OpenRouter requests used in the test
-  (free only, daily cap 200).
-- Server files: secrets `/etc/mentor-pro/{app,postgres}.env`; old copies
-  `/etc/mentor-pro/app.env.pre-adr030`,
-  `/opt/mentor-pro/compose.deploy.yml.{bak,pre-adr030,pre-wifi}` (all
-  `0600`; delete once stable); workbook
-  `/opt/mentor-pro/baseline/PNE-Tracker-2026-workbook.xlsx` (`0600`);
-  backup `/var/backups/mentor-pro/mentor_pro_2026-10-26_223101.dump`
-  (taken before the import, empty database); release log
-  `/opt/mentor-pro/RELEASES`; `/etc/sysctl.d/99-mentor-pro.conf`.
+- **T032/T033 are implemented, tested and deployed, but have not yet
+  passed the real-user production acceptance test.** No writing draft,
+  submission or evaluation exists in production yet.
+- **Production (ADR-030, ADR-031):** macedonianserver, project
+  `mentor-pro`, `/opt/mentor-pro/compose.deploy.yml`. `mentor-pro-app-1`
+  and `mentor-pro-tutor-1` both run
+  `ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137`
+  (`2f6a4b3`); `mentor-pro-postgres-1` (`postgres:17.6`, healthy, volume
+  `mentor-pro_postgres_data`, unchanged). App ports `127.0.0.1:8080` and
+  `192.168.50.229:8080`; students open `http://192.168.50.229:8080/`
+  (tutor routes 404 there). Tutor on `127.0.0.1:8081` only, through
+  `ssh -N -L 8081:127.0.0.1:8081 jonnabio@100.64.84.15`.
+- **Tutor boundary:** token (48 characters, `/etc/mentor-pro/tutor.env`,
+  root `0600`, never in `app.env`) plus client address equal to the
+  compose gateway `172.19.0.1`; forwarded headers ignored. Verified in
+  production: refused on Wi-Fi, Tailscale and wired addresses; no token,
+  wrong token and forged `X-Forwarded-For` 403; valid token 200; token not
+  in logs.
+- Production data: curriculum `PNE2026-SUM-v1.0` (98/344); writing bank
+  L1 3, L2 3, L3 3, L4 2, L5 0 (11 eligible, ADR-027); quarantined
+  `PE-L1-feria-ciencia-escuela-c9576f` not exported (404 in production);
+  one practice session (`0cd5fb94…`, `automated_test`); no student
+  sessions or writing work yet.
+- Server files: secrets `/etc/mentor-pro/{app,postgres,tutor}.env` (root
+  `0600`); bank bundle `/opt/mentor-pro/baseline/writing-bank.json` (uid
+  1000, `0600`, contains tutor references; never in Git) next to the
+  workbook; compose copies `.pre-t033` (before the digest update),
+  `.pre-tutor` (before the tutor service) and older `.bak`, `.pre-adr030`,
+  `.pre-wifi`; backups in `/var/backups/mentor-pro/` (root `0700`):
+  `mentor_pro_2026-10-28_002257.dump` (127791 bytes, verified, taken
+  before the import) and `mentor_pro_2026-10-26_223101.dump` (905 bytes,
+  empty database); release log `/opt/mentor-pro/RELEASES` (last entry
+  `5d69fe6c…`, 2026-10-28T01:10:25Z); `/etc/sysctl.d/99-mentor-pro.conf`.
 - Server access: SSH key login from this PC (`jonnabio@100.64.84.15`);
   `jonnabio` is in the `docker` group (root-equivalent); compose commands
   need `sudo` (root-only env files); the agent cannot use `sudo`.
-- `main` committed and pushed to `origin/main` (T027–T030 pushed at
-  handoff); working tree clean; no task in progress, no lock files; no
-  server, browser or generation job left running.
+- Repository: `main` at `2f6a4b3` (the release); `dev` is `main` plus
+  PR #10 (documentation only; promote with the next release); no open PRs
+  after closure; working tree clean; no task in progress; this repository
+  has no lock or lane files; no local server, browser or generation job and
+  no production command left running.
 - Multiple choice: unchanged since T019 — free models only (paid
   disabled), checker 1.6.0, prompts generation 1.3.0 / rubric 1.1.0,
   generation limit 4000 tokens, daily request budget 1000, daily USD 0.
@@ -231,32 +310,46 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - CI (GitHub Actions, `.github/workflows/ci.yml`): Python Tests on
   PostgreSQL 17.6 service (102 skipped: no workbook in CI), then Validate
   and Publish Docker Image: build once, smoke test `GET /` (HTTP 200 within
-  60 s), push that same image to GHCR only on push to `main` (RCA-005).
-- Tests: 579 passing (T032 bank, T033 tutor service); browser (mocked,
+  60 s), tutor entrypoint smoke (exit 78; 403, 404 and 503 boundary
+  checks), push that same image to GHCR only on push to `main` (RCA-005).
+  Triggers: push to `dev` or `main`, PRs into `main` only.
+- Tests: 582 passing locally (T032 bank, T033 tutor service); CI 480
+  passed, 102 skipped; browser (mocked,
   `mentor_pro_test`) 447/447; live
   draft restart check 4/4; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
-0. T032 approvals: (a) merge `dev` → `main` and deploy the new digest;
-   (b) import the writing bank in production (runbook section H, after a
-   backup); (c) accept or amend ADR-031, then implement
-   `MENTOR_PRO_TUTOR_ALLOWED_HOSTS`, the `tutor` service and its tests.
-1. Stage 6.3 close: the student completes a five-question Matemáticas
+1. **Real-user acceptance test.** On the student's own device
+   (`http://192.168.50.229:8080`): Producción escrita → an exercise → type
+   a short text → wait for "Guardado" → reload (text remains) → submit →
+   status "Pendiente de revisión del tutor".
+2. **Parent tutor review.** SSH tunnel, `http://127.0.0.1:8081/tutor`,
+   token from `sudo cat /etc/mentor-pro/tutor.env` (kept in a password
+   manager); score the rubric, save feedback, mark complete; the student
+   sees it.
+3. **Persistence.** `sudo docker restart mentor-pro-app-1`; the submission
+   and evaluation are still shown. Optional: from the student device
+   `http://192.168.50.229:8081/` must fail.
+4. **Record acceptance** in this file and the T032/T033 notes from observed
+   outcomes only; on a failure open a focused defect and keep the evidence.
+5. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
+   1–15 characters), T034 (deterministic practice-set test), then assess
+   CI for PRs into `dev`; each a separate verified change.
+6. Stage 6.3 close: the student completes a five-question Matemáticas
    practice from the student's own device at `http://192.168.50.229:8080/`,
    sees the result, and the progress survives an app restart (ADR-030
    criterion 8). Record it in ACTIVE_CONTEXT.
-2. Initial content decisions (ADR-030 section 7, no new ADR): pre-generate
-   a small Matemáticas bank so practice does not wait about 5 minutes; for
-   writing, provision one eligible exercise or label it "not yet
-   available" (UI change).
-3. Stage 6.4: controlled image promotion to the server (pull by digest,
+7. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
+   a small Matemáticas bank so practice does not wait about 5 minutes
+   (writing is provisioned: 11 exercises).
+8. Stage 6.4: controlled image promotion to the server (pull by digest,
    backup, `up -d`, health check of the four URLs, `RELEASES` entry,
    tested rollback to the previous digest). Plan with an ADR first.
-4. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
-   `.pre-wifi` copies.
-5. Task 3 — CI maintenance (see Current Objective).
-6. Earlier backlog: T032 L5 examination simulation candidate; reopening a
+9. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
+   `.pre-wifi`, `.pre-t033` and `.pre-tutor` copies.
+10. Task 3 — CI maintenance (see Current Objective).
+11. Earlier backlog: L5 examination simulation candidate; reopening a
    completed evaluation; rerun `benchmark_writing_reviewers.py` when the
    free listing changes; revalidate `PE-L1-feria-ciencia-escuela-c9576f`
    (local database); `fail_interrupted()` follow-up (T018); suite slowdown.
@@ -265,10 +358,17 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 - Production practice generation takes about 5 minutes per new set and
   may return `partial` (4 of 5 in the test) until the bank fills.
-- No writing exercises in production until the T032 import is approved.
-- Tutor review is unavailable through the published ports (loopback only,
-  ADR-024 kept by ADR-030 section 8); tutor access is a separate
-  administrator-only follow-up.
+- **Blocker for closing the release:** the real-user acceptance test
+  (student and parent) has not been performed; nothing is marked accepted.
+- T035 (maintenance, pending): a tutor token of 1–15 characters refuses
+  startup but exits 1 (`ValueError` while importing `app.main`) instead of
+  78. Consistency defect; no listener starts; no authentication bypass.
+- T034 (maintenance, pending):
+  `test_transient_failure_then_success_completes` is nondeterministic with
+  parallel slots (failed once in CI 40534292823; the rerun passed).
+- CI does not run on PRs into `dev` (only on the push after the merge);
+  separate improvement.
+- No L5 writing exercises (L5 shows 0).
 - No login on the app; anyone on the house Wi-Fi can use it and see
   progress (accepted; revisit if guests join or for outside access).
 - `macedonianserver.local` did not resolve for `curl` on this Windows PC;
@@ -288,8 +388,11 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - Draft limits (ADR-028): keepalive bodies above 64 KiB may not arrive on
   close; a crash keeps only server-confirmed text (up to 2 s lost).
 - Writing checks are partly keyword-based (W04, W13 voseo list, W16, W19).
-- Tutor boundary is a local code, not authentication (ADR-024); a completed
-  evaluation cannot be reopened.
+- Tutor boundary is a shared token plus the gateway address, not user
+  accounts (ADR-024, ADR-031); a completed evaluation cannot be reopened.
+  Residual risk: a host-network container or server process reaches
+  `127.0.0.1:8081` as the gateway (it still needs the token); recheck the
+  gateway if the compose network is recreated (a wrong one fails closed).
 - The unexplained T016 `gate=test` failure was never reproduced
   (RCA-003); full logs are kept if it recurs.
 - 14 quarantined practice sessions await an optional human review (T017).
@@ -327,6 +430,17 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - Backups before real-database changes:
   `%USERPROFILE%\mentor-pro-backups\mentor_pro_pre_T029_2026-10-25.dump`
   (`writing`, `llm`); `pg_dump` is in `C:\Program Files\PostgreSQL\17\bin`.
+- Release procedure used on 2026-10-28: runbook sections B (backup), F
+  (start and verify), H (writing bank:
+  `python -m app.writing.bank export|import [--dry-run]|inventory`; local
+  export, `scp`, install as uid 1000 `0600`, dry run → import → re-import)
+  and J (tutor service). The agent cannot `sudo`: it prepares a script, the
+  administrator saves it with a heredoc and runs `bash /tmp/stageN.sh`,
+  then the agent verifies over SSH. Lessons: pasted scripts need
+  `compose exec/run -T … </dev/null` (otherwise they read the terminal and
+  hang); bind-mounted files must be readable by uid 1000; under `set -e`,
+  `grep -c` with 0 matches exits 1. Never `docker compose down -v`, never
+  restore over the live database, never print env values or the token.
 - Production runbook: `docs/runbooks/production-deployment.md`
   (variables `COMPOSE`, `WB`, `WB_SHA`, `DIGEST`; gates `BACKUP OK`,
   `sha256sum -c` OK, `DB OK`). Diagnostics only with redaction; never
@@ -353,5 +467,5 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - `.ace/standards/question-engine.md`
 - `.ace/standards/coding.md`, `.ace/standards/security.md`
 - [ADR-005](../adr/ADR-005-question-engine-skill-suite.md) to
-  [ADR-029](../adr/ADR-029-writing-review-fallback.md)
+  [ADR-031](../adr/ADR-031-tutor-access-in-production.md)
 - Regression guards: `docs/rca/regression-guards.yaml` (RCA-001 to RCA-005)
