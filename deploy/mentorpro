@@ -1,7 +1,8 @@
 #!/bin/sh
 # Mentor Pro deployment commands (ADR-033). Increment I1: read-only only.
 #
-#   deploy/mentorpro status   what is running: images, health, schema, releases, backups
+#   deploy/mentorpro status   what is running: images, health, schema, releases, backups;
+#                             exit 0 HEALTHY, 1 UNHEALTHY, 3 INCOMPLETE (something unknown)
 #   deploy/mentorpro smoke    HTTP checks of the student and tutor services; exit 1 on any FAIL
 #
 # Both commands change nothing and can be rerun at any time. Output is
@@ -15,6 +16,7 @@
 #   MENTORPRO_RELEASE_ENV  /opt/mentor-pro/release.env
 #   MENTORPRO_RELEASES     /opt/mentor-pro/RELEASES
 #   MENTORPRO_BACKUPS      /var/backups/mentor-pro
+#   MENTORPRO_DOCKER       docker
 set -u
 
 APP_URL=${MENTORPRO_APP_URL:-http://127.0.0.1:8080}
@@ -23,6 +25,7 @@ WIFI_ADDR=${MENTORPRO_WIFI_ADDR-192.168.50.229}
 RELEASE_ENV=${MENTORPRO_RELEASE_ENV:-/opt/mentor-pro/release.env}
 RELEASES=${MENTORPRO_RELEASES:-/opt/mentor-pro/RELEASES}
 BACKUPS=${MENTORPRO_BACKUPS:-/var/backups/mentor-pro}
+DOCKER=${MENTORPRO_DOCKER:-docker}
 
 # HTTP status code of a GET, or 000 when nothing answers.
 code() {
@@ -62,6 +65,12 @@ smoke() {
   fi
 }
 
+problems=0
+unknowns=0
+ok() { echo "OK      $1"; }
+problem() { problems=$((problems + 1)); echo "PROBLEM $1"; }
+unknown() { unknowns=$((unknowns + 1)); echo "UNKNOWN $1"; }
+
 status() {
   echo "== release"
   if [ -r "$RELEASE_ENV" ]; then
@@ -71,27 +80,40 @@ status() {
   fi
 
   echo "== containers"
-  if command -v docker >/dev/null 2>&1; then
+  if command -v "$DOCKER" >/dev/null 2>&1; then
     for svc in app tutor postgres; do
       # Image reference, state and health only; never the environment.
-      docker inspect "mentor-pro-$svc-1" --format \
-        "$svc {{.Config.Image}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}" \
-        2>/dev/null || echo "$svc: no container"
+      if line=$("$DOCKER" inspect "mentor-pro-$svc-1" --format           '{{.Config.Image}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}'           2>/dev/null); then
+        case "$line" in
+          *" running healthy") ok "$svc $line" ;;
+          *" running none") unknown "$svc $line (no health check)" ;;
+          *) problem "$svc $line" ;;
+        esac
+      else
+        problem "$svc: no container"
+      fi
     done
     echo "== writing schema"
     # Read-only; images before T036 have no migrate module.
-    if schema=$(docker exec mentor-pro-app-1 python -m app.writing.migrate status 2>/dev/null); then
-      echo "$schema" | tr -d '\n '; echo
+    if out=$("$DOCKER" exec mentor-pro-app-1 python -m app.writing.migrate status 2>/dev/null); then
+      state=$(echo "$out" | tr -d '\n ' | sed -n 's/.*"state":"\([a-z]*\)".*/\1/p')
+      case "$state" in
+        current) ok "schema current" ;;
+        "") unknown "schema: unreadable answer" ;;
+        *) problem "schema $state" ;;
+      esac
     else
-      echo "not reported by this image"
+      unknown "schema: not reported by this image or container"
     fi
   else
-    echo "docker: not available on this host"
+    unknown "docker: not available on this host; containers and schema not checked"
   fi
 
   echo "== http"
-  echo "student / $(code "$APP_URL/")"
-  echo "tutor /tutor $(code "$TUTOR_URL/tutor")"
+  got=$(code "$APP_URL/")
+  if [ "$got" = 200 ]; then ok "student / $got"; else problem "student / $got"; fi
+  got=$(code "$TUTOR_URL/tutor")
+  if [ "$got" = 200 ]; then ok "tutor /tutor $got"; else problem "tutor /tutor $got"; fi
 
   echo "== last releases"
   if [ -r "$RELEASES" ]; then tail -n 3 "$RELEASES"; else echo "RELEASES: not readable ($RELEASES)"; fi
@@ -105,6 +127,14 @@ status() {
   else
     echo "backups: not readable ($BACKUPS); run with sudo"
   fi
+
+  # Unknown is never reported as healthy.
+  if [ "$problems" -gt 0 ]; then
+    echo "STATUS UNHEALTHY ($problems problem(s), $unknowns unknown)"; return 1
+  elif [ "$unknowns" -gt 0 ]; then
+    echo "STATUS INCOMPLETE ($unknowns item(s) unknown)"; return 3
+  fi
+  echo "STATUS HEALTHY"
 }
 
 case "${1:-}" in

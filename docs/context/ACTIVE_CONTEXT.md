@@ -55,7 +55,8 @@ recorded. Approval is not authorization for every increment.
 **T041 — ADR-033 I1 (versioned compose, read-only `status`/`smoke`):
 implemented, PR to `dev` for PO review.** `deploy/compose.yml`,
 `deploy/mentorpro`; 6 tests against real processes on `mentor_pro_test`;
-gate 632 passed. Docker not installed locally: Docker parts of `status`
+gate 641 passed after PO corrections. No Docker locally: Compose CLI
+validation not run; Docker parts of `status`
 untested; server file equivalence to be checked at I6.
 [T041 result](../progress/task_T041_result.md).
 

@@ -6,12 +6,14 @@ student and tutor processes on the isolated test database. Nothing here touches 
 
 from __future__ import annotations
 
+import http.server
 import os
 import re
 import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -54,11 +56,38 @@ def test_compose_bindings_match_adr_030_and_031():
         assert "healthcheck:" in block and "restart: unless-stopped" in block
 
 
-def test_tutor_healthcheck_accepts_the_403_its_own_loopback_gets():
+def _answering(status):
+    """A local HTTP server that answers every GET with `status`; returns (server, port)."""
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(status)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, server.server_address[1]
+
+
+def _tutor_healthcheck(port):
     test = re.search(r'test: \["CMD", "python", "-c", "(.*)"\]', service("tutor")).group(1)
-    code = test.encode().decode("unicode_escape")
-    assert "except e.HTTPError: pass" in code
-    compile(code, "healthcheck", "exec")
+    code = test.encode().decode("unicode_escape").replace("127.0.0.1:8000", f"127.0.0.1:{port}")
+    return subprocess.run([sys.executable, "-c", code], timeout=30).returncode
+
+
+@pytest.mark.parametrize("status, healthy", [(403, True), (200, False), (500, False), (503, False)])
+def test_tutor_healthcheck_passes_only_on_the_expected_403(status, healthy):
+    server, port = _answering(status)
+    try:
+        assert (_tutor_healthcheck(port) == 0) is healthy
+    finally:
+        server.shutdown()
+
+
+def test_tutor_healthcheck_fails_without_a_connection():
+    assert _tutor_healthcheck(_free_port()) != 0
 
 
 # ------------------------------------------------------------------ the script against real processes
@@ -82,8 +111,8 @@ def _serve(code, port, env):
     raise RuntimeError(f"port {port} did not open")
 
 
-def run(command, app_port, tutor_port, tmp_path):
-    env = {**os.environ, "MENTORPRO_APP_URL": f"http://127.0.0.1:{app_port}",
+def run(command, app_port, tutor_port, tmp_path, docker="mentorpro-test-no-docker", **extra):
+    env = {**os.environ, **extra, "MENTORPRO_DOCKER": docker, "MENTORPRO_APP_URL": f"http://127.0.0.1:{app_port}",
            "MENTORPRO_TUTOR_URL": f"http://127.0.0.1:{tutor_port}", "MENTORPRO_WIFI_ADDR": "",
            "MENTORPRO_RELEASE_ENV": str(tmp_path / "release.env"), "MENTORPRO_RELEASES": str(tmp_path / "RELEASES"),
            "MENTORPRO_BACKUPS": str(tmp_path / "backups")}
@@ -140,13 +169,45 @@ def test_status_is_read_only_and_reports_without_secrets(services, tmp_path):
     (tmp_path / "backups" / "mentor_pro_2026-10-28.dump").write_bytes(b"x")
     before = sorted((p.name, p.stat().st_size, p.stat().st_mtime_ns) for p in tmp_path.rglob("*"))
     result = run("status", app_port, tutor_port, tmp_path)
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == 3, result.stdout  # Docker unknown: never reported as healthy
     out = result.stdout
+    assert "UNKNOWN docker: not available on this host" in out and "STATUS INCOMPLETE (1 item(s) unknown)" in out
+    assert "HEALTHY" not in out
     assert "MENTOR_PRO_IMAGE=ghcr.io/jonnabio/mentor-pro@sha256:" in out
-    assert "student / 200" in out and "tutor /tutor 200" in out
+    assert "OK      student / 200" in out and "OK      tutor /tutor 200" in out
     assert "operator ok" in out and "dumps 1," in out and "no automatic deletion" in out
     assert TOKEN not in out and "postgresql://" not in out
     assert sorted((p.name, p.stat().st_size, p.stat().st_mtime_ns) for p in tmp_path.rglob("*")) == before
+
+
+FAKE_DOCKER = """#!/bin/sh
+# Test double: answers `inspect` and `exec` like Docker for the three services.
+case "$1" in
+  inspect) [ "$2" = mentor-pro-tutor-1 ] && echo "img@sha256:t running $TUTOR_HEALTH" || echo "img@sha256:a running healthy" ;;
+  exec) [ -n "$SCHEMA" ] || exit 1; printf '{\n "state": "%s"\n}\n' "$SCHEMA" ;;
+esac
+"""
+
+
+@pytest.mark.parametrize("tutor_health, schema, code, verdict", [
+    ("healthy", "current", 0, "STATUS HEALTHY"),
+    ("unhealthy", "current", 1, "STATUS UNHEALTHY (1 problem(s), 0 unknown)"),
+    ("healthy", "drifted", 1, "STATUS UNHEALTHY (1 problem(s), 0 unknown)"),
+    ("healthy", "", 3, "STATUS INCOMPLETE (1 item(s) unknown)"),
+    ("none", "current", 3, "STATUS INCOMPLETE (1 item(s) unknown)"),
+])
+def test_status_separates_healthy_unhealthy_and_unknown(services, tmp_path, tutor_health, schema, code, verdict):
+    app_port, tutor_port, _ = services
+    fake = tmp_path / "docker"
+    fake.write_text(FAKE_DOCKER, encoding="utf-8", newline="\n")
+    fake.chmod(0o755)
+    (tmp_path / "backups").mkdir()
+    result = run("status", app_port, tutor_port, tmp_path, docker=fake.as_posix(),
+                 TUTOR_HEALTH=tutor_health, SCHEMA=schema)
+    assert result.returncode == code, result.stdout
+    assert result.stdout.rstrip().endswith(verdict)
+    if code == 3:
+        assert "UNKNOWN" in result.stdout and "HEALTHY" not in result.stdout
 
 
 def test_unknown_command_is_refused():
