@@ -23,7 +23,7 @@ version but refuses an unmigrated one (`SchemaMigrationRequired`; the
 migration is explicit: `python -m app.writing.migrate apply`); (2)
 `uq_submission_exercise` removed from startup DDL; (3) attempt 1 follows
 editorial revisions until submitted, revision attempts stay pinned. Draft
-PR to `dev` may be opened; merge needs approval. Details:
+PR #11 to `dev` opened (draft); merge needs approval. Details:
 [T036 result](../progress/task_T036_result.md).
 
 **T032 + T033 release — deployed; awaiting real-user acceptance.** PR #9
