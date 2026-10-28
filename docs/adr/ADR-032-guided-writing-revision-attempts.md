@@ -1,6 +1,6 @@
 # ADR-032: Guided Writing Revision with Student Attempts
 
-> **Status:** Accepted for T036 (data foundation) — principles approved 2026-10-28; T036 implementation decisions PO 1–3 approved 2026-10-28; merge to `dev` conditionally approved; production migration, deployment, merge to `main` and infrastructure changes NOT authorized
+> **Status:** Accepted for T036 (data foundation) and T037 (student revision API, amendment approved 2026-10-28); principles approved 2026-10-28; T036 merged to `dev`; production migration, deployment, GHCR publication, merge to `main` and infrastructure changes NOT authorized
 > **Date:** 2026-10-28
 > **Scope:** Producción escrita L1–L4; separate from editorial exercise revisions
 > **First ACE task:** T036 (registered 2026-10-28, data foundation only)
@@ -148,6 +148,33 @@ unavailable while it lasts.
 ## API compatibility approach
 
 Continue supporting existing exercise endpoints for attempt 1 and introduce attempt-scoped endpoints (exact paths/response shape to be decided in API review). New writes must identify the target attempt; never infer the newest attempt for a write in a way that could redirect an in-flight autosave. Keep existing student responses compatible with first-attempt users. Tutor APIs remain behind ADR-031's dedicated service, SSH tunnel, exact-host checks and token; student endpoints cannot return tutor-only references.
+
+### T037 amendment: student revision API (PO approved 2026-10-28)
+
+Approved as proposed in
+[the T037 plan](../planning/2026-10-28-T037-student-revision-plan.md),
+student service only, additive:
+
+| Method and path | Behaviour |
+| --- | --- |
+| `GET /api/writing/exercises/{id}` | Existing fields unchanged (attempt 1). New `revision_attempt`: `{available, attempt}`; `attempt` is `null` or `{attempt_id, attempt_number, editable, draft, submission, feedback}` |
+| `POST /api/writing/exercises/{id}/revision` | 201 created, 200 existing (same `attempt_id`); 409 `revision_not_allowed` (Spanish reason); 409 `exercise_unavailable` when quarantined |
+| `PUT /api/writing/attempts/{attempt_id}/draft` | Same body, `client_seq` ordering and responses as the exercise draft route; 409 `already_submitted` |
+| `POST /api/writing/attempts/{attempt_id}/submit` | Same validation as the exercise route; a retry returns the first submission |
+
+- The new block is named `revision_attempt`, not `revision` as in the plan:
+  the exercise response already has `revision` (the editorial revision
+  number, ADR-023), and renaming it would break existing clients.
+- Writes always name the `attempt_id`. Attempt routes refuse attempt 1
+  (409 `attempt_routes_are_for_revisions`); malformed IDs 422, unknown 404.
+- **Quarantine (PO decision 3):** no revision starts, and an open revision
+  cannot be saved or submitted, while the exercise is quarantined (409
+  `exercise_unavailable`; `available` false, `editable` false). Historical
+  submissions and evaluations stay readable.
+- **Release (PO decision 4):** T037 and T038 are developed and verified
+  independently and released together; T037 is never deployed alone.
+  Without T038 the tutor sees a revision as an ordinary submission, and
+  the student page does not yet show the review of the improved version.
 
 ## Progress semantics
 

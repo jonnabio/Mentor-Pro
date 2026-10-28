@@ -1,8 +1,8 @@
 # T037 — Student Revision ("Mejorar mi respuesta") — Implementation Plan
 
 > **Date:** 2026-10-28
-> **Status:** PROPOSED — awaiting Product Owner approval; T037 not
-> registered in `docs/progress/tasks.json`; no code written
+> **Status:** APPROVED by the Product Owner 2026-10-28 (API, quarantine:
+> no revision; release together with T038); T037 registered and implemented
 > **ADR:** [ADR-032](../adr/ADR-032-guided-writing-revision-attempts.md)
 > (accepted for T036); this plan proposes the API details ADR-032 left to
 > "API review" and needs an ADR-032 amendment before code

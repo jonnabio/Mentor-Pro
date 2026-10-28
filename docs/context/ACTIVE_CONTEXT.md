@@ -2,7 +2,7 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (T036 session closure)
+- **Last Updated:** 2026-10-28 (T037 implementation, PR to `dev`)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -27,10 +27,21 @@ push CI); (5) production migration, deployment, merge to `main`,
 infrastructure — NOT AUTHORIZED. Details:
 [T036 result](../progress/task_T036_result.md).
 
-**T037 — "Mejorar mi respuesta": plan proposed, not registered.**
-[Plan](../planning/2026-10-28-T037-student-revision-plan.md); awaits PO
-approval of the API (ADR-032 amendment), quarantine rule and release
-pairing with T038.
+**T037 — "Mejorar mi respuesta": implemented, PR to `dev` open, not
+merged, not deployed.** PO approved the plan, the ADR-032 amendment, no
+revision while quarantined, and release only together with T038. Branch
+`feature/T037-student-revision`; gate `VERIFY_RESULT=pass gate=all` (621
+passed); browser 473/473. [T037 result](../progress/task_T037_result.md).
+PR #12 (T036 closure docs) merged as `273100b`.
+
+**T040 — deployment simplification and repeatability assessment:
+registered, pending** (after T037 review; assessment only, no
+infrastructure or production change). T038/T039 stay reserved for
+ADR-032.
+
+Milestones: learning — Write → Tutor Feedback → Revise → Resubmit → Tutor
+Re-evaluation (needs T038); operational — a predictable, reproducible,
+recoverable production deployment (T040).
 
 **T032 + T033 release — deployed; awaiting real-user acceptance.** PR #9
 merged as `2f6a4b3`; CI
@@ -369,9 +380,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **T037 approval (PO):** API table (ADR-032 amendment), quarantine
-   rule, release together with T038; then register and implement T037.
-   Do not start an image containing T036 in production; a production
+0. **T037 PR review and merge authorization (PO)**; then T038 (tutor
+   re-evaluation) and a joint T037+T038 release decision; then T040
+   assessment. Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).
 1. **Real-user acceptance test.** On the student's own device
    (`http://192.168.50.229:8080`): Producción escrita → an exercise → type
