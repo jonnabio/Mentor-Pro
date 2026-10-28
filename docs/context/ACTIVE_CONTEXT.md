@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (T038 merged to `dev`; T040 assessment
-  delivered for PO review)
-- **Active Role:** Architect
+- **Last Updated:** 2026-10-28 (T040 merged; ADR-033 approved with
+  refinements; T041 = I1 implemented, PR for review)
+- **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
   GHCR) and 2026-10-26 to 2026-10-27 (deployment Stages 6.1–6.3: RCA-005,
@@ -41,15 +41,24 @@ green (524 passed, 102 skipped; image built, both smoke tests passed; GHCR
 login and publish skipped). Integrated.
 [T038 result](../progress/task_T038_result.md).
 
-**T040 — deployment assessment: delivered, awaiting PO review.** Branch
-`docs/T040-deployment-assessment`;
-[assessment](../planning/2026-10-28-deployment-simplification-assessment.md)
-and [ADR-033](../adr/ADR-033-repeatable-deployment-workflow.md)
-(Proposed). Top risks: no image/schema compatibility check before deploy
-or rollback; backups never restore-tested; production compose file not in
-Git. Proposal: versioned `deploy/` files, one `mentorpro` script with
-enforced gates, CI release manifest, increments I1 to I8 (I6 onward
-change production). [T040 result](../progress/task_T040_result.md).
+**T040 — deployment assessment: merged into `dev`.** PR #15 (docs only)
+merged as `e368c9c`; `dev` CI 40770016065 green (524 passed).
+[ADR-033](../adr/ADR-033-repeatable-deployment-workflow.md) accepted as
+the direction (PO 2026-10-28): `release.env` exception, tags
+`vYYYY.MM.DD-N` and immutable manifests, rehearsal with a production
+dump copy in principle (only with controls R4 to R6), primary
+administrator as the only operator, retention of ten routine plus all
+pre-migration dumps without automatic deletion. Refinements R1 to R8
+recorded. Approval is not authorization for every increment.
+[T040 result](../progress/task_T040_result.md).
+
+**T041 — ADR-033 I1 (versioned compose, read-only `status`/`smoke`):
+implemented, PR to `dev` for PO review.** `deploy/compose.yml`,
+`deploy/mentorpro`; 6 tests against real processes on `mentor_pro_test`;
+gate 641 passed after PO corrections. No Docker locally: Compose CLI
+validation not run; Docker parts of `status`
+untested; server file equivalence to be checked at I6.
+[T041 result](../progress/task_T041_result.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix
 progress counting of repeated attempts first; the T036 migration needs a
@@ -401,8 +410,8 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **PO review of T040 / ADR-033** and its five open questions; then
-   I1 to I5 as separate tasks (no production change). T039 (progress
+0. **PO review of the T041 PR (I1).** I2 to I5 each need a separate
+   task and approval; I6 onward change production. T039 (progress
    counting) before any T037+T038 release; both released together.
    Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).
