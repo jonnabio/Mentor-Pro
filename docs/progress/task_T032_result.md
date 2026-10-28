@@ -2,7 +2,9 @@
 
 - **Date:** 2026-10-27
 - **Role:** Developer
-- **Status:** verified locally; not deployed (needs Product Owner approval)
+- **Status:** verified locally; published (`main` `2f6a4b3`,
+  `sha256:5d69fe6c…1137`); deployed to production 2026-10-28 (runbook
+  B, H; technical checks passed); real-user acceptance pending
 
 ## Assessment (Thought)
 
