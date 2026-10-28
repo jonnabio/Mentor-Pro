@@ -105,7 +105,7 @@ CREATE INDEX ix_submission_exercise ON writing.submission (exercise_id);
 ROLLBACK_SQL = """
 DROP INDEX writing.ix_submission_exercise;
 DROP INDEX writing.uq_submission_attempt;
-CREATE UNIQUE INDEX uq_submission_exercise ON writing.submission (exercise_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_submission_exercise ON writing.submission (exercise_id);
 DROP INDEX writing.ix_draft_exercise;
 ALTER TABLE writing.draft DROP CONSTRAINT draft_pkey;
 ALTER TABLE writing.draft ADD CONSTRAINT draft_pkey PRIMARY KEY (exercise_id);
@@ -134,10 +134,29 @@ def is_applied(conn: psycopg.Connection, migration_id: str = STUDENT_ATTEMPTS) -
 
 
 def state(conn: psycopg.Connection) -> str:
-    """'fresh' (no student tables yet), 'legacy' (needs the migration) or 'current'."""
+    """'fresh' (no student tables yet), 'legacy' (needs the migration), 'drifted' (migrated, but a pre-T036 image
+    has since recreated uq_submission_exercise, which would block revision submissions) or 'current'."""
     if not _exists(conn, "writing.draft"):
         return "fresh"
-    return "current" if is_applied(conn) else "legacy"
+    if not is_applied(conn):
+        return "legacy"
+    return "drifted" if _exists(conn, "writing.uq_submission_exercise") else "current"
+
+
+REFUSALS = {
+    "legacy": "writing tables predate migration 0001_student_attempts; "
+              "run `python -m app.writing.migrate apply` after a verified backup",
+    "drifted": "uq_submission_exercise was recreated after migration 0001_student_attempts (an older image ran on "
+               "this database); run `python -m app.writing.migrate repair`",
+}
+
+
+def refuse_unless_current(conn: psycopg.Connection) -> str:
+    """The startup check of the application and tutor service; returns the state when it may start."""
+    current = state(conn)
+    if current in REFUSALS:
+        raise SchemaMigrationRequired(REFUSALS[current])
+    return current
 
 
 def fingerprints(conn: psycopg.Connection) -> dict[str, dict[str, Any]]:
@@ -240,6 +259,17 @@ def apply(url: str, dry_run: bool = False) -> dict[str, Any]:
         except _DryRun as done:
             return {**done.report, "status": "dry_run_rolled_back"}
     return report
+
+
+def repair(url: str) -> dict[str, Any]:
+    """Remove a uq_submission_exercise recreated by an older image; nothing else changes."""
+    with psycopg.connect(url) as conn, conn.transaction():
+        conn.execute(LOCK_SQL)
+        if state(conn) != "drifted":
+            raise MigrationError(f"nothing to repair (state {state(conn)})")
+        before = fingerprints(conn)
+        conn.execute("DROP INDEX writing.uq_submission_exercise")
+        return {"migration": STUDENT_ATTEMPTS, "status": "repaired", "before": before, "after": fingerprints(conn)}
 
 
 def rollback(url: str) -> dict[str, Any]:

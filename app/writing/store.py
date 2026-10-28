@@ -215,18 +215,16 @@ MAX_ATTEMPTS = 2  # ADR-032: the first increment allows one revision; the schema
 class WritingStore:
     def __init__(self, url: str):
         """Additive DDL only. T036: a database without writing tables is created at the current version; one with
-        older writing tables is refused until `python -m app.writing.migrate apply` has run (never implicit)."""
+        older writing tables (or a migrated schema an older image has changed) is refused (never implicit)."""
         self.url = url
         with psycopg.connect(url, autocommit=True) as conn:
             conn.execute("SELECT pg_advisory_lock(hashtext('bootstrap:writing'))")
             try:
-                state = migrations.state(conn)
-                if state == "legacy":
-                    raise migrations.SchemaMigrationRequired(
-                        "writing tables predate migration 0001_student_attempts; "
-                        "run `python -m app.writing.migrate apply` after a verified backup")
+                fresh = migrations.state(conn) == "fresh"
+                if not fresh:
+                    migrations.refuse_unless_current(conn)
                 conn.execute(SCHEMA_SQL)
-                if state == "fresh":
+                if fresh:
                     migrations.create_fresh(conn)
             finally:
                 conn.execute("SELECT pg_advisory_unlock(hashtext('bootstrap:writing'))")

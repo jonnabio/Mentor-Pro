@@ -7,18 +7,27 @@ from __future__ import annotations
 
 import copy
 import os
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import psycopg
 import pytest
+from fastapi.testclient import TestClient
 from psycopg.types.json import Jsonb
 
+from app.main import create_app
+from app.tutor_main import EX_CONFIG, create_tutor_app
 from app.writing import migrations
 from app.writing.store import SCHEMA_SQL, RevisionNotAllowed, WritingStore
+from conftest import SYNTHETIC
 from test_writing_guided import SECTIONS, guided_exercise
+from test_tutor_service import call
 from test_writing_tutor import L1, L23
 
 URL = os.environ["TEST_DATABASE_URL"]
+REPO = Path(__file__).resolve().parents[2]
 L2 = L23["introduction_paragraph"]
 L3 = next(r for k, r in L23.items() if k != "introduction_paragraph")
 L4 = guided_exercise()
@@ -45,7 +54,9 @@ def unchecked_store() -> WritingStore:
 def complete(submission_id, evaluation_id=None):
     """A completed tutor evaluation with two criterion scores (rows as T026 stores them)."""
     eid = evaluation_id or f"EVAL-{submission_id}"
-    record = {"evaluation_id": eid, "feedback_es": {"strengths": ["Bien."], "improvements": ["Revisá tildes."]}}
+    record = {"evaluation_id": eid, "evaluated_at": "2026-10-20T10:00:00Z", "criterion_scores": [
+        {"criterion": "EE07", "status": "scored", "points": 3}, {"criterion": "EE08", "status": "scored", "points": 2}],
+        "feedback_es": {"strengths": ["Bien."], "improvements": ["Revisá tildes."]}}
     with psycopg.connect(URL) as conn:
         conn.execute("""INSERT INTO writing.evaluation (evaluation_id, submission_id, status, evaluator_role, rubric_id,
                             rubric_sha256, evaluated_at, feedback, record, exercise_revision)
@@ -405,3 +416,128 @@ def test_handwritten_submissions_cannot_be_revised(fresh):
     assert fresh.attempts(L2["exercise_id"])[0]["attempt_number"] == 1
     with pytest.raises(RevisionNotAllowed, match="typed"):
         fresh.start_revision(L2["exercise_id"])
+
+
+# ---------------------------------------------------------------- startup guard and attempt-1 compatibility (PO review)
+
+TUTOR_TOKEN = "tutor-attempts-token-0123456789abcdef"
+FEEDBACK = {"strengths": ["Bien."], "improvements": ["Revisá tildes."]}
+
+
+def student_app():
+    return create_app(URL, "catalog_unused", SYNTHETIC)
+
+
+def tutor_app():
+    return create_tutor_app(URL, TUTOR_TOKEN, "127.0.0.1")
+
+
+def test_both_apps_refuse_to_start_on_an_unmigrated_schema(legacy):
+    before = snapshot()
+    for app in (student_app(), tutor_app()):
+        with pytest.raises(migrations.SchemaMigrationRequired), TestClient(app):
+            pass
+    assert snapshot() == before and sql("SELECT to_regclass('writing.student_attempt')") == [(None,)]
+
+
+def test_refused_processes_exit_without_serving(legacy, tmp_path):
+    env = {**os.environ, "DATABASE_URL": URL, "PYTHONPATH": str(REPO), "MENTOR_PRO_TUTOR_TOKEN": TUTOR_TOKEN,
+           "MENTOR_PRO_TUTOR_ALLOWED_HOSTS": "127.0.0.1"}
+    tutor = subprocess.run([sys.executable, "-m", "app.tutor_main"], cwd=tmp_path, env=env, capture_output=True,
+                           text=True, timeout=60)
+    assert tutor.returncode == EX_CONFIG and tutor.stderr.startswith("tutor start refused: ")
+    assert "app.writing.migrate apply" in tutor.stderr and TUTOR_TOKEN not in tutor.stderr + tutor.stdout
+    student = subprocess.run([sys.executable, "-m", "uvicorn", "app.main:app", "--port", "0"], cwd=tmp_path,
+                             env=env, capture_output=True, text=True, timeout=60)
+    assert student.returncode != 0 and "SchemaMigrationRequired" in student.stderr
+    assert "Application startup failed" in student.stderr
+    assert sql("SELECT to_regclass('writing.student_attempt')") == [(None,)]
+
+
+def test_an_unreachable_database_still_starts_and_answers_503():
+    for app in (create_app("postgresql://nobody@127.0.0.1:1/none", "c", SYNTHETIC),
+                create_tutor_app("postgresql://nobody@127.0.0.1:1/none", TUTOR_TOKEN, "127.0.0.1")):
+        with TestClient(app):
+            pass  # the guard leaves an unreachable database to the first request, as before T036
+
+
+def test_writing_requests_on_an_unmigrated_schema_answer_503(legacy):
+    student = TestClient(student_app())  # no lifespan: as if the schema changed after startup
+    response = student.get("/api/writing/levels")
+    assert response.status_code == 503 and response.json()["error"] == "schema_migration_required"
+    response = call(tutor_app(), "127.0.0.1", "/api/tutor/queue", {"X-Tutor-Token": TUTOR_TOKEN})
+    assert response.status_code == 503 and response.json()["error"] == "schema_migration_required"
+
+
+def test_migrated_history_works_through_the_unchanged_api(legacy):
+    migrations.apply(URL)
+    before = snapshot()
+    with TestClient(student_app()) as student:
+        base = "/api/writing/exercises"
+        l1 = student.get(f"{base}/{L1['exercise_id']}").json()
+        assert l1["submission"]["status"] == "reviewed" and l1["draft"]["text"] == L1_CORRECTED
+        assert l1["feedback"]["strengths_es"] == FEEDBACK["strengths"]
+        l4 = student.get(f"{base}/{L4['exercise_id']}").json()
+        assert l4["draft"]["sections"] == SECTIONS and l4["submission"]["status"] == "pending_review"
+        assert student.get(f"{base}/{L2['exercise_id']}").json()["draft"]["text"] == "Mi borrador."
+        states = {e["exercise_id"]: e["state"] for e in
+                  student.get(f"/api/writing/levels/{L2['level']}/exercises").json()["exercises"]}
+        assert states[L2["exercise_id"]] == "draft"
+        # historical submissions stay frozen; their retry returns the original
+        frozen = student.put(f"{base}/{L1['exercise_id']}/draft", json={"text": "Cambio.", "client_seq": 99})
+        assert frozen.status_code == 409
+        again = student.post(f"{base}/{L3['exercise_id']}/submit",
+                             json={"text": "Otro.", "client_request_id": "req-retry-0003"}).json()
+        assert again["created"] is False
+        assert snapshot() == before
+        # the historical draft continues: ordered saves, then the first submission of attempt 1
+        saved = student.put(f"{base}/{L2['exercise_id']}/draft", json={"text": "Mi borrador final.", "client_seq": 1})
+        assert saved.json()["applied"]
+        assert not student.put(f"{base}/{L2['exercise_id']}/draft",
+                               json={"text": "Viejo.", "client_seq": 1}).json()["applied"]
+        done = student.post(f"{base}/{L2['exercise_id']}/submit",
+                            json={"text": "Mi borrador final.", "client_request_id": "req-new-0002"}).json()
+        assert done["created"] is True
+    store = WritingStore(URL)
+    assert [a["attempt_number"] for a in store.attempts(L2["exercise_id"])] == [1]
+    assert store.submission(L2["exercise_id"])["attempt_id"] == store.attempts(L2["exercise_id"])[0]["attempt_id"]
+    with TestClient(tutor_app()):  # the tutor service starts on the migrated schema
+        pass
+    queue = call(tutor_app(), "127.0.0.1", "/api/tutor/queue", {"X-Tutor-Token": TUTOR_TOKEN})
+    assert queue.status_code == 200
+    ids = {s["submission_id"] for s in queue.json()["submissions"]}
+    assert {"SUB-L1-hist-0001", "SUB-L3-hist-0001", "SUB-L4-hist-0001"} <= ids and len(ids) == 4
+
+
+def test_an_old_image_recreating_the_exercise_index_is_detected_and_repaired(legacy):
+    """Observed with the pre-T036 store: on a migrated database its startup DDL recreates uq_submission_exercise,
+    which would later block revision submissions. The new code refuses that state until `migrate repair`."""
+    migrations.apply(URL)
+    with psycopg.connect(URL, autocommit=True) as conn:  # what the old image's SCHEMA_SQL does
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_submission_exercise ON writing.submission (exercise_id)")
+        assert migrations.state(conn) == "drifted"
+    before = snapshot()
+    with pytest.raises(migrations.SchemaMigrationRequired, match="migrate repair"):
+        WritingStore(URL)
+    for app in (student_app(), tutor_app()):
+        with pytest.raises(migrations.SchemaMigrationRequired, match="migrate repair"), TestClient(app):
+            pass
+    report = migrations.repair(URL)
+    assert report["status"] == "repaired" and report["before"] == report["after"] and snapshot() == before
+    assert "uq_submission_exercise" not in indexes()
+    with pytest.raises(migrations.MigrationError, match="nothing to repair"):
+        migrations.repair(URL)
+    store = WritingStore(URL)
+    attempt = store.start_revision(L1["exercise_id"])[0]
+    assert store.submit_attempt(attempt["attempt_id"], "Mejora.", "req-after-repair")[1]
+
+
+def test_an_unconfigured_database_does_not_block_startup():
+    """CI smoke tests start both images without DATABASE_URL; the guard must leave that to the first request."""
+    from app.writing.routes import WritingService
+    from curriculum import db
+
+    def missing():
+        raise db.ConfigurationError("DATABASE_URL is not set")
+
+    WritingService(missing).check_schema()

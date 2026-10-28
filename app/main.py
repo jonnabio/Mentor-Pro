@@ -11,7 +11,8 @@ Run:
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -27,6 +28,7 @@ from app.dev_routes import LlmFactory, build_dev_router
 from app.practice.jobs import SetRunner, live_set_runner
 from app.practice.mastery import NOTICE_ES, STATUS_LABELS_ES, STATUSES, Thresholds, subject_dashboard
 from app.practice.routes import PracticeService, build_practice_router
+from app.writing.migrations import SchemaMigrationRequired
 from app.writing.routes import WritingService, build_writing_router
 from app.writing.tutor import LOOPBACK, build_tutor_router
 from curriculum import db
@@ -67,7 +69,13 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
                baseline: str = BASELINE_VERSION, dev_endpoints: bool | None = None,
                llm_factory: LlmFactory | None = None, practice_runner: SetRunner | None = None,
                tutor_token: str | None = None, tutor_hosts: frozenset[str] = LOOPBACK) -> FastAPI:
-    app = FastAPI(title="Mentor Pro", version="0.4.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        app.state.writing.check_schema()  # T036: refuse to start on an unmigrated writing schema
+        yield
+
+    app = FastAPI(title="Mentor Pro", version="0.4.0", docs_url="/api/docs", openapi_url="/api/openapi.json",
+                  lifespan=lifespan)
     app.state.catalog_target = (database_url, schema)
 
     def catalog() -> Iterator[psycopg.Connection]:
@@ -80,6 +88,11 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
     @app.exception_handler(ApiError)
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
         return JSONResponse(status_code=exc.status, content={"error": exc.code, "message_es": exc.message_es})
+
+    @app.exception_handler(SchemaMigrationRequired)
+    async def schema_migration_required(_: Request, __: Exception) -> JSONResponse:
+        return JSONResponse(status_code=503, content={
+            "error": "schema_migration_required", "message_es": "La aplicación está en mantenimiento."})
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:

@@ -2,6 +2,7 @@
 
     python -m app.writing.migrate status
     python -m app.writing.migrate apply [--dry-run]
+    python -m app.writing.migrate repair
     python -m app.writing.migrate rollback
 
 Reads DATABASE_URL like the application. Output is counts and digests only, never student text.
@@ -26,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("status")
     apply = sub.add_parser("apply")
     apply.add_argument("--dry-run", action="store_true")
+    sub.add_parser("repair")
     sub.add_parser("rollback")
     args = parser.parse_args(argv)
     url = db.database_url()
@@ -35,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
                 report = {"state": migrations.state(conn)}
         elif args.command == "apply":
             report = migrations.apply(url, dry_run=args.dry_run)
+        elif args.command == "repair":
+            report = migrations.repair(url)
         else:
             report = migrations.rollback(url)
     except migrations.MigrationError as exc:

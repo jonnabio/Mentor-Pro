@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import ipaddress
 import sys
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import psycopg
 
@@ -23,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.main import STATIC_DIR, ApiError
+from app.writing.migrations import SchemaMigrationRequired
 from app.writing.routes import WritingService
 from app.writing.tutor import build_tutor_router
 from curriculum import db
@@ -62,7 +65,15 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
         raise TutorConfigurationError(f"MENTOR_PRO_TUTOR_TOKEN must have at least {MIN_SERVICE_TOKEN} characters")
     hosts = parse_allowed_hosts(allowed_hosts if allowed_hosts is not None
                                 else db.setting("MENTOR_PRO_TUTOR_ALLOWED_HOSTS"))
-    app = FastAPI(title="Mentor Pro tutor", docs_url=None, redoc_url=None, openapi_url=None)
+    service = WritingService(lambda: database_url or db.database_url())
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        service.check_schema()  # T036: refuse to start on an unmigrated writing schema
+        yield
+
+    app = FastAPI(title="Mentor Pro tutor", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+    app.state.writing = service
 
     @app.exception_handler(ApiError)
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
@@ -75,7 +86,11 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
         return JSONResponse(status_code=503, content={
             "error": "database_unavailable", "message_es": "La base de datos no está disponible. Intentá más tarde."})
 
-    service = WritingService(lambda: database_url or db.database_url())
+    @app.exception_handler(SchemaMigrationRequired)
+    async def schema_migration_required(_: Request, __: Exception) -> JSONResponse:
+        return JSONResponse(status_code=503, content={
+            "error": "schema_migration_required", "message_es": "El servicio está en mantenimiento."})
+
     app.include_router(build_tutor_router(service, ApiError, token, hosts))
 
     @app.get("/tutor", include_in_schema=False)
@@ -93,7 +108,11 @@ if __name__ == "__main__":
 
     try:
         tutor_app = create_tutor_app()
+        tutor_app.state.writing.check_schema()
     except TutorConfigurationError as exc:  # never prints the token itself
         print(f"tutor configuration rejected: {exc}", file=sys.stderr)
+        raise SystemExit(EX_CONFIG) from None
+    except SchemaMigrationRequired as exc:
+        print(f"tutor start refused: {exc}", file=sys.stderr)
         raise SystemExit(EX_CONFIG) from None
     uvicorn.run(tutor_app, **UVICORN_OPTIONS)
