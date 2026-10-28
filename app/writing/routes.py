@@ -18,8 +18,9 @@ import psycopg
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.writing import contracts, progress
+from app.writing import contracts, migrations, progress
 from app.writing.store import GUIDED_PARAGRAPHS, GUIDED_SECTIONS, WritingStore, assemble_sections, word_count
+from curriculum import db
 
 MAX_TEXT = 20000
 PENDING_ES = "Pendiente de revisión del tutor"
@@ -94,6 +95,17 @@ class WritingService:
             if self._store is None:
                 self._store = WritingStore(self._url_factory())
             return self._store
+
+    def check_schema(self) -> None:
+        """Startup guard (T036, ADR-032 PO 1): raise SchemaMigrationRequired when the writing tables predate the
+        current migration or an older image has changed them ('drifted'). A database that cannot be reached is
+        left to the first request (503), as before."""
+        try:
+            conn = psycopg.connect(self._url_factory(), connect_timeout=5)
+        except (psycopg.OperationalError, db.ConfigurationError):
+            return
+        with conn:
+            migrations.refuse_unless_current(conn)
 
 
 def _unit_es(unit: str, n: int) -> str:

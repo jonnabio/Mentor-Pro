@@ -2,16 +2,29 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (session closure)
+- **Last Updated:** 2026-10-28 (T036 session closure)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
   GHCR) and 2026-10-26 to 2026-10-27 (deployment Stages 6.1–6.3: RCA-005,
   ADR-030, production on macedonianserver, home Wi-Fi access) and
   2026-10-27 to 2026-10-28 (T032 writing bank, T033 tutor service,
-  ADR-031, production rollout of both)
+  ADR-031, production rollout of both) and 2026-10-28 (T036 student
+  attempt data foundation, feature branch only)
 
 ## Current Objective
+
+**T036 — student attempt data foundation (ADR-032): implemented and
+verified on `feature/T036-guided-writing-revision-design`; awaiting Product
+Owner review.** Not merged, not deployed, no production migration. Three
+implementation decisions need PO confirmation (ADR-032 "T036
+implementation"): (1) startup creates an empty database at the current
+version but refuses an unmigrated one (`SchemaMigrationRequired`; the
+migration is explicit: `python -m app.writing.migrate apply`); (2)
+`uq_submission_exercise` removed from startup DDL; (3) attempt 1 follows
+editorial revisions until submitted, revision attempts stay pinned. Draft
+PR #11 to `dev` opened (draft); merge needs approval. Details:
+[T036 result](../progress/task_T036_result.md).
 
 **T032 + T033 release — deployed; awaiting real-user acceptance.** PR #9
 merged as `2f6a4b3`; CI
@@ -212,6 +225,22 @@ pending)
   and `run -T … </dev/null`; section J notes T035. Tracker: T034 and T035
   added (pending).
 
+Guided writing revision (ADR-032, 2026-10-28, feature branch)
+
+- **ADR-032** proposed (`e7afb13`) with plan (`d99186d`); PO approved the
+  architecture principles and T036 implementation.
+- **T036** — `writing.student_attempt`; drafts keyed by attempt;
+  `uq_submission_attempt` replaces `uq_submission_exercise`; composite FKs
+  keep draft/submission exercise equal to the attempt's; evaluation keys
+  unchanged. Versioned migration `0001_student_attempts`
+  (`app/writing/migrations.py`, CLI `app/writing/migrate.py`): one
+  transaction, preconditions, attempt 1 backfill, before/after digests of
+  student tables, ledger `writing.schema_migration`, dry run, rollback
+  while only attempt 1 exists. Store: exercise-level methods = attempt 1
+  only; `save_attempt_draft`, `submit_attempt`, `start_revision` (no
+  route). Tests 19 new; runbook section K (not authorized). Commits
+  `1652181`, `8bd806f`, `ce0fa5c` + docs.
+
 Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 - **Stage 6.1** — server pulls the image by digest (`linux/amd64`).
@@ -273,9 +302,10 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - Server access: SSH key login from this PC (`jonnabio@100.64.84.15`);
   `jonnabio` is in the `docker` group (root-equivalent); compose commands
   need `sudo` (root-only env files); the agent cannot use `sudo`.
-- Repository: `main` at `2f6a4b3` (the release); `dev` is `main` plus
-  PR #10 (documentation only; promote with the next release); no open PRs
-  after closure; working tree clean; no task in progress; this repository
+- Repository: `main` at `2f6a4b3` (the release); `dev` `1f2fcfd` is
+  `main` plus PR #10 (documentation only); T036 on
+  `feature/T036-guided-writing-revision-design` (pushed; see git log for the
+  head); working tree clean; no task in progress; this repository
   has no lock or lane files; no local server, browser or generation job and
   no production command left running.
 - Multiple choice: unchanged since T019 — free models only (paid
@@ -313,13 +343,21 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   60 s), tutor entrypoint smoke (exit 78; 403, 404 and 503 boundary
   checks), push that same image to GHCR only on push to `main` (RCA-005).
   Triggers: push to `dev` or `main`, PRs into `main` only.
-- Tests: 582 passing locally (T032 bank, T033 tutor service); CI 480
+- T036 verification: `test_writing_attempts.py` 19 passed; ACE gate
+  test 601 passed; mocked browser 447/447. Migration exercised only on
+  `mentor_pro_test` (synthetic history), never on student or production
+  data.
+- Tests before T036: 582 passing locally (T032 bank, T033 tutor service); CI 480
   passed, 102 skipped; browser (mocked,
   `mentor_pro_test`) 447/447; live
   draft restart check 4/4; ACE gate `VERIFY_RESULT=pass gate=all`.
 
 ### Next Steps
 
+0. **T036 review (PO):** confirm ADR-032 PO 1–3, review the draft PR to
+   `dev`; then T037 (student revision UI on `start_revision`,
+   `save_attempt_draft`, `submit_attempt`). A production migration needs a
+   restore rehearsal and separate approval (runbook K).
 1. **Real-user acceptance test.** On the student's own device
    (`http://192.168.50.229:8080`): Producción escrita → an exercise → type
    a short text → wait for "Guardado" → reload (text remains) → submit →
@@ -356,6 +394,10 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Blockers/Issues
 
+- T036: an image containing it refuses to start on the unmigrated
+  production database until `migrate apply` runs (fail closed, by design);
+  progress and tutor queue will count revision submissions as activity
+  until T039.
 - Production practice generation takes about 5 minutes per new set and
   may return `partial` (4 of 5 in the test) until the bank fills.
 - **Blocker for closing the release:** the real-user acceptance test

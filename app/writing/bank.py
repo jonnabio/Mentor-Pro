@@ -38,7 +38,7 @@ from app.writing import contracts
 from app.writing.store import WritingStore
 
 BUNDLE_VERSION = "writing-bank-1"
-STUDENT_TABLES = ("draft", "submission", "evaluation", "criterion_score")
+STUDENT_TABLES = ("student_attempt", "draft", "submission", "evaluation", "criterion_score")
 JSONB = {
     "writing.exercise": {"record"},
     "writing.generation_attempt": {"checks", "review", "reasons", "exercise", "reference"},
