@@ -1263,6 +1263,33 @@
       "result_file": "docs/progress/task_T040_result.md",
       "failures": [],
       "notes": "Registered 2026-10-28 by PO priority after T037 reached review. T038 and T039 reserved for ADR-032, hence T040."
+    },
+    {
+      "id": "T041",
+      "name": "Versioned deployment Compose configuration, read-only status and smoke checks (ADR-033 I1)",
+      "objective": "Add deploy/compose.yml (production services of ADR-030/031 with health checks, image digest from non-secret release.env) and deploy/mentorpro with read-only status and smoke commands; test only against an isolated local environment on mentor_pro_test. No server, volume, secret, release workflow or container change.",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "deploy/compose.yml",
+          "deploy/mentorpro",
+          "tests/app/test_deploy.py",
+          "docs/progress/task_T041_result.md"
+        ],
+        "modify": [
+          "docs/adr/ADR-033-repeatable-deployment-workflow.md"
+        ]
+      },
+      "depends_on": [
+        "T040"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T041_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-28 after PO approval of ADR-033 (I1 only). T039 reserved by ADR-032, hence T041. Increments I2-I5 need separate tasks and approvals."
     }
   ]
 }

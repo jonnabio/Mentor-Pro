@@ -1,0 +1,76 @@
+# Mentor Pro production services (ADR-030, ADR-031, ADR-033 increment I1).
+#
+# Versioned copy of /opt/mentor-pro/compose.deploy.yml with health checks
+# added. Not yet adopted on the server (increment I6 needs PO authorization).
+#
+#   docker compose -f deploy/compose.yml --env-file /opt/mentor-pro/release.env ...
+#
+# No secret values here: secrets stay in /etc/mentor-pro/*.env (root, 0600)
+# and are read with env_file only. The single interpolated value is the
+# non-secret image digest from release.env (ADR-033, approved exception to
+# ADR-030 section 4):
+#
+#   MENTOR_PRO_IMAGE=ghcr.io/jonnabio/mentor-pro@sha256:<digest>
+name: mentor-pro
+
+services:
+  app:
+    image: ${MENTOR_PRO_IMAGE:?set MENTOR_PRO_IMAGE in release.env}
+    restart: unless-stopped
+    env_file:
+      - /etc/mentor-pro/app.env
+    environment:
+      CURRICULUM_BASELINE: PNE2026-SUM-v1.0
+      MENTOR_PRO_DEV_ENDPOINTS: "false"
+    ports:
+      - "127.0.0.1:8080:8000"
+      - "192.168.50.229:8080:8000"   # house Wi-Fi only (ADR-030 section 10)
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The student page answers 200; Python is in the image, curl is not.
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  tutor:
+    image: ${MENTOR_PRO_IMAGE:?set MENTOR_PRO_IMAGE in release.env}  # same digest as app
+    command: ["python", "-m", "app.tutor_main"]
+    restart: unless-stopped
+    env_file:
+      - /etc/mentor-pro/app.env     # database settings; no tutor key
+      - /etc/mentor-pro/tutor.env   # token and allowed hosts (tutor only)
+    environment:
+      MENTOR_PRO_DEV_ENDPOINTS: "false"
+    ports:
+      - "127.0.0.1:8081:8000"       # never the Wi-Fi or wired address
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # From inside the container the client is 127.0.0.1, not the allowed
+      # gateway, so /tutor answers 403: any HTTP answer means the service is up.
+      test: ["CMD", "python", "-c", "import urllib.request as u, urllib.error as e\ntry: u.urlopen('http://127.0.0.1:8000/tutor', timeout=3)\nexcept e.HTTPError: pass"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  postgres:
+    image: postgres:17.6
+    restart: unless-stopped
+    env_file:
+      - /etc/mentor-pro/postgres.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mentor_pro_admin -d mentor_pro"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
