@@ -3,9 +3,9 @@
 - **Date:** 2026-10-28
 - **Role:** Developer
 - **Branch:** `feature/T042-restore-checked-backup` (from `dev` at `cf43e91`)
-- **Status:** PO pre-merge changes applied and verified locally;
-  merge authorized once local verification passes; **not verified** until
-  post-merge CI runs both Docker tests. Not used on the server.
+- **Status:** integrated and verified. PR #17 merged as `4efed63`; `dev`
+  CI 40787440842 green with both Docker tests executed and passed. Not
+  used on the server.
 
 ## Thought
 
@@ -105,7 +105,18 @@ PO pre-merge changes (review of PR #17):
 
 No server, production volume, secret, workflow, image or container change.
 
+## Post-merge CI
+
+Run [40787440842](https://github.com/jonnabio/Mentor-Pro/actions/runs/40787440842)
+on `4efed63`: success; 542 passed, 111 skipped; image build and both
+smoke tests passed; GHCR steps skipped. Both Docker tests executed and
+passed: with `MENTORPRO_REQUIRE_DOCKER=1` they cannot skip, there were no
+failures, and the counts match (previous `dev` run 539 passed, 102
+skipped; +3 passed = the two Docker tests and the refusal test; +9
+skipped = the local-cluster tests, as CI has no PostgreSQL 17 server
+tools). The `ERROR` lines in the job's PostgreSQL log are constraint
+violations provoked on purpose by existing tests.
+
 ## Next
 
-PO review of the PR. After merge, check that CI ran the two Docker tests
-(not skipped). I3 needs its own task and approval.
+I3 plan (T043) for PO review; implementation needs its own authorization.
