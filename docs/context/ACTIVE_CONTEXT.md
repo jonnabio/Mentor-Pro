@@ -53,8 +53,8 @@ recorded. Approval is not authorization for every increment.
 [T040 result](../progress/task_T040_result.md).
 
 **T041 — ADR-033 I1: merged into `dev`.** PO corrections (tutor health
-check only on 403; `status` never reports unknown as healthy) applied; PR
-#16 merged as `cf43e91`; `dev` CI 40781126775 green (539 passed).
+check only on 403; `status` never reports unknown as healthy) applied;
+PR #16 merged as `cf43e91`; `dev` CI 40781126775 green (539 passed).
 Compose CLI validation not run locally (no Docker); a Docker-gated test
 is in T042. [T041 result](../progress/task_T041_result.md).
 
