@@ -1212,7 +1212,7 @@
       "id": "T038",
       "name": "Guided writing revision: tutor re-evaluation (ADR-032)",
       "objective": "Tutor queue and detail identify revision submissions and show the original response with its completed evaluation, the revised response and the official rubric; the new evaluation attaches only to the revision; previous evaluations immutable; the student sees the new review through the existing feedback view. ADR-031 isolation and token unchanged. No progress changes (T039).",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1244,11 +1244,13 @@
       "id": "T040",
       "name": "Deployment process simplification and repeatability assessment",
       "objective": "Assess ADR-030/ADR-031 architecture, the production runbook and scripts, GHCR immutable releases, the T036 explicit migration and schema compatibility, backup/restore rehearsal and verification, approval gates, health and tutor security checks, rollback and recovery, automatable manual steps and replicability on a clean isolated environment; propose a documented, minimally complex, repeatable procedure using existing Docker Compose, PostgreSQL and GitHub Actions. Assessment only: no infrastructure provisioning, no production change.",
-      "status": "pending",
+      "status": "done",
       "role": "Architect",
       "files": {
         "create": [
-          "docs/progress/task_T040_result.md"
+          "docs/progress/task_T040_result.md",
+          "docs/planning/2026-10-28-deployment-simplification-assessment.md",
+          "docs/adr/ADR-033-repeatable-deployment-workflow.md"
         ],
         "modify": []
       },
@@ -1257,7 +1259,7 @@
       ],
       "complexity": "M",
       "acceptance_cmd": "bash .ace/scripts/verify.sh",
-      "attempts": 0,
+      "attempts": 1,
       "result_file": "docs/progress/task_T040_result.md",
       "failures": [],
       "notes": "Registered 2026-10-28 by PO priority after T037 reached review. T038 and T039 reserved for ADR-032, hence T040."
