@@ -1151,7 +1151,7 @@
       "id": "T036",
       "name": "Guided writing revision: student attempt data foundation (ADR-032)",
       "objective": "Versioned, explicitly invoked migration 0001_student_attempts: writing.student_attempt, attempt-scoped drafts and submissions (one submission per attempt), attempt 1 backfilled with every historical record unchanged, transactional rollback; attempt-aware store methods with exercise-level methods kept on attempt 1. No student UI, tutor UI, progress or deployment changes.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1176,7 +1176,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T036_result.md",
       "failures": [],
-      "notes": "PO approved ADR-032 principles and T036 implementation on feature/T036-guided-writing-revision-design (2026-10-28). No production migration or deployment authorized. T037 (student revision UI), T038 (tutor re-evaluation), T039 (progress comparison) reserved, not registered."
+      "notes": "PO approved ADR-032 principles and T036 implementation on feature/T036-guided-writing-revision-design (2026-10-28). No production migration or deployment authorized. T037 (student revision UI), T038 (tutor re-evaluation), T039 (progress comparison) reserved, not registered. Verified 2026-10-28: 19 new tests, gate test 601 passed, browser 447/447. Awaiting PO confirmation of ADR-032 PO 1-3 and PR review; not merged or deployed."
     }
   ]
 }

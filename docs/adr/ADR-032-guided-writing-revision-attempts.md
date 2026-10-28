@@ -1,9 +1,9 @@
 # ADR-032: Guided Writing Revision with Student Attempts
 
-> **Status:** Proposed — architecture principles approved by Product Owner 2026-10-28; physical schema, migration and implementation NOT authorized
+> **Status:** Proposed — architecture principles approved by Product Owner 2026-10-28; T036 data foundation implemented on the feature branch (see "T036 implementation"); PO confirmation of its three implementation decisions pending; production migration, deployment and release NOT authorized
 > **Date:** 2026-10-28
 > **Scope:** Producción escrita L1–L4; separate from editorial exercise revisions
-> **First proposed ACE task:** T036 (planning only; tracker registration at implementation approval)
+> **First ACE task:** T036 (registered 2026-10-28, data foundation only)
 
 ## Context and learning objective
 
@@ -33,6 +33,70 @@ Add `attempt_id` foreign keys to `writing.draft` and `writing.submission`. Backf
 After validated backfill, make `attempt_id` non-null for active student rows, replace the old draft `exercise_id` PK with a primary key on `attempt_id` (retain exercise_id FK for compatibility if useful), replace `uq_submission_exercise` with `UNIQUE(attempt_id)`, retain `uq_evaluation_submission` and existing evaluation/criterion keys. Add consistency constraints or transactional checks that each draft/submission's exercise matches its attempt. Keep existing submission IDs; do not introduce an alternative evaluation identity. A second attempt has its own draft, submission and evaluation; the first stays immutable.
 
 **Migration mechanism decision deferred:** `WritingStore.__init__` currently executes `SCHEMA_SQL` during application startup under `bootstrap:writing` advisory lock. Do not place destructive index/PK changes into unguarded startup DDL. Implement an explicitly versioned, separately invoked migration with an audit/check table or equivalent controlled revision state. Startup schema initialization must remain safe on both fresh and migrated test databases; no implicit production migration during app startup.
+
+## T036 implementation (physical design, 2026-10-28)
+
+Implemented on `feature/T036-guided-writing-revision-design`; see
+[T036 result](../progress/task_T036_result.md). Within the decision above;
+three points need Product Owner confirmation (marked **PO**).
+
+Schema (`app/writing/migrations.py`, migration `0001_student_attempts`):
+
+- `writing.student_attempt` as proposed, with `uq_attempt_exercise_number
+  (exercise_id, attempt_number)`, `uq_attempt_exercise (attempt_id,
+  exercise_id)` (target of the composite FKs), `uq_attempt_previous`
+  (linear chain, no fork), `ck_attempt_first_has_no_previous` and
+  `fk_attempt_previous_same_exercise (previous_attempt_id, exercise_id)`.
+  "Predecessor is the immediately earlier attempt" is enforced in the store
+  transaction (an FK cannot express `attempt_number - 1`) and tested.
+- `writing.draft`: `attempt_id NOT NULL`, primary key `attempt_id`;
+  `exercise_id` kept (FK to the exercise, indexed);
+  `fk_draft_attempt (attempt_id, exercise_id)`.
+- `writing.submission`: `attempt_id NOT NULL`, `uq_submission_attempt`
+  replaces `uq_submission_exercise`; `fk_submission_attempt (attempt_id,
+  exercise_id)`. `uq_evaluation_submission`, evaluation and criterion score
+  keys unchanged; no new evaluation identity.
+- Attempt IDs: `ATT-<exercise suffix>-<n>-<8 hex>`, random for new
+  attempts, derived from `md5(exercise_id)` for the backfill (deterministic).
+- Backfill revision: submission, else draft, else current (as above);
+  `created_at` is the earliest recorded timestamp of that work.
+- Ledger `writing.schema_migration (migration_id, applied_at, mode,
+  report)`; reports hold counts and MD5 digests, never student text.
+
+Migration mechanism (decides the deferred point above):
+
+- `python -m app.writing.migrate status | apply [--dry-run] | rollback`.
+  One transaction under the `bootstrap:writing` advisory lock with the
+  student tables locked exclusively; preconditions (one submission per
+  exercise, no orphans); digests of `draft`, `submission`, `evaluation`,
+  `criterion_score` (all columns but `attempt_id`) must match before and
+  after; any failure rolls everything back. Re-running reports
+  `already_applied`.
+- `rollback` restores the old schema only while no attempt above 1 exists;
+  otherwise refused (restore the pre-migration backup, as above).
+- **PO 1 — startup:** `WritingStore` never migrates existing tables. A
+  database without writing tables is created directly at the current
+  version (tests, CI smoke, new installs). A database with older writing
+  tables makes the application and tutor service **refuse to start**
+  (`SchemaMigrationRequired`) until the migration is applied, so a future
+  release must run the migration before starting the new image (runbook
+  section K). The old image keeps working on the unmigrated database.
+- **PO 2 — `uq_submission_exercise`** is no longer created by startup DDL
+  (it would otherwise be recreated after the migration on every boot).
+
+Compatibility and revision pinning:
+
+- Exercise-level store methods and all current routes address attempt 1
+  only; they never select or write a later attempt (tested: an old client
+  cannot write into an open revision). Attempt-scoped
+  `save_attempt_draft`, `submit_attempt` and `start_revision` exist in the
+  store only; no route exposes them (T037).
+- **PO 3 — revision pinning:** attempt 1 keeps today's behaviour (ADR-023):
+  until submitted it follows the latest editorial revision and its
+  `exercise_revision` is updated with each save; at submission it is fixed.
+  A revision attempt is pinned at creation to the revision of the
+  submission it revises and is never upgraded. Pinning attempt 1 at its
+  creation would change the current student experience.
 
 ## Lifecycle and workflows
 
