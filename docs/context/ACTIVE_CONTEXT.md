@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (T041 = I1 merged; T042 = I2 implemented,
-  PR for review)
+- **Last Updated:** 2026-10-28 (T042 = I2 merged and verified; T043 = I3
+  plan for review)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -58,12 +58,17 @@ PR #16 merged as `cf43e91`; `dev` CI 40781126775 green (539 passed).
 Compose CLI validation not run locally (no Docker); a Docker-gated test
 is in T042. [T041 result](../progress/task_T041_result.md).
 
-**T042 — ADR-033 I2 (restore-checked backup): implemented, PR to `dev`
-for PO review.** `mentorpro backup` and `verify-backup`: before/after
-fingerprints, restore into a disposable PostgreSQL, `BACKUP OK` only on a
-match, verified cleanup. Synthetic data only; gate 649 passed, 2 Docker
-tests skipped locally (run on Linux CI after merge).
+**T042 — ADR-033 I2 (restore-checked backup): merged and verified.** PO
+pre-merge changes (full fingerprint scope, unexpected or missing schemas
+fail, mandatory Docker tests in CI, limits documented) applied; local
+gate 651 passed. PR #17 merged as `4efed63`; `dev` CI 40787440842 green
+(542 passed, 111 skipped), both Docker tests executed and passed.
 [T042 result](../progress/task_T042_result.md).
+
+**T043 — ADR-033 I3 plan: proposed, awaiting PO review.** Schema range in
+code, OCI labels, validated manifest, immutable `vYYYY.MM.DD-N` tag and
+GitHub Release on `main` only, PR CI for `dev`.
+[T043 plan](../planning/2026-10-28-T043-release-metadata-plan.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix
 progress counting of repeated attempts first; the T036 migration needs a
@@ -415,9 +420,8 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **PO review of the T042 PR (I2).** After merge, confirm CI ran the two
-   Docker tests. I3 to I5 each need a separate task and approval; I6
-   onward change production. Local gate now ~17 min (backup tests). T039 (progress
+0. **PO review of the T043 plan (I3).** I3 to I5 each need separate
+   implementation and merge authorization; I6 onward change production. T039 (progress
    counting) before any T037+T038 release; both released together.
    Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).

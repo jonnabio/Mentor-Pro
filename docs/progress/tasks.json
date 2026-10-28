@@ -1295,7 +1295,7 @@
       "id": "T042",
       "name": "Restore-checked backups (ADR-033 I2)",
       "objective": "deploy/mentorpro backup: pg_dump -Fc into a never-overwritten file, fingerprint the source (table counts and deterministic per-table checksums) before and after the dump, restore into a disposable PostgreSQL with its own volume and network, compare, report BACKUP OK only then; verify-backup re-checks an earlier dump; metadata without row data or secrets; cleanup verified and limited to resources the run created. Synthetic test data only.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1315,7 +1315,33 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T042_result.md",
       "failures": [],
-      "notes": "Registered 2026-10-28 after PO approval of I2 following T041 integration. Separate PR to dev; not merged without PO approval. No server, volume or production change."
+      "notes": "Registered 2026-10-28 after PO approval of I2 following T041 integration. Separate PR to dev; not merged without PO approval. No server, volume or production change. PO pre-merge changes: full fingerprint scope with unexpected/missing schema failures; MENTORPRO_REQUIRE_DOCKER=1 in CI. Local gate 651 passed. Merged as 4efed63 (PR #17); dev CI 40787440842 green: 542 passed, 111 skipped; both Docker tests ran and passed (mandatory mode; +3 passed = 2 Docker + refusal, +9 skipped = local-cluster tests without PostgreSQL 17 tools on CI)."
+    },
+    {
+      "id": "T043",
+      "name": "Release metadata: OCI labels, immutable manifest, release tags, PR CI for dev (ADR-033 I3)",
+      "objective": "Schema range in code, OCI labels with a label check, validated release manifest and immutable vYYYY.MM.DD-N tag with GitHub Release on main only (dry-run artifact elsewhere), pull_request CI for dev. No publication or tag before an authorized main merge.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/planning/2026-10-28-T043-release-metadata-plan.md"
+        ],
+        "modify": [
+          ".github/workflows/ci.yml",
+          "app/writing/migrations.py",
+          "app/writing/migrate.py"
+        ]
+      },
+      "depends_on": [
+        "T042"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T043_result.md",
+      "failures": [],
+      "notes": "Plan proposed 2026-10-28; implementation needs separate PO authorization."
     }
   ]
 }
