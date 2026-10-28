@@ -15,7 +15,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from app.writing import contracts
+from app.writing import contracts, migrations
 
 SCHEMA_SQL = """
 CREATE SCHEMA IF NOT EXISTS writing;
@@ -97,7 +97,8 @@ CREATE TABLE IF NOT EXISTS writing.draft (
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE writing.submission ADD COLUMN IF NOT EXISTS client_request_id TEXT;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_submission_exercise ON writing.submission (exercise_id);
+-- T036 (ADR-032): uq_submission_exercise (T022) is no longer created here; migration 0001_student_attempts replaces
+-- it with one submission per student attempt (app/writing/migrations.py).
 -- T023 (ADR-022): tutor-only reference correction of a correction exercise. Separate from writing.exercise,
 -- whose record feeds the student API; no student endpoint reads this table.
 CREATE TABLE IF NOT EXISTS writing.reference_correction (
@@ -204,13 +205,29 @@ class InvalidRecord(ValueError):
         self.problems = problems
 
 
+class RevisionNotAllowed(RuntimeError):
+    """A revision attempt cannot start (no completed evaluation yet, or the attempt limit is reached)."""
+
+
+MAX_ATTEMPTS = 2  # ADR-032: the first increment allows one revision; the schema allows more
+
+
 class WritingStore:
     def __init__(self, url: str):
+        """Additive DDL only. T036: a database without writing tables is created at the current version; one with
+        older writing tables is refused until `python -m app.writing.migrate apply` has run (never implicit)."""
         self.url = url
         with psycopg.connect(url, autocommit=True) as conn:
             conn.execute("SELECT pg_advisory_lock(hashtext('bootstrap:writing'))")
             try:
+                state = migrations.state(conn)
+                if state == "legacy":
+                    raise migrations.SchemaMigrationRequired(
+                        "writing tables predate migration 0001_student_attempts; "
+                        "run `python -m app.writing.migrate apply` after a verified backup")
                 conn.execute(SCHEMA_SQL)
+                if state == "fresh":
+                    migrations.create_fresh(conn)
             finally:
                 conn.execute("SELECT pg_advisory_unlock(hashtext('bootstrap:writing'))")
 
@@ -331,8 +348,9 @@ class WritingStore:
                           {CURRENT_REVISION_SQL} AS revision, e.created_at, {ELIGIBLE_SQL} AS eligible,
                           d.updated_at AS draft_saved_at, s.submission_id, s.submitted_at
                    FROM writing.exercise e
-                   LEFT JOIN writing.draft d USING (exercise_id)
-                   LEFT JOIN writing.submission s USING (exercise_id)
+                   LEFT JOIN writing.student_attempt a ON a.exercise_id = e.exercise_id AND a.attempt_number = 1
+                   LEFT JOIN writing.draft d ON d.attempt_id = a.attempt_id
+                   LEFT JOIN writing.submission s ON s.attempt_id = a.attempt_id
                    WHERE (%(level)s::text IS NULL OR e.level = %(level)s) AND (NOT %(eligible_only)s OR {ELIGIBLE_SQL})
                    ORDER BY e.created_at, e.exercise_id""", {"level": level, "eligible_only": eligible_only}).fetchall()
 
@@ -379,65 +397,195 @@ class WritingStore:
             return conn.execute("SELECT * FROM writing.independent_validation WHERE %(id)s::text IS NULL "
                                 "OR exercise_id = %(id)s ORDER BY created_at", {"id": exercise_id}).fetchall()
 
+    # T036 (ADR-032): every draft and submission belongs to a student attempt. The exercise-level methods below
+    # (draft, submission, save_draft, submit_typed) are the T022 contract and always mean attempt 1: they never
+    # select or write a later attempt. Attempt-level methods take an explicit attempt_id.
+
+    @staticmethod
+    def _current_revision(conn: psycopg.Connection, exercise_id: str) -> int:
+        return conn.execute("SELECT COALESCE(MAX(revision), 1) AS n FROM writing.exercise_revision "
+                            "WHERE exercise_id = %s", (exercise_id,)).fetchone()["n"]
+
+    def _first_attempt(self, conn: psycopg.Connection, exercise_id: str, create: bool) -> dict[str, Any] | None:
+        """Attempt 1 of an exercise; created on the first write (caller holds the exercise row lock)."""
+        row = conn.execute("SELECT * FROM writing.student_attempt WHERE exercise_id = %s AND attempt_number = 1",
+                           (exercise_id,)).fetchone()
+        if row or not create:
+            return row
+        return conn.execute(
+            """INSERT INTO writing.student_attempt (attempt_id, exercise_id, attempt_number, exercise_revision)
+               VALUES (%s, %s, 1, %s) RETURNING *""",
+            (f"ATT-{exercise_id[3:40]}-1-{secrets.token_hex(4)}", exercise_id,
+             self._current_revision(conn, exercise_id))).fetchone()
+
+    def _lock_attempt(self, conn: psycopg.Connection, attempt_id: str) -> dict[str, Any] | None:
+        """The attempt, after locking its exercise row (the lock every student write of that exercise takes)."""
+        row = conn.execute("SELECT exercise_id FROM writing.student_attempt WHERE attempt_id = %s",
+                           (attempt_id,)).fetchone()
+        if row is None:
+            return None
+        conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (row["exercise_id"],))
+        return conn.execute("SELECT * FROM writing.student_attempt WHERE attempt_id = %s", (attempt_id,)).fetchone()
+
+    def attempts(self, exercise_id: str) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.student_attempt WHERE exercise_id = %s "
+                                "ORDER BY attempt_number", (exercise_id,)).fetchall()
+
+    def attempt(self, attempt_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.student_attempt WHERE attempt_id = %s",
+                                (attempt_id,)).fetchone()
+
+    def attempt_draft(self, attempt_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.draft WHERE attempt_id = %s", (attempt_id,)).fetchone()
+
+    def attempt_submission(self, attempt_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM writing.submission WHERE attempt_id = %s", (attempt_id,)).fetchone()
+
     def draft(self, exercise_id: str) -> dict[str, Any] | None:
         with self._connect() as conn:
-            return conn.execute("SELECT * FROM writing.draft WHERE exercise_id = %s", (exercise_id,)).fetchone()
+            return conn.execute("""SELECT d.* FROM writing.draft d JOIN writing.student_attempt a USING (attempt_id)
+                                   WHERE a.exercise_id = %s AND a.attempt_number = 1""", (exercise_id,)).fetchone()
 
     def submission(self, exercise_id: str) -> dict[str, Any] | None:
         with self._connect() as conn:
-            return conn.execute("SELECT * FROM writing.submission WHERE exercise_id = %s", (exercise_id,)).fetchone()
+            return conn.execute("""SELECT s.* FROM writing.submission s
+                                   JOIN writing.student_attempt a USING (attempt_id)
+                                   WHERE a.exercise_id = %s AND a.attempt_number = 1""", (exercise_id,)).fetchone()
 
     def save_draft(self, exercise_id: str, text_es: str, sections: dict[str, str] | None = None,
                    client_seq: int | None = None) -> dict[str, Any] | None:
-        """Upsert the draft; None when the exercise was already submitted (drafts are then frozen).
+        """Upsert the draft of attempt 1; None when it was already submitted (drafts are then frozen).
         Guided compositions (T028) pass their sections; text_es is then the assembled paragraphs.
         T030: a save carrying a `client_seq` not newer than the stored one is stale (a delayed request) and
         changes nothing; the row is returned with `applied` False. Each save records the exercise revision."""
         with self._connect() as conn, conn.transaction():
             conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
-            if conn.execute("SELECT 1 FROM writing.submission WHERE exercise_id = %s", (exercise_id,)).fetchone():
-                return None
-            current = conn.execute("SELECT * FROM writing.draft WHERE exercise_id = %s", (exercise_id,)).fetchone()
-            if current and client_seq is not None and current["client_seq"] is not None \
-                    and client_seq <= current["client_seq"]:
-                return {**current, "applied": False}
-            revision = conn.execute("SELECT COALESCE(MAX(revision), 1) AS n FROM writing.exercise_revision "
-                                    "WHERE exercise_id = %s", (exercise_id,)).fetchone()["n"]
-            row = conn.execute(
-                """INSERT INTO writing.draft (exercise_id, text_es, word_count, sections, client_seq, exercise_revision)
-                   VALUES (%s, %s, %s, %s, %s, %s)
-                   ON CONFLICT (exercise_id) DO UPDATE SET text_es = EXCLUDED.text_es,
-                       word_count = EXCLUDED.word_count, sections = EXCLUDED.sections,
-                       client_seq = COALESCE(EXCLUDED.client_seq, writing.draft.client_seq),
-                       exercise_revision = EXCLUDED.exercise_revision, updated_at = now()
-                   RETURNING *""", (exercise_id, text_es, word_count(text_es),
-                                    Jsonb(sections) if sections is not None else None, client_seq,
-                                    revision)).fetchone()
-            return {**row, "applied": True}
+            attempt = self._first_attempt(conn, exercise_id, create=True)
+            return self._save_draft(conn, attempt, text_es, sections, client_seq)
+
+    def save_attempt_draft(self, attempt_id: str, text_es: str, sections: dict[str, str] | None = None,
+                           client_seq: int | None = None) -> dict[str, Any] | None:
+        """save_draft for an explicit attempt; LookupError for an unknown attempt."""
+        with self._connect() as conn, conn.transaction():
+            attempt = self._lock_attempt(conn, attempt_id)
+            if attempt is None:
+                raise LookupError(attempt_id)
+            return self._save_draft(conn, attempt, text_es, sections, client_seq)
+
+    def _save_draft(self, conn: psycopg.Connection, attempt: dict[str, Any], text_es: str,
+                    sections: dict[str, str] | None, client_seq: int | None) -> dict[str, Any] | None:
+        attempt_id, exercise_id = attempt["attempt_id"], attempt["exercise_id"]
+        if conn.execute("SELECT 1 FROM writing.submission WHERE attempt_id = %s", (attempt_id,)).fetchone():
+            return None
+        current = conn.execute("SELECT * FROM writing.draft WHERE attempt_id = %s", (attempt_id,)).fetchone()
+        if current and client_seq is not None and current["client_seq"] is not None \
+                and client_seq <= current["client_seq"]:
+            return {**current, "applied": False}
+        revision = self._attempt_revision(conn, attempt)
+        row = conn.execute(
+            """INSERT INTO writing.draft (attempt_id, exercise_id, text_es, word_count, sections, client_seq,
+                   exercise_revision)
+               VALUES (%s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (attempt_id) DO UPDATE SET text_es = EXCLUDED.text_es,
+                   word_count = EXCLUDED.word_count, sections = EXCLUDED.sections,
+                   client_seq = COALESCE(EXCLUDED.client_seq, writing.draft.client_seq),
+                   exercise_revision = EXCLUDED.exercise_revision, updated_at = now()
+               RETURNING *""", (attempt_id, exercise_id, text_es, word_count(text_es),
+                                Jsonb(sections) if sections is not None else None, client_seq,
+                                revision)).fetchone()
+        return {**row, "applied": True}
+
+    def _attempt_revision(self, conn: psycopg.Connection, attempt: dict[str, Any]) -> int:
+        """Attempt 1 follows the latest editorial revision until it is submitted (T024, ADR-023) and the attempt row
+        records it; a revision attempt stays on the revision it was created with (ADR-032)."""
+        if attempt["attempt_number"] > 1:
+            return attempt["exercise_revision"]
+        revision = self._current_revision(conn, attempt["exercise_id"])
+        if revision != attempt["exercise_revision"]:
+            conn.execute("UPDATE writing.student_attempt SET exercise_revision = %s WHERE attempt_id = %s",
+                         (revision, attempt["attempt_id"]))
+        return revision
 
     def submit_typed(self, exercise_id: str, text_es: str, client_request_id: str,
                      sections: dict[str, str] | None = None) -> tuple[dict[str, Any], bool]:
-        """Store the one typed submission of an exercise; repeated or parallel calls return the first."""
+        """Store the one typed submission of attempt 1; repeated or parallel calls return the first."""
         with self._connect() as conn, conn.transaction():
             conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
-            existing = conn.execute("SELECT * FROM writing.submission WHERE exercise_id = %s",
-                                    (exercise_id,)).fetchone()
-            if existing:
-                return existing, False
-            revision = conn.execute("SELECT COALESCE(MAX(revision), 1) AS n FROM writing.exercise_revision "
-                                    "WHERE exercise_id = %s", (exercise_id,)).fetchone()["n"]
-            row = conn.execute(
-                """INSERT INTO writing.submission (submission_id, exercise_id, evidence_mode, text_es, word_count,
-                       paragraph_count, submitted_at, client_request_id, exercise_revision, sections)
-                   VALUES (%s, %s, 'typed', %s, %s, %s, now(), %s, %s, %s) RETURNING *""",
-                (f"SUB-{exercise_id[3:40]}-{secrets.token_hex(4)}", exercise_id, text_es, word_count(text_es),
-                 paragraph_count(text_es), client_request_id, revision,
-                 Jsonb(sections) if sections is not None else None)).fetchone()
-            conn.execute("""INSERT INTO writing.draft (exercise_id, text_es, word_count, sections) VALUES (%s, %s, %s, %s)
-                            ON CONFLICT (exercise_id) DO UPDATE SET text_es = EXCLUDED.text_es,
-                                word_count = EXCLUDED.word_count, sections = EXCLUDED.sections, updated_at = now()""",
-                         (exercise_id, text_es, word_count(text_es), Jsonb(sections) if sections is not None else None))
-            return row, True
+            attempt = self._first_attempt(conn, exercise_id, create=True)
+            return self._submit(conn, attempt, text_es, client_request_id, sections)
+
+    def submit_attempt(self, attempt_id: str, text_es: str, client_request_id: str,
+                       sections: dict[str, str] | None = None) -> tuple[dict[str, Any], bool]:
+        """submit_typed for an explicit attempt; LookupError for an unknown attempt."""
+        with self._connect() as conn, conn.transaction():
+            attempt = self._lock_attempt(conn, attempt_id)
+            if attempt is None:
+                raise LookupError(attempt_id)
+            return self._submit(conn, attempt, text_es, client_request_id, sections)
+
+    def _submit(self, conn: psycopg.Connection, attempt: dict[str, Any], text_es: str, client_request_id: str,
+                sections: dict[str, str] | None) -> tuple[dict[str, Any], bool]:
+        attempt_id, exercise_id = attempt["attempt_id"], attempt["exercise_id"]
+        existing = conn.execute("SELECT * FROM writing.submission WHERE attempt_id = %s", (attempt_id,)).fetchone()
+        if existing:
+            return existing, False
+        revision = self._attempt_revision(conn, attempt)
+        row = conn.execute(
+            """INSERT INTO writing.submission (submission_id, exercise_id, attempt_id, evidence_mode, text_es,
+                   word_count, paragraph_count, submitted_at, client_request_id, exercise_revision, sections)
+               VALUES (%s, %s, %s, 'typed', %s, %s, %s, now(), %s, %s, %s) RETURNING *""",
+            (f"SUB-{exercise_id[3:40]}-{secrets.token_hex(4)}", exercise_id, attempt_id, text_es,
+             word_count(text_es), paragraph_count(text_es), client_request_id, revision,
+             Jsonb(sections) if sections is not None else None)).fetchone()
+        conn.execute("""INSERT INTO writing.draft (attempt_id, exercise_id, text_es, word_count, sections)
+                        VALUES (%s, %s, %s, %s, %s)
+                        ON CONFLICT (attempt_id) DO UPDATE SET text_es = EXCLUDED.text_es,
+                            word_count = EXCLUDED.word_count, sections = EXCLUDED.sections, updated_at = now()""",
+                     (attempt_id, exercise_id, text_es, word_count(text_es),
+                      Jsonb(sections) if sections is not None else None))
+        return row, True
+
+    def start_revision(self, exercise_id: str) -> tuple[dict[str, Any], bool]:
+        """Persistence for a revision attempt (no student action calls this yet; T037). Allowed only after the
+        latest attempt's submission has a completed evaluation, up to MAX_ATTEMPTS. The new draft is seeded once
+        from that submission (L1: the student's correction, not the source text; L4: all five sections). A
+        repeated or parallel call returns the open revision attempt (created False) and never re-seeds it."""
+        with self._connect() as conn, conn.transaction():
+            conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
+            latest = conn.execute("SELECT * FROM writing.student_attempt WHERE exercise_id = %s "
+                                  "ORDER BY attempt_number DESC LIMIT 1", (exercise_id,)).fetchone()
+            if latest is None:
+                raise RevisionNotAllowed("no submitted attempt")
+            submitted = conn.execute("SELECT * FROM writing.submission WHERE attempt_id = %s",
+                                     (latest["attempt_id"],)).fetchone()
+            if submitted is None:
+                if latest["attempt_number"] > 1:
+                    return latest, False
+                raise RevisionNotAllowed("the first attempt is not submitted")
+            if submitted["evidence_mode"] != "typed":
+                raise RevisionNotAllowed("only typed submissions can be revised")
+            evaluation = conn.execute("SELECT status FROM writing.evaluation WHERE submission_id = %s",
+                                      (submitted["submission_id"],)).fetchone()
+            if evaluation is None or evaluation["status"] != "completed":
+                raise RevisionNotAllowed("the tutor evaluation is not completed")
+            if latest["attempt_number"] >= MAX_ATTEMPTS:
+                raise RevisionNotAllowed("attempt limit reached")
+            number = latest["attempt_number"] + 1
+            attempt = conn.execute(
+                """INSERT INTO writing.student_attempt (attempt_id, exercise_id, attempt_number, previous_attempt_id,
+                       exercise_revision) VALUES (%s, %s, %s, %s, %s) RETURNING *""",
+                (f"ATT-{exercise_id[3:40]}-{number}-{secrets.token_hex(4)}", exercise_id, number,
+                 latest["attempt_id"], submitted["exercise_revision"])).fetchone()
+            conn.execute("""INSERT INTO writing.draft (attempt_id, exercise_id, text_es, word_count, sections,
+                                exercise_revision) VALUES (%s, %s, %s, %s, %s, %s)""",
+                         (attempt["attempt_id"], exercise_id, submitted["text_es"], word_count(submitted["text_es"]),
+                          Jsonb(submitted["sections"]) if submitted["sections"] is not None else None,
+                          submitted["exercise_revision"]))
+            return attempt, True
 
     # ------------------------------------------------------------ tutor evaluation (T026)
 
@@ -451,8 +599,10 @@ class WritingStore:
         with self._connect() as conn:
             return conn.execute(
                 """SELECT s.submission_id, s.exercise_id, s.exercise_revision, s.submitted_at, s.evidence_mode,
-                          e.level, COALESCE(v.status, 'pending') AS status, v.evaluated_at, v.updated_at
+                          e.level, COALESCE(v.status, 'pending') AS status, v.evaluated_at, v.updated_at,
+                          a.attempt_number
                    FROM writing.submission s JOIN writing.exercise e USING (exercise_id)
+                   JOIN writing.student_attempt a USING (attempt_id)
                    LEFT JOIN writing.evaluation v USING (submission_id)
                    ORDER BY s.submitted_at""").fetchall()
 
@@ -536,12 +686,15 @@ class WritingStore:
     def add_submission(self, submission: dict[str, Any], exercise_id: str, text_es: str | None = None,
                        handwritten_ref: str | None = None) -> None:
         with self._connect() as conn, conn.transaction():
+            conn.execute("SELECT 1 FROM writing.exercise WHERE exercise_id = %s FOR UPDATE", (exercise_id,))
+            attempt = self._first_attempt(conn, exercise_id, create=True)
             conn.execute(
-                """INSERT INTO writing.submission (submission_id, exercise_id, evidence_mode, text_es, handwritten_ref,
-                       word_count, paragraph_count, submitted_at)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                (submission["submission_id"], exercise_id, submission["evidence_mode"], text_es, handwritten_ref,
-                 submission.get("word_count"), submission.get("paragraph_count"), submission["submitted_at"]))
+                """INSERT INTO writing.submission (submission_id, exercise_id, attempt_id, evidence_mode, text_es,
+                       handwritten_ref, word_count, paragraph_count, submitted_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (submission["submission_id"], exercise_id, attempt["attempt_id"] if attempt else None,
+                 submission["evidence_mode"], text_es, handwritten_ref, submission.get("word_count"),
+                 submission.get("paragraph_count"), submission["submitted_at"]))
 
     def add_evaluation(self, evaluation: dict[str, Any]) -> None:
         exercise = self.exercise(evaluation["exercise_id"])
