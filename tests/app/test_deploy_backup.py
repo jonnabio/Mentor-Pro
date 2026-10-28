@@ -65,12 +65,20 @@ def run(*args, **env):
     return subprocess.run([SH, str(SCRIPT), *args], env=base, capture_output=True, text=True, timeout=300)
 
 
+BACKUP_DB = "mentor_pro_backup_test"
+
+
 @pytest.fixture(scope="module")
 def live():
-    """A synthetic schema in the isolated test database: text with accents, timestamps, JSON, NULLs."""
-    url = db.require_test_database(db.test_database_url())
+    """A dedicated, disposable *_test database holding only the synthetic schema, so the backup's scope check
+    (every user schema must be expected) sees exactly what the test put there: accents, timestamps, JSON, NULLs."""
+    admin_url = db.require_test_database(db.test_database_url())
+    url = db.require_test_database(re.sub(r"/mentor_pro_test(?=$|\?)", f"/{BACKUP_DB}", admin_url))
+    assert url != admin_url
+    with psycopg.connect(admin_url, autocommit=True) as conn:
+        conn.execute(f"DROP DATABASE IF EXISTS {BACKUP_DB} WITH (FORCE)")
+        conn.execute(f"CREATE DATABASE {BACKUP_DB}")
     with psycopg.connect(url, autocommit=True) as conn:
-        conn.execute(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE")
         conn.execute(f"CREATE SCHEMA {SCHEMA}")
         conn.execute(f"CREATE TABLE {SCHEMA}.note (id int PRIMARY KEY, body text, at timestamptz, extra jsonb)")
         conn.execute(f"CREATE TABLE {SCHEMA}.empty (id int)")
@@ -78,8 +86,8 @@ def live():
                          + g * interval '1 minute', CASE WHEN g % 3 = 0 THEN NULL ELSE jsonb_build_object('k', g) END
                          FROM generate_series(1, 120) g""")
     yield url
-    with psycopg.connect(url, autocommit=True) as conn:
-        conn.execute(f"DROP SCHEMA IF EXISTS {SCHEMA} CASCADE")
+    with psycopg.connect(admin_url, autocommit=True) as conn:
+        conn.execute(f"DROP DATABASE IF EXISTS {BACKUP_DB} WITH (FORCE)")
 
 
 def local_env(tmp_path, url):
@@ -177,12 +185,12 @@ def test_restore_that_does_not_match_the_source_is_not_ok(live, made, tmp_path):
 
 @local_only
 def test_failed_backup_is_recorded_and_never_ok(live, tmp_path):
-    env = {**local_env(tmp_path, live), "MENTORPRO_LIVE_URL": live.replace("/mentor_pro_test", "/missing_db_test")}
+    env = {**local_env(tmp_path, live), "MENTORPRO_LIVE_URL": live.replace(f"/{BACKUP_DB}", "/missing_db_test")}
     result = run("backup", **env)
-    assert result.returncode == 1 and "BACKUP FAILED: live database not readable" in result.stdout
+    assert result.returncode == 1 and "BACKUP FAILED: schema list not readable" in result.stdout
     assert "BACKUP OK" not in result.stdout
     (record,) = (tmp_path / "backups").glob("*.verify")
-    assert record.read_text(encoding="utf-8").rstrip().endswith("result BACKUP FAILED: live database not readable")
+    assert record.read_text(encoding="utf-8").rstrip().endswith("result BACKUP FAILED: schema list not readable")
 
 
 @local_only
@@ -196,6 +204,32 @@ def test_existing_dump_is_never_overwritten(live, tmp_path):
     result = run("backup", **local_env(tmp_path, live))
     assert result.returncode == 1 and "already exists" in result.stdout
     assert all(p.read_bytes() == b"keep" for p in folder.glob("*.dump"))
+
+
+@local_only
+def test_tables_outside_the_expected_schemas_fail_the_backup(live, tmp_path):
+    """Incomplete scope is detected, never silently excluded."""
+    with psycopg.connect(live, autocommit=True) as conn:
+        conn.execute("CREATE SCHEMA t042_stray")
+        conn.execute("CREATE TABLE t042_stray.forgotten (id int)")
+        conn.execute("CREATE TABLE public.also_forgotten (id int)")
+    try:
+        result = run("backup", **local_env(tmp_path, live))
+        assert result.returncode == 1 and "BACKUP OK" not in result.stdout
+        assert "BACKUP FAILED: unexpected schema(s) with tables: public t042_stray" in result.stdout
+        listed = run("backup", **{**local_env(tmp_path / "b", live),
+                                   "MENTORPRO_BACKUP_SCHEMAS": f"{SCHEMA} t042_stray public"})
+        assert listed.returncode == 0 and "dump: 4 tables, 120 rows" in listed.stdout  # all of them fingerprinted
+    finally:
+        with psycopg.connect(live, autocommit=True) as conn:
+            conn.execute("DROP SCHEMA t042_stray CASCADE")
+            conn.execute("DROP TABLE public.also_forgotten")
+
+
+@local_only
+def test_missing_expected_schema_fails_the_backup(live, tmp_path):
+    result = run("backup", **{**local_env(tmp_path, live), "MENTORPRO_BACKUP_SCHEMAS": f"{SCHEMA} writing"})
+    assert result.returncode == 1 and "BACKUP FAILED: expected schema(s) missing: writing" in result.stdout
 
 
 def test_local_provider_refuses_a_database_that_is_not_a_test_database(tmp_path):
@@ -231,7 +265,16 @@ def _docker_ready():
     return bool(docker and SH and subprocess.run([docker, "info"], capture_output=True).returncode == 0)
 
 
-docker_only = pytest.mark.skipif(not _docker_ready(), reason="Docker is not available")
+# CI sets MENTORPRO_REQUIRE_DOCKER=1 on Linux: there a missing Docker fails these tests instead of skipping them.
+DOCKER_REQUIRED = os.environ.get("MENTORPRO_REQUIRE_DOCKER") == "1"
+
+
+@pytest.fixture()
+def docker():
+    if not _docker_ready():
+        if DOCKER_REQUIRED:
+            pytest.fail("Docker is required here (MENTORPRO_REQUIRE_DOCKER=1) but not available")
+        pytest.skip("Docker is not available")
 
 
 def _verify_resources():
@@ -243,10 +286,10 @@ def _verify_resources():
     return out
 
 
-@docker_only
-def test_docker_backup_uses_an_isolated_disposable_instance(tmp_path):
+def test_docker_backup_uses_an_isolated_disposable_instance(docker, tmp_path):
     """Production provider end to end against a test-owned 'live' container with synthetic data."""
     name = f"mentorpro-test-live-{uuid.uuid4().hex[:8]}"
+    assert not name.startswith("mentor-pro-")  # never a production container name (mentor-pro-*)
     subprocess.run(["docker", "run", "-d", "--name", name, "-e", "POSTGRES_HOST_AUTH_METHOD=trust",
                     "-e", "POSTGRES_USER=mentor_pro_admin", "-e", "POSTGRES_DB=mentor_pro", "postgres:17.6"],
                    check=True, capture_output=True)
@@ -273,8 +316,7 @@ def test_docker_backup_uses_an_isolated_disposable_instance(tmp_path):
         subprocess.run(["docker", "rm", "-f", name], capture_output=True)  # the test's own container only
 
 
-@docker_only
-def test_compose_file_is_valid_for_the_docker_compose_cli(tmp_path):
+def test_compose_file_is_valid_for_the_docker_compose_cli(docker, tmp_path):
     """PO correction 4 (T041): `docker compose config` on deploy/compose.yml with empty stand-in env files."""
     text = (REPO / "deploy" / "compose.yml").read_text(encoding="utf-8")
     for name in ("app.env", "tutor.env", "postgres.env"):

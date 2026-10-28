@@ -149,6 +149,12 @@ status() {
 # only when the restore succeeds and the fingerprints match. The record
 # <dump>.verify holds counts and digests, never row data.
 #
+# Scope: the fingerprint covers every table in every user schema (all but
+# pg_* and information_schema), not a chosen list. MENTORPRO_BACKUP_SCHEMAS
+# is the set the application is expected to have: a schema holding tables
+# that is not in it, or an expected schema that is missing, fails the backup
+# instead of being left out silently.
+#
 # Disposable instance (MENTORPRO_PROVIDER):
 #   docker  container, internal network and volume, all named
 #           mentorpro-verify-<id>; nothing published; removed afterwards
@@ -176,10 +182,16 @@ SET extra_float_digits = 1;
 SELECT format('SELECT %L, count(*), md5(coalesce(string_agg(t::text, E''\n'' ORDER BY t::text COLLATE "C"), '''')) FROM %I.%I t',
               n.nspname || '.' || c.relname, n.nspname, c.relname)
 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE c.relkind IN ('r', 'p') AND n.nspname = ANY (string_to_array(:'schemas', ' '))
+WHERE c.relkind IN ('r', 'p') AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
 ORDER BY 1 \gexec
 SQL
 )
+
+# Schemas that hold at least one table, and all user schemas (one name per line).
+SCOPE_SQL="SELECT DISTINCT n.nspname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r', 'p') AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' ORDER BY 1"
+SCHEMAS_SQL="SELECT nspname FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema'
+ORDER BY 1"
 
 # shellcheck disable=SC2086
 live_psql() {
@@ -263,7 +275,27 @@ scratch_cleanup() {
   echo "cleanup verified: container, volume and network $VNAME removed"
 }
 
-fingerprint() { printf '%s\n' "$FINGERPRINT_SQL" | "$@" -v schemas="$SCHEMAS"; }
+fingerprint() { printf '%s\n' "$FINGERPRINT_SQL" | "$@"; }
+
+# Fails (and prints why) when the database holds tables outside the expected
+# schemas, or an expected schema is missing.
+check_scope() {  # check_scope <psql function>
+  with_tables=$(printf '%s\n' "$SCOPE_SQL" | "$1") || { echo "schema list not readable"; return 1; }
+  present=$(printf '%s\n' "$SCHEMAS_SQL" | "$1") || { echo "schema list not readable"; return 1; }
+  # psql on Windows ends lines with CR.
+  with_tables=$(printf '%s\n' "$with_tables" | tr -d '\r')
+  present=$(printf '%s\n' "$present" | tr -d '\r')
+  unexpected=""
+  for schema in $with_tables; do
+    case " $SCHEMAS " in *" $schema "*) ;; *) unexpected="$unexpected $schema" ;; esac
+  done
+  missing=""
+  for schema in $SCHEMAS; do
+    printf '%s\n' "$present" | grep -qx "$schema" || missing="$missing $schema"
+  done
+  [ -z "$unexpected" ] || { echo "unexpected schema(s) with tables:$unexpected; add them to the expected set or investigate"; return 1; }
+  [ -z "$missing" ] || { echo "expected schema(s) missing:$missing"; return 1; }
+}
 digest() { printf '%s\n' "$1" | sha256sum | cut -d' ' -f1; }
 rows() { printf '%s\n' "$1" | awk -F'|' '{s += $2} END {print s + 0}'; }
 tables() { printf '%s\n' "$1" | grep -c '|'; }
@@ -305,7 +337,8 @@ backup() {
   if ! (set -C; : >"$dump") 2>/dev/null; then echo "BACKUP FAILED: $dump already exists"; return 1; fi
   printf 'dump %s\ncreated %s\noperator %s\nschemas %s\n' "$(basename "$dump")" "$(now)" "$(id -un)" "$SCHEMAS" >"$record"
 
-  if ! before=$(fingerprint live_psql); then reason="live database not readable"
+  if ! scope=$(check_scope live_psql); then reason=$scope
+  elif ! before=$(fingerprint live_psql); then reason="live database not readable"
   elif ! live_dump >"$dump"; then reason="pg_dump failed"
   elif ! after=$(fingerprint live_psql); then reason="live database not readable"
   elif [ "$before" != "$after" ]; then reason="the data changed during the dump; retry, or stop app and tutor first"
