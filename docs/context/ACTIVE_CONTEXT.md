@@ -14,17 +14,23 @@
 
 ## Current Objective
 
-**T036 — student attempt data foundation (ADR-032): implemented and
-verified on `feature/T036-guided-writing-revision-design`; awaiting Product
-Owner review.** Not merged, not deployed, no production migration. Three
-implementation decisions need PO confirmation (ADR-032 "T036
-implementation"): (1) startup creates an empty database at the current
-version but refuses an unmigrated one (`SchemaMigrationRequired`; the
-migration is explicit: `python -m app.writing.migrate apply`); (2)
-`uq_submission_exercise` removed from startup DDL; (3) attempt 1 follows
-editorial revisions until submitted, revision attempts stay pinned. Draft
-PR #11 to `dev` opened (draft); merge needs approval. Details:
+**T036 — student attempt data foundation (ADR-032): merged into `dev`,
+not deployed.** PR #11 merged as `dab1550` (2026-10-28); `dev` push CI
+[40694417061](https://github.com/jonnabio/Mentor-Pro/actions/runs/40694417061)
+green (506 passed, 102 skipped; image build, `GET /` and tutor smoke; no
+publication from `dev`). PO decisions: (1) refuse startup on an unmigrated
+schema — APPROVED; (2) attempt-level uniqueness replaces
+`uq_submission_exercise` — APPROVED; (3) attempt 1 follows editorial
+revisions until submitted, revisions pinned — APPROVED; (4) merge to `dev`
+— done (CI cannot run on PRs into `dev`; PO chose merge then verify the
+push CI); (5) production migration, deployment, merge to `main`,
+infrastructure — NOT AUTHORIZED. Details:
 [T036 result](../progress/task_T036_result.md).
+
+**T037 — "Mejorar mi respuesta": plan proposed, not registered.**
+[Plan](../planning/2026-10-28-T037-student-revision-plan.md); awaits PO
+approval of the API (ADR-032 amendment), quarantine rule and release
+pairing with T038.
 
 **T032 + T033 release — deployed; awaiting real-user acceptance.** PR #9
 merged as `2f6a4b3`; CI
@@ -240,6 +246,15 @@ Guided writing revision (ADR-032, 2026-10-28, feature branch)
   only; `save_attempt_draft`, `submit_attempt`, `start_revision` (no
   route). Tests 19 new; runbook section K (not authorized). Commits
   `1652181`, `8bd806f`, `ce0fa5c` + docs.
+- **T036 PO review** — startup guard in both apps (`check_schema()` in the
+  lifespan; tutor exit 78 "tutor start refused"; unreachable or
+  unconfigured database still 503 on first request); 503
+  `schema_migration_required`; old image on a migrated database observed
+  (recreates `uq_submission_exercise`, draft saves and new submissions
+  fail; startup DDL fails once a revision exists) → state `drifted`
+  refused, `python -m app.writing.migrate repair` (`bf2fdb4`); ADR-032
+  accepted for T036; runbook K; 26 attempt tests; gate 608 passed; browser
+  447/447. Merged by PR #11 (`dab1550`).
 
 Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
@@ -302,10 +317,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - Server access: SSH key login from this PC (`jonnabio@100.64.84.15`);
   `jonnabio` is in the `docker` group (root-equivalent); compose commands
   need `sudo` (root-only env files); the agent cannot use `sudo`.
-- Repository: `main` at `2f6a4b3` (the release); `dev` `1f2fcfd` is
-  `main` plus PR #10 (documentation only); T036 on
-  `feature/T036-guided-writing-revision-design` (pushed; see git log for the
-  head); working tree clean; no task in progress; this repository
+- Repository: `main` at `2f6a4b3` (the release, unchanged); `dev`
+  `dab1550` = `main` + PR #10 (docs) + PR #11 (T036); this closure on
+  branch `docs/T036-closure` (PR to `dev`); no task in progress; this repository
   has no lock or lane files; no local server, browser or generation job and
   no production command left running.
 - Multiple choice: unchanged since T019 — free models only (paid
@@ -343,8 +357,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   60 s), tutor entrypoint smoke (exit 78; 403, 404 and 503 boundary
   checks), push that same image to GHCR only on push to `main` (RCA-005).
   Triggers: push to `dev` or `main`, PRs into `main` only.
-- T036 verification: `test_writing_attempts.py` 19 passed; ACE gate
-  test 601 passed; mocked browser 447/447. Migration exercised only on
+- T036 verification: `test_writing_attempts.py` 26 passed; ACE gate
+  608 passed (`VERIFY_RESULT=pass gate=all`); mocked browser 447/447;
+  `dev` CI 506 passed, 102 skipped. Migration exercised only on
   `mentor_pro_test` (synthetic history), never on student or production
   data.
 - Tests before T036: 582 passing locally (T032 bank, T033 tutor service); CI 480
@@ -354,10 +369,10 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **T036 review (PO):** confirm ADR-032 PO 1–3, review the draft PR to
-   `dev`; then T037 (student revision UI on `start_revision`,
-   `save_attempt_draft`, `submit_attempt`). A production migration needs a
-   restore rehearsal and separate approval (runbook K).
+0. **T037 approval (PO):** API table (ADR-032 amendment), quarantine
+   rule, release together with T038; then register and implement T037.
+   Do not start an image containing T036 in production; a production
+   migration needs a restore rehearsal and separate approval (runbook K).
 1. **Real-user acceptance test.** On the student's own device
    (`http://192.168.50.229:8080`): Producción escrita → an exercise → type
    a short text → wait for "Guardado" → reload (text remains) → submit →
@@ -396,6 +411,7 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 - T036: an image containing it refuses to start on the unmigrated
   production database until `migrate apply` runs (fail closed, by design);
+  never run a pre-T036 image on a migrated database (ADR-032);
   progress and tutor queue will count revision submissions as activity
   until T039.
 - Production practice generation takes about 5 minutes per new set and
