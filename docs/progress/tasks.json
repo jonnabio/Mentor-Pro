@@ -1268,7 +1268,7 @@
       "id": "T041",
       "name": "Versioned deployment Compose configuration, read-only status and smoke checks (ADR-033 I1)",
       "objective": "Add deploy/compose.yml (production services of ADR-030/031 with health checks, image digest from non-secret release.env) and deploy/mentorpro with read-only status and smoke commands; test only against an isolated local environment on mentor_pro_test. No server, volume, secret, release workflow or container change.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1289,7 +1289,33 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T041_result.md",
       "failures": [],
-      "notes": "Registered 2026-10-28 after PO approval of ADR-033 (I1 only). T039 reserved by ADR-032, hence T041. Increments I2-I5 need separate tasks and approvals."
+      "notes": "Registered 2026-10-28 after PO approval of ADR-033 (I1 only). T039 reserved by ADR-032, hence T041. Increments I2-I5 need separate tasks and approvals. PO corrections applied (tutor health check only on 403; status UNKNOWN never healthy). Merged as cf43e91 (PR #16); dev CI 40781126775 green (539 passed). Compose CLI validation not run locally (no Docker); added as a Docker-gated test in T042."
+    },
+    {
+      "id": "T042",
+      "name": "Restore-checked backups (ADR-033 I2)",
+      "objective": "deploy/mentorpro backup: pg_dump -Fc into a never-overwritten file, fingerprint the source (table counts and deterministic per-table checksums) before and after the dump, restore into a disposable PostgreSQL with its own volume and network, compare, report BACKUP OK only then; verify-backup re-checks an earlier dump; metadata without row data or secrets; cleanup verified and limited to resources the run created. Synthetic test data only.",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_deploy_backup.py",
+          "docs/progress/task_T042_result.md"
+        ],
+        "modify": [
+          "deploy/mentorpro",
+          ".gitattributes"
+        ]
+      },
+      "depends_on": [
+        "T041"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T042_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-28 after PO approval of I2 following T041 integration. Separate PR to dev; not merged without PO approval. No server, volume or production change."
     }
   ]
 }
