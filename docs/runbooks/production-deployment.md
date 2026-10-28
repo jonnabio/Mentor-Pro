@@ -386,7 +386,8 @@ without affecting students.
 
 ## K. Writing schema migration 0001 (T036, ADR-032) — not yet authorized
 
-An image that contains T036 refuses to start (app and tutor service) on a
+An image that contains T036 refuses to start (app: uvicorn "Application
+startup failed"; tutor service: exit 78 "tutor start refused") on a
 database whose writing tables predate migration `0001_student_attempts`
 (`SchemaMigrationRequired`); the current production image is unaffected.
 Applying it in production needs separate Product Owner approval. Planned
@@ -395,8 +396,14 @@ order, all with the new pinned `DIGEST`:
 1. Section B backup (`BACKUP OK`) and an isolated restore rehearsal of that
    dump on which `apply --dry-run` and `apply` are run first.
 2. `$COMPOSE stop app tutor` (no student writes during the migration).
-3. `$COMPOSE run --rm -T --no-deps app python -m app.writing.migrate apply --dry-run </dev/null`,
-   then the same with `apply`. Output is counts and digests only; the
+3. Dry run, then the same command without `--dry-run`:
+
+   ```bash
+   $COMPOSE run --rm -T --no-deps app \
+     python -m app.writing.migrate apply --dry-run </dev/null
+   ```
+
+   Output is counts and digests only; the
    `before` and `after` digests must be equal. `MIGRATION FAILED (nothing
    changed)` leaves the database as it was.
 4. Section F with the new digest; `migrate status` answers `current`.
@@ -405,3 +412,9 @@ Rollback: `python -m app.writing.migrate rollback` (with the new image)
 restores the old schema only while no revision attempt exists; afterwards,
 restore the pre-migration backup in an approved window after exporting the
 revision attempts (ADR-032). Never `docker compose down -v`.
+
+Never start a pre-T036 image on a migrated database: it recreates
+`uq_submission_exercise` and its draft saves and new submissions fail
+(ADR-032, "Old image against a migrated database"). If it happened, the
+new image refuses to start with "run `python -m app.writing.migrate
+repair`"; that command drops only the recreated index.

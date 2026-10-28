@@ -1,6 +1,6 @@
 # ADR-032: Guided Writing Revision with Student Attempts
 
-> **Status:** Proposed — architecture principles approved by Product Owner 2026-10-28; T036 data foundation implemented on the feature branch (see "T036 implementation"); PO confirmation of its three implementation decisions pending; production migration, deployment and release NOT authorized
+> **Status:** Accepted for T036 (data foundation) — principles approved 2026-10-28; T036 implementation decisions PO 1–3 approved 2026-10-28; merge to `dev` conditionally approved; production migration, deployment, merge to `main` and infrastructure changes NOT authorized
 > **Date:** 2026-10-28
 > **Scope:** Producción escrita L1–L4; separate from editorial exercise revisions
 > **First ACE task:** T036 (registered 2026-10-28, data foundation only)
@@ -37,8 +37,21 @@ After validated backfill, make `attempt_id` non-null for active student rows, re
 ## T036 implementation (physical design, 2026-10-28)
 
 Implemented on `feature/T036-guided-writing-revision-design`; see
-[T036 result](../progress/task_T036_result.md). Within the decision above;
-three points need Product Owner confirmation (marked **PO**).
+[T036 result](../progress/task_T036_result.md). Within the decision above.
+
+Product Owner decisions (2026-10-28):
+
+1. **APPROVED** — the application refuses to start on an unmigrated
+   writing schema.
+2. **APPROVED** — `uq_submission_exercise` replaced by attempt-level
+   uniqueness.
+3. **APPROVED** — attempt 1 keeps ADR-023 editorial revision behaviour
+   until submission; later attempts stay pinned to the revision they
+   improve.
+4. **CONDITIONALLY APPROVED** — merge PR #11 into `dev` after review and
+   CI gates pass.
+5. **NOT AUTHORIZED** — production migration, deployment, merge to `main`
+   or production infrastructure changes.
 
 Schema (`app/writing/migrations.py`, migration `0001_student_attempts`):
 
@@ -74,14 +87,21 @@ Migration mechanism (decides the deferred point above):
   `already_applied`.
 - `rollback` restores the old schema only while no attempt above 1 exists;
   otherwise refused (restore the pre-migration backup, as above).
-- **PO 1 — startup:** `WritingStore` never migrates existing tables. A
-  database without writing tables is created directly at the current
-  version (tests, CI smoke, new installs). A database with older writing
-  tables makes the application and tutor service **refuse to start**
-  (`SchemaMigrationRequired`) until the migration is applied, so a future
-  release must run the migration before starting the new image (runbook
-  section K). The old image keeps working on the unmigrated database.
-- **PO 2 — `uq_submission_exercise`** is no longer created by startup DDL
+- **PO 1 — startup (approved):** `WritingStore` never migrates existing
+  tables. A database without writing tables is created directly at the
+  current version (tests, CI smoke, new installs). The store is created
+  lazily, so both apps check the schema at startup
+  (`WritingService.check_schema()` in the FastAPI lifespan; also before
+  uvicorn in `python -m app.tutor_main`, exit 78): an unmigrated schema
+  (`legacy`) or a drifted one (below) **refuses startup**
+  (`SchemaMigrationRequired`). An unreachable or unconfigured database is
+  left to the first request (503 `database_unavailable`, unchanged; CI
+  smoke tests run without a database). If the schema changes after
+  startup, writing requests answer 503 `schema_migration_required`. A
+  future release must run the migration before starting the new image
+  (runbook section K). The old image keeps working on the unmigrated
+  database.
+- **PO 2 — `uq_submission_exercise` (approved)** is no longer created by startup DDL
   (it would otherwise be recreated after the migration on every boot).
 
 Compatibility and revision pinning:
@@ -91,12 +111,30 @@ Compatibility and revision pinning:
   cannot write into an open revision). Attempt-scoped
   `save_attempt_draft`, `submit_attempt` and `start_revision` exist in the
   store only; no route exposes them (T037).
-- **PO 3 — revision pinning:** attempt 1 keeps today's behaviour (ADR-023):
+- **PO 3 — revision pinning (approved):** attempt 1 keeps today's behaviour (ADR-023):
   until submitted it follows the latest editorial revision and its
   `exercise_revision` is updated with each save; at submission it is fixed.
   A revision attempt is pinned at creation to the revision of the
   submission it revises and is never upgraded. Pinning attempt 1 at its
   creation would change the current student experience.
+
+### Old image against a migrated database (incompatibility)
+
+Observed by running the pre-T036 `store.py` (`origin/dev` `1f2fcfd`) on
+migrated `mentor_pro_test` databases:
+
+| Situation | Old image behaviour |
+| --- | --- |
+| Only attempt 1 exists | Starts; its startup DDL **recreates `uq_submission_exercise`**; reads, listing, tutor queue and progress work; saving an existing draft fails (`ON CONFLICT (exercise_id)` has no matching constraint); a first submission fails (`attempt_id` NOT NULL); retries of existing submissions return them |
+| A revision submission exists | Startup DDL fails (`UniqueViolation` creating `uq_submission_exercise`): every writing request fails; its listing would duplicate rows per attempt |
+| New image after the old one ran | The recreated index would block revision submissions; the new code reports state `drifted` and refuses to start until `python -m app.writing.migrate repair` drops that index (digests unchanged) |
+
+Rules: never start a pre-T036 image on a migrated database. To go back,
+first `migrate rollback` with the new image (possible only while no
+revision attempt exists), then start the old image; otherwise restore the
+pre-migration backup (above). No student data is lost by the failures
+above (writes are refused, nothing is overwritten), but student writing is
+unavailable while it lasts.
 
 ## Lifecycle and workflows
 

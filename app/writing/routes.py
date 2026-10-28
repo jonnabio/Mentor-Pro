@@ -98,7 +98,8 @@ class WritingService:
 
     def check_schema(self) -> None:
         """Startup guard (T036, ADR-032 PO 1): raise SchemaMigrationRequired when the writing tables predate the
-        current migration. A database that cannot be reached is left to the first request (503), as before."""
+        current migration or an older image has changed them ('drifted'). A database that cannot be reached is
+        left to the first request (503), as before."""
         try:
             conn = psycopg.connect(self._url_factory(), connect_timeout=5)
         except (psycopg.OperationalError, db.ConfigurationError):

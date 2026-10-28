@@ -3,9 +3,9 @@
 - **Date:** 2026-10-28
 - **Role:** Developer
 - **Branch:** `feature/T036-guided-writing-revision-design` (not merged)
-- **Status:** implemented and verified locally on `mentor_pro_test`; three
-  implementation decisions await Product Owner confirmation (ADR-032
-  "T036 implementation", PO 1–3); no production migration, deployment or
+- **Status:** implemented and verified locally on `mentor_pro_test`; PO
+  decisions 1–3 approved 2026-10-28, merge to `dev` conditionally approved
+  (PR #11); no production migration, deployment, merge to `main` or
   release
 
 ## Thought
@@ -112,11 +112,48 @@ Verification:
 Final gate (after the documentation): `VERIFY_RESULT=pass gate=all`, test
 601 passed, lint passed (log `.ace/logs/verify/20261028-062220-1096`).
 
+## PO review follow-up (2026-10-28)
+
+Decisions: PO 1–3 approved; merge to `dev` after review and CI; nothing
+in production.
+
+- **Startup refusal was not yet true.** `WritingService` creates the store
+  on the first writing request, so an unmigrated schema failed per
+  request, not at startup. Added `WritingService.check_schema()` to the
+  lifespan of both apps and before uvicorn in `app.tutor_main` (exit 78);
+  unreachable or unconfigured databases keep the 503 behaviour (CI smoke
+  has no database); 503 `schema_migration_required` after startup.
+- **Old image on a migrated database** (pre-T036 `store.py` from
+  `origin/dev` run against migrated test databases): starts and recreates
+  `uq_submission_exercise`; draft saves (`InvalidColumnReference`) and new
+  submissions (`NotNullViolation`) fail; with a revision submission its
+  startup DDL fails (`UniqueViolation`). The recreated index later blocked
+  a revision submission (`UniqueViolation`) under the new code → new state
+  `drifted`, refused at startup, `migrate repair` drops the index.
+  Documented in ADR-032 and runbook K.
+- **Legacy attempt 1 after migration** through the unchanged APIs:
+  historical L1 feedback, L4 sections and L2 draft shown; submitted
+  exercises 409 on draft save and retries return the original; the
+  historical draft continues with ordered saves and its first submission
+  goes to attempt 1; tutor queue lists all four submissions; snapshot of
+  historical rows unchanged.
+- **Guards and standards:** changed files `app/main.py`,
+  `app/tutor_main.py`, `app/writing/{routes,store,migrations,migrate,bank}.py`
+  and tests; none is in `regression-guards.yaml` (RCA-003 `app.js`,
+  `verify.sh`; RCA-004 writing generation, editing, revalidation; RCA-005
+  requirements, Dockerfile, CI untouched). No new third-party import
+  (RCA-005 invariant 1). Parameterized SQL; no student text in reports or
+  logs; tutor boundary unchanged (ADR-031).
+- Tests: `test_writing_attempts.py` 26 passed (7 added).
+- `bash .ace/scripts/verify.sh`: `VERIFY_RESULT=pass gate=all`, 608 passed
+  (log `.ace/logs/verify/20261028-070611-1320`).
+
 ## Risks
 
 - A release of an image containing T036 needs the migration first
   (runbook K); without it the app and tutor service refuse to start (fail
-  closed, old image unaffected).
+  closed, old image unaffected). Running the old image on a migrated
+  database breaks student writing until it is stopped (ADR-032).
 - `progress_inputs()` and the tutor queue count every submission; once
   revision attempts exist, activity counts include them (T039 must
   separate attempts from exercises). No route can create one yet.
