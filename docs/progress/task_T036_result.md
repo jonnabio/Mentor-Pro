@@ -147,6 +147,11 @@ in production.
 - Tests: `test_writing_attempts.py` 26 passed (7 added).
 - `bash .ace/scripts/verify.sh`: `VERIFY_RESULT=pass gate=all`, 608 passed
   (log `.ace/logs/verify/20261028-070611-1320`).
+- `scripts/dev/practice_e2e.py` with the startup guard: `E2E=pass (447
+  checks, 0 failed)`.
+- CI cannot run on PRs into `dev` (triggers: push to `dev`/`main`, PRs
+  into `main`; `ci.yml` is RCA-005-guarded and out of scope). PO chose:
+  merge, then verify the `dev` push CI and revert the merge if it fails.
 
 ## Risks
 
