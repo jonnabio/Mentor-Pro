@@ -2,8 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (T037 merged; T038 implementation, PR to `dev`)
-- **Active Role:** Developer
+- **Last Updated:** 2026-10-28 (T038 merged to `dev`; T040 assessment
+  delivered for PO review)
+- **Active Role:** Architect
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
   GHCR) and 2026-10-26 to 2026-10-27 (deployment Stages 6.1–6.3: RCA-005,
@@ -33,11 +34,22 @@ merged as `6ed9703`; `dev` CI
 green (519 passed, 102 skipped; image built and smoke-tested; GHCR publish
 skipped). [T037 result](../progress/task_T037_result.md).
 
-**T038 — tutor re-evaluation: implemented, PR to `dev` open, awaiting PO
-merge approval.** Branch `feature/T038-tutor-reevaluation`; gate
-`VERIFY_RESULT=pass gate=all` (626 passed); browser 481/481; live restart
-check 10/10 (student app and tutor service as real processes on
-`mentor_pro_test`). [T038 result](../progress/task_T038_result.md).
+**T038 — tutor re-evaluation: merged into `dev`, not deployed.** PR #14
+(head `13851f4` unchanged) merged as `b0a3509`; `dev` CI
+[40760514180](https://github.com/jonnabio/Mentor-Pro/actions/runs/40760514180)
+green (524 passed, 102 skipped; image built, both smoke tests passed; GHCR
+login and publish skipped). Integrated.
+[T038 result](../progress/task_T038_result.md).
+
+**T040 — deployment assessment: delivered, awaiting PO review.** Branch
+`docs/T040-deployment-assessment`;
+[assessment](../planning/2026-10-28-deployment-simplification-assessment.md)
+and [ADR-033](../adr/ADR-033-repeatable-deployment-workflow.md)
+(Proposed). Top risks: no image/schema compatibility check before deploy
+or rollback; backups never restore-tested; production compose file not in
+Git. Proposal: versioned `deploy/` files, one `mentorpro` script with
+enforced gates, CI release manifest, increments I1 to I8 (I6 onward
+change production). [T040 result](../progress/task_T040_result.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix
 progress counting of repeated attempts first; the T036 migration needs a
@@ -389,8 +401,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **T038 PR merge approval (PO)**; T040 assessment (approved, starts
-   now that T038 is reviewable); T039 before any T037+T038 release.
+0. **PO review of T040 / ADR-033** and its five open questions; then
+   I1 to I5 as separate tasks (no production change). T039 (progress
+   counting) before any T037+T038 release; both released together.
    Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).
 1. **Real-user acceptance test.** On the student's own device
@@ -416,9 +429,7 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 7. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
    a small Matemáticas bank so practice does not wait about 5 minutes
    (writing is provisioned: 11 exercises).
-8. Stage 6.4: controlled image promotion to the server (pull by digest,
-   backup, `up -d`, health check of the four URLs, `RELEASES` entry,
-   tested rollback to the previous digest). Plan with an ADR first.
+8. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
 9. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
    `.pre-wifi`, `.pre-t033` and `.pre-tutor` copies.
 10. Task 3 — CI maintenance (see Current Objective).
