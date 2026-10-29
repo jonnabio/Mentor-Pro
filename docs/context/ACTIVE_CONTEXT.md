@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (T042 = I2 merged and verified; T043 = I3
-  plan for review)
+- **Last Updated:** 2026-10-28 (T043 = I3 implemented; PR #19 to `dev`
+  for review)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -65,10 +65,16 @@ gate 651 passed. PR #17 merged as `4efed63`; `dev` CI 40787440842 green
 (542 passed, 111 skipped), both Docker tests executed and passed.
 [T042 result](../progress/task_T042_result.md).
 
-**T043 — ADR-033 I3 plan: proposed, awaiting PO review.** Schema range in
-code, OCI labels, validated manifest, immutable `vYYYY.MM.DD-N` tag and
-GitHub Release on `main` only, PR CI for `dev`.
-[T043 plan](../planning/2026-10-28-T043-release-metadata-plan.md).
+**T043 — ADR-033 I3: implemented, PR #19 to `dev` awaiting PO
+approval.** Plan PR #18 merged as `22a6847` (`dev` CI 40790275976
+green). Release identity before the build, OCI labels with the
+code-defined schema range, validated manifests (dry-run artifact off
+`main`), guarded publication and tag/release on pushes to `main` only,
+serialized `main` runs, least privilege, PR CI for `dev`. Local gate 677
+passed; PR CI 40792928230 green (first `pull_request` run into `dev`).
+`v*` tag ruleset **not configured** (API `[]`); required before the first
+authorized release. [T043 plan](../planning/2026-10-28-T043-release-metadata-plan.md),
+[T043 result](../progress/task_T043_result.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix
 progress counting of repeated attempts first; the T036 migration needs a
@@ -420,8 +426,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **PO review of the T043 plan (I3).** I3 to I5 each need separate
-   implementation and merge authorization; I6 onward change production. T039 (progress
+0. **PO review of PR #19 (T043, I3).** Owner to create the `v*` tag
+   ruleset (no update, no deletion), then verify it. I4 and I5 each need
+   separate tasks and approvals; I6 onward change production. T039 (progress
    counting) before any T037+T038 release; both released together.
    Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).

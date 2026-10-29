@@ -1321,16 +1321,20 @@
       "id": "T043",
       "name": "Release metadata: OCI labels, immutable manifest, release tags, PR CI for dev (ADR-033 I3)",
       "objective": "Schema range in code, OCI labels with a label check, validated release manifest and immutable vYYYY.MM.DD-N tag with GitHub Release on main only (dry-run artifact elsewhere), pull_request CI for dev. No publication or tag before an authorized main merge.",
-      "status": "pending",
+      "status": "in_progress",
       "role": "Developer",
       "files": {
         "create": [
-          "docs/planning/2026-10-28-T043-release-metadata-plan.md"
+          "scripts/release/release.py",
+          "docs/release/manifest.schema.json",
+          "tests/app/test_release.py",
+          "docs/progress/task_T043_result.md"
         ],
         "modify": [
           ".github/workflows/ci.yml",
           "app/writing/migrations.py",
-          "app/writing/migrate.py"
+          "app/writing/migrate.py",
+          "docs/planning/2026-10-28-T043-release-metadata-plan.md"
         ]
       },
       "depends_on": [
@@ -1338,10 +1342,10 @@
       ],
       "complexity": "M",
       "acceptance_cmd": "bash .ace/scripts/verify.sh",
-      "attempts": 0,
+      "attempts": 1,
       "result_file": "docs/progress/task_T043_result.md",
       "failures": [],
-      "notes": "Plan proposed 2026-10-28; implementation needs separate PO authorization."
+      "notes": "Plan approved 2026-10-28 with refinements (identity before build, concurrency, partial-release recovery, least privilege). v* tag ruleset NOT configured (API returned [] on 2026-10-28). No main merge, publication or deployment."
     }
   ]
 }

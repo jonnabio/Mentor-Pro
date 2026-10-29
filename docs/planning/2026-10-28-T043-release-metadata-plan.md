@@ -2,8 +2,9 @@
 
 - **Date:** 2026-10-28
 - **Role:** Architect
-- **Status:** PROPOSED for Product Owner review. Not implemented. I3 needs
-  separate implementation and merge authorization.
+- **Status:** APPROVED for implementation (PO, 2026-10-28) with the
+  refinements below; implemented on `feature/T043-release-metadata`.
+  Merge needs PO approval. No `main` merge, publication or deployment.
 - **Decision record:** [ADR-033](../adr/ADR-033-repeatable-deployment-workflow.md)
   decisions 3 and 7, refinements R2, R3 and R7
 
@@ -97,16 +98,74 @@ so the logic is exercised on every integration without publishing.
   limited to push to `main`.
 - Fork PRs get no secrets (default); none are needed.
 
+## Refinements required by the PO (2026-10-28)
+
+### Release identity before the build
+
+A new `identity` job (read-only: `contents: read`, `packages: read`)
+decides version and build time **before** the image is built:
+
+- push to `main`: `vYYYY.MM.DD-N`, N one above the highest N that day
+  among git tags; a number already present in GHCR (published by a run
+  that never tagged it) is skipped, never reused;
+- anything else: `dev-<sha7>` or `pr<N>-<sha7>` (dry run).
+
+The single build (`load: true, push: false`) receives these labels; a
+label check compares them with the code-defined schema range before the
+smoke tests. The smoke-tested image is the one pushed (RCA-005 kept).
+The build time comes from `identity`, so every later step, and every
+retry, uses the same values.
+
+### Concurrent runs
+
+- `concurrency: ci-${{ github.ref }}` with cancellation only for pull
+  requests: runs on `main` queue one after another and are never
+  cancelled midway.
+- The git tag is created with a plain `git push` of a new ref, which
+  fails if the ref exists: two runs can never hold the same version.
+
+### Failure and retry matrix
+
+| Situation | Behavior | Recovery |
+| --- | --- | --- |
+| Tests, label check or smoke test fail | nothing published, no tag | fix on a branch; new run |
+| Version already in GHCR or as a git tag before publishing | `docker-build` stops before any push | new run (allocates the next number) |
+| Publication fails partway (some image tags pushed) | job fails; no git tag, no release | new run; the partly used number is burned (skipped by `identity`) and never deployable |
+| Published, but tag or release creation fails | `release` job fails | **re-run only the `release` job**: it reuses the recorded version, build time and digest |
+| `release` re-run, tag exists | accepted only if it points at this commit; otherwise fails | investigate; never move the tag |
+| `release` re-run, GitHub Release exists | accepted only if its manifest is byte-identical | investigate; never replace the asset |
+| `docker-build` re-run after a successful publish | refused (version taken): a rebuild would have another digest | re-run `release` only, or start a new run |
+
+A version counts as **released** only with all three: the image in
+GHCR, the git tag on the commit, and the GitHub Release with a valid
+manifest. The later deployment commands (I4) accept nothing else.
+
+### Least privilege
+
+| Job | Permissions |
+| --- | --- |
+| workflow default, `tests` | `contents: read` |
+| `identity` | `contents: read`, `packages: read` |
+| `docker-build` | `contents: read`, `packages: write` (used only by the publish steps, pushes to `main` only) |
+| `release` (pushes to `main` only) | `contents: write` |
+
+### Tag ruleset
+
+Checked read-only on 2026-10-28: `GET /repos/jonnabio/Mentor-Pro/rulesets`
+returned `[]`. **No `v*` ruleset exists.** It must be created by the
+owner and verified before the first authorized release; the workflow
+itself never moves or deletes tags either way.
+
 ## Plan (increments inside T043)
 
 | Step | Change | Verification |
 | --- | --- | --- |
 | 1 | `SCHEMA_MIN`/`SCHEMA_MAX`, `migrate range`, tests | unit tests |
 | 2 | OCI labels at build; label check step | dry run on the PR itself |
-| 3 | `scripts/release/manifest.py` (build, validate against `docs/release/manifest.schema.json`), tests | unit tests, artifact on PR |
+| 3 | `scripts/release/release.py` (identity, labels, manifest, validation against `docs/release/manifest.schema.json`), tests | unit tests, artifact on PR |
 | 4 | Release job (tag, manifest, GitHub Release) on `main` only | logic tested by unit tests and the dry-run artifact; **first real run only at the next authorized merge to `main`** |
 | 5 | `pull_request` to `dev` | the T043 PR itself is the first run |
-| 6 | Runbook note: where to find the digest and manifest | doc lint |
+| 6 | Runbook note: where to find the digest and manifest | deferred to I8 (runbook rewrite) |
 
 ## Verify
 
@@ -122,13 +181,15 @@ so the logic is exercised on every integration without publishing.
   on `main`, and merging into `main` is not authorized.
 - A tag ruleset is a repository setting, which the PO or owner must
   apply; the workflow does not depend on it to refuse an existing tag.
+  Not configured as of 2026-10-28.
 - No server, production, secret or GHCR change. T039 remains a release
   prerequisite; T032/T033 acceptance remains pending.
 
-## Decisions requested
+## PO decisions (2026-10-28)
 
-1. Approve this plan for implementation as T043.
-2. Approve "Published, not authorized for deployment" as the release
-   wording.
-3. Confirm that the owner will add the `v*` tag ruleset (no update, no
-   deletion) before the first release.
+1. PR #18 merged; T043 implementation approved on a feature branch.
+2. Release wording: "Published, not authorized for deployment".
+3. The `v*` ruleset (no update, no deletion) must be verified before the
+   first authorized release; not configured yet.
+4. Not authorized: merge into `main`, GHCR publication, deployment,
+   migration, server changes.
