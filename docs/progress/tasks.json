@@ -1321,7 +1321,7 @@
       "id": "T043",
       "name": "Release metadata: OCI labels, immutable manifest, release tags, PR CI for dev (ADR-033 I3)",
       "objective": "Schema range in code, OCI labels with a label check, validated release manifest and immutable vYYYY.MM.DD-N tag with GitHub Release on main only (dry-run artifact elsewhere), pull_request CI for dev. No publication or tag before an authorized main merge.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1345,7 +1345,29 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T043_result.md",
       "failures": [],
-      "notes": "Plan approved 2026-10-28 with refinements (identity before build, concurrency, partial-release recovery, least privilege). v* tag ruleset NOT configured (API returned [] on 2026-10-28). No main merge, publication or deployment."
+      "notes": "Plan approved 2026-10-28 with refinements (identity before build, concurrency, partial-release recovery, least privilege). v* tag ruleset NOT configured (API returned [] on 2026-10-28). No main merge, publication or deployment. PO approved merge 2026-10-28: head e6a9877 unchanged, scope T043 only; PR #19 merged as 474774e; dev CI 40809496126 green: 568 passed, 111 skipped (Docker tests mandatory), identity dev-474774e, LABELS OK, both smoke tests passed, MANIFEST OK, artifact manifest-dry-run; GHCR login, refuse-taken, publish and Tag and Release skipped; no v* tag, no GitHub Release. Not release-ready: ruleset, real GHCR digest path and partial-release recovery unverified."
+    },
+    {
+      "id": "T044",
+      "name": "Preflight, compatibility, deploy and rollback (ADR-033 I4)",
+      "objective": "deploy/mentorpro preflight, deploy and rollback by digest with the schema compatibility rule checked before any container change, safe refusal of incompatible rollbacks, append-only RELEASES; tested in an isolated project with a local registry and synthetic data.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/planning/2026-10-28-T044-deploy-rollback-plan.md"
+        ],
+        "modify": []
+      },
+      "depends_on": [
+        "T043"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T044_result.md",
+      "failures": [],
+      "notes": "Plan proposed 2026-10-28 for PO review; implementation NOT authorized."
     }
   ]
 }
