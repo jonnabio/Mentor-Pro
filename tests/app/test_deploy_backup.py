@@ -61,7 +61,7 @@ def _posix(path):
 
 def run(*args, **env):
     base = {**os.environ, "PATH": os.pathsep.join(filter(None, [PG_BIN, os.environ["PATH"]])),
-            "MENTORPRO_BACKUP_SCHEMAS": SCHEMA, **env}
+            "MENTORPRO_BACKUP_SCHEMAS": SCHEMA, "MENTORPRO_PYTHON": _posix(sys.executable), **env}
     return subprocess.run([SH, str(SCRIPT), *args], env=base, capture_output=True, text=True, timeout=300)
 
 
@@ -132,6 +132,9 @@ def test_backup_is_restored_and_compared_before_backup_ok(live, made, tmp_path):
     assert f"table {SCHEMA}.note 120" in record and f"table {SCHEMA}.empty 0" in record
     assert "restore pass" in record and record.rstrip().endswith("result BACKUP OK")
     assert re.search(r"^fingerprint [0-9a-f]{64}$", record, re.M)
+    # Deploy evidence (T044): database, schema state (no writing tables here: fresh) and verification time.
+    assert f"\ndatabase {BACKUP_DB}\n" in record and "\nschema_state fresh none\n" in record
+    assert re.search(r"^verified \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$", record, re.M)
     assert "Ñandú" not in record and "Ñandú" not in result.stdout and live not in result.stdout  # no data, no URL
     if os.name == "posix":
         assert dump.stat().st_mode & 0o777 == 0o600 and (tmp_path / "backups").stat().st_mode & 0o777 == 0o700
