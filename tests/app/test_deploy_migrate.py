@@ -582,7 +582,7 @@ class Production:
         for path in seed.iterdir():
             path.chmod(0o644)
         out = sh("docker", "run", "--rm", "--network", f"{self.project}_default", "-v", f"{_posix(seed)}:/seed:ro",
-                 "-e", f"DATABASE_URL={self.database_url}", self.real_ref, "python", "/seed/seed.py")
+                 "-e", f"DATABASE_URL={self.database_url}", "-e", "PYTHONPATH=/app", self.real_ref, "python", "/seed/seed.py")
         assert out.returncode == 0 and "SEEDED" in out.stdout, out.stdout + out.stderr
 
     def run(self, *args, **extra):
