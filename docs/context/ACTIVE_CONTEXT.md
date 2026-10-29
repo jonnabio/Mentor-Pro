@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (T043 = I3 merged into `dev` as `474774e`;
-  I4 plan T044 proposed)
+- **Last Updated:** 2026-10-28 (T044 = I4 implemented; PR #21 to `dev`
+  for review)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -79,6 +79,17 @@ passed; PR CI 40792928230 green (first `pull_request` run into `dev`).
 `v*` tag ruleset **not configured** (API `[]`); required before the first
 authorized release. [T043 plan](../planning/2026-10-28-T043-release-metadata-plan.md),
 [T043 result](../progress/task_T043_result.md).
+
+**T044 — ADR-033 I4: implemented, PR #21 to `dev` awaiting PO
+approval.** PR #20 merged as `0bcf64d`. `deploy/mentorpro
+preflight|deploy|rollback` by digest: manifest file validated (dry-run
+refused), registry digest and tag mapping, labels, read-only live schema
+(fresh/legacy/current/drifted/corrupt/unreadable), six-hour preflight and
+backup evidence bound to the deployment, compatibility rechecked in the
+lock, window and PO references recorded (not verified), app and tutor
+only, manual rollback only. PR CI 40811750620 green (636 passed; Docker
+cycle test with local registry ran). Nothing run on the server.
+[T044 result](../progress/task_T044_result.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix
 progress counting of repeated attempts first; the T036 migration needs a
@@ -430,13 +441,11 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **PO review of the I4 plan (T044,
-   [plan](../planning/2026-10-28-T044-deploy-rollback-plan.md)); 5
-   decisions requested; not authorized to implement.** Owner to create
-   the `v*` tag ruleset (no update, no deletion), then verify it; validate
-   the real GHCR digest on the first authorized release. I4 and I5 each
-   need separate approvals; I6 onward change production. T039 (progress
-   counting) before any T037+T038 release; both released together.
+0. **PO review of PR #21 (T044, I4).** Owner to create the `v*` tag
+   ruleset, then verify it; validate the real GHCR digest on the first
+   authorized release. I5 needs its own approval; I6 onward change
+   production. T039 (progress counting) before any T037+T038 release;
+   both released together.
    Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).
 1. **Real-user acceptance test.** On the student's own device
