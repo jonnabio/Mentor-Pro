@@ -6,10 +6,17 @@ on:
   push:
     branches: [dev, main]
   pull_request:
-    branches: [main]
+    branches: [main, dev]  # T043: feature PRs into dev are verified before merge
 
 permissions:
   contents: read
+
+# T043 (ADR-033 I3): runs on main are serialized and never cancelled, so two
+# releases cannot allocate the same version or publish out of order. A newer
+# push to the same pull request replaces its older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tests:
@@ -60,27 +67,107 @@ jobs:
       - name: Validate ACE skills
         run: python .ace/scripts/validate_skills.py
 
+  # T043: the release identity is fixed before the image is built, so labels,
+  # manifest, git tag and published digest name the same artifact. Pushes to
+  # main get the next vYYYY.MM.DD-N; everything else gets a dry-run name
+  # (dev-<sha> or pr<N>-<sha>) and publishes nothing. Read-only.
+  identity:
+    name: Release Identity
+    runs-on: ubuntu-latest
+    needs: tests
+    permissions:
+      contents: read
+      packages: read  # only to see which versions GHCR already holds
+    outputs:
+      version: ${{ steps.id.outputs.version }}
+      created: ${{ steps.id.outputs.created }}
+      labels: ${{ steps.id.outputs.labels }}
+      release: ${{ steps.mode.outputs.release }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Decide release mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/main ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Allocate version
+        id: id
+        env:
+          PR: ${{ github.event.number }}
+          SHA: ${{ github.sha }}
+        run: |
+          git ls-remote --tags origin 'refs/tags/v*' | sed 's#.*refs/tags/##; s#\^{}$##' | sort -u > tags.txt
+          if [ "${{ steps.mode.outputs.release }}" = true ]; then
+            echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null
+            # A number published to GHCR by a run that never tagged it is burned, not reused.
+            for _ in $(seq 1 20); do
+              python scripts/release/release.py identity --mode release --sha "$SHA" --tags tags.txt > id.txt
+              v=$(sed -n 's/^version=//p' id.txt)
+              docker manifest inspect "ghcr.io/jonnabio/mentor-pro:$v" >/dev/null 2>&1 || break
+              echo "$v" >> tags.txt
+            done
+            cat id.txt >> "$GITHUB_OUTPUT"
+          else
+            label=dev; [ -n "$PR" ] && label="pr$PR"
+            python scripts/release/release.py identity --mode dry-run --label "$label" --sha "$SHA" --tags tags.txt >> "$GITHUB_OUTPUT"
+          fi
+          grep -E '^(version|created)=' "$GITHUB_OUTPUT"
+
   docker-build:
     name: Validate and Publish Docker Image
     runs-on: ubuntu-latest
-    needs: tests
+    needs: [tests, identity]
 
+    # packages: write is used only by the publish steps, which run only on
+    # pushes to main; contents stays read-only (tags are created in `release`).
     permissions:
       contents: read
       packages: write
 
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+
     env:
       CANDIDATE: mentor-pro:candidate
+      VERSION: ${{ needs.identity.outputs.version }}
+      CREATED: ${{ needs.identity.outputs.created }}
+      REVISION: ${{ github.sha }}
+      RELEASE: ${{ needs.identity.outputs.release }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       # Build once into the local Docker engine; the smoke test and the publish
-      # below use this same image, never a rebuild (RCA-005).
+      # below use this same image, never a rebuild (RCA-005). The OCI labels
+      # carry the release identity and the code-defined schema range (T043).
       - name: Build image
         uses: docker/build-push-action@v6
         with:
@@ -88,6 +175,10 @@ jobs:
           load: true
           push: false
           tags: ${{ env.CANDIDATE }}
+          labels: ${{ needs.identity.outputs.labels }}
+
+      - name: Check image labels against the code
+        run: python scripts/release/release.py check-labels --image "$CANDIDATE" --version "$VERSION" --revision "$REVISION" --created "$CREATED"
 
       # Publication gate (RCA-005): the container must start and answer
       # HTTP 200 on / within 60 s. Fails if it exits, never answers, or
@@ -169,10 +260,114 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish smoke-tested image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      # Dry run (feature branches, pull requests, dev): the manifest is built and
+      # validated against docs/release/manifest.schema.json, then kept as a
+      # workflow artifact. Nothing is pushed, tagged or released.
+      - name: Dry-run release manifest
+        if: env.RELEASE != 'true'
         run: |
-          for tag in testing "sha-${GITHUB_SHA}"; do
+          python scripts/release/release.py manifest --dry-run --out release-manifest.json \
+            --version "$VERSION" --commit "$REVISION" --run "$GITHUB_RUN_ID" --created "$CREATED" \
+            --image-id "$(docker inspect --format '{{.Id}}' "$CANDIDATE")"
+          cat release-manifest.json
+
+      - name: Keep dry-run manifest
+        if: env.RELEASE != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-dry-run
+          path: release-manifest.json
+
+      # A version is published once. If the version tag already exists in GHCR
+      # or as a git tag (for example when this job is re-run after a successful
+      # publish), stop: a rebuild would have another digest. See the T043
+      # recovery procedure.
+      - name: Refuse a version that is already taken
+        if: env.RELEASE == 'true'
+        run: |
+          if docker manifest inspect "ghcr.io/jonnabio/mentor-pro:$VERSION" >/dev/null 2>&1; then
+            echo "::error::$VERSION is already in GHCR; re-run only the release job, or start a new run"; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::git tag $VERSION already exists; start a new run for a new version"; exit 1
+          fi
+
+      - name: Publish smoke-tested image
+        id: publish
+        if: env.RELEASE == 'true'
+        run: |
+          for tag in "$VERSION" "sha-${GITHUB_SHA}" testing; do
             docker tag "$CANDIDATE" "ghcr.io/jonnabio/mentor-pro:${tag}"
             docker push "ghcr.io/jonnabio/mentor-pro:${tag}"
           done
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "ghcr.io/jonnabio/mentor-pro:$VERSION" | sed 's/.*@//')
+          remote=$(docker buildx imagetools inspect "ghcr.io/jonnabio/mentor-pro:$VERSION" --format '{{.Manifest.Digest}}')
+          [ "$digest" = "$remote" ] || { echo "::error::digest mismatch: local $digest, registry $remote"; exit 1; }
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "published ghcr.io/jonnabio/mentor-pro@$digest as $VERSION"
+
+  # T043: tag, manifest and GitHub Release, only for pushes to main, after the
+  # smoke-tested image is published. The only job that can write repository
+  # contents. Safe to re-run on its own: an existing tag must already point at
+  # this commit, and an existing release must carry the identical manifest.
+  release:
+    name: Tag and Release
+    runs-on: ubuntu-latest
+    needs: [identity, docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: write
+
+    env:
+      VERSION: ${{ needs.identity.outputs.version }}
+      CREATED: ${{ needs.identity.outputs.created }}
+      DIGEST: ${{ needs.docker-build.outputs.digest }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build and validate the manifest
+        run: |
+          python scripts/release/release.py manifest --out release-manifest.json \
+            --version "$VERSION" --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID" --created "$CREATED" --digest "$DIGEST"
+          cat release-manifest.json
+
+      # Atomic: pushing a tag that exists fails, so two runs can never share a
+      # version. Tags are never moved or deleted.
+      - name: Create the release tag
+        run: |
+          # The commit an existing (annotated) tag points at, if any.
+          existing=$(git ls-remote --tags origin "refs/tags/$VERSION*"             | awk -v t="refs/tags/$VERSION" '$2 == t "^{}" {p=$1} $2 == t {l=$1} END {print (p ? p : l)}')
+          if [ -n "$existing" ]; then
+            [ "$existing" = "$GITHUB_SHA" ] || { echo "::error::$VERSION points at $existing, not $GITHUB_SHA"; exit 1; }
+            echo "tag $VERSION already points at this commit (retry)"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$VERSION" -m "Mentor Pro $VERSION (CI run $GITHUB_RUN_ID)" "$GITHUB_SHA"
+            git push origin "refs/tags/$VERSION"
+          fi
+
+      - name: Create the GitHub Release
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            gh release download "$VERSION" --pattern release-manifest.json --dir existing
+            cmp -s existing/release-manifest.json release-manifest.json \
+              || { echo "::error::release $VERSION exists with a different manifest"; exit 1; }
+            echo "release $VERSION already exists with this manifest (retry)"
+          else
+            gh release create "$VERSION" release-manifest.json --verify-tag --title "$VERSION" \
+              --notes "Published, not authorized for deployment"
+          fi

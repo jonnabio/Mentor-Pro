@@ -4,6 +4,7 @@
     python -m app.writing.migrate apply [--dry-run]
     python -m app.writing.migrate repair
     python -m app.writing.migrate rollback
+    python -m app.writing.migrate range      (no database: supported schema range, ADR-033)
 
 Reads DATABASE_URL like the application. Output is counts and digests only, never student text.
 """
@@ -29,7 +30,11 @@ def main(argv: list[str] | None = None) -> int:
     apply.add_argument("--dry-run", action="store_true")
     sub.add_parser("repair")
     sub.add_parser("rollback")
+    sub.add_parser("range")
     args = parser.parse_args(argv)
+    if args.command == "range":  # no database: the supported schema range of this image (ADR-033 R2)
+        print(json.dumps({"min": migrations.SCHEMA_MIN, "max": migrations.SCHEMA_MAX}))
+        return 0
     url = db.database_url()
     try:
         if args.command == "status":

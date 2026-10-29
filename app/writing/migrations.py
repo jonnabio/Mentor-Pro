@@ -22,6 +22,13 @@ from psycopg.types.json import Jsonb
 
 LOCK_SQL = "SELECT pg_advisory_xact_lock(hashtext('bootstrap:writing'))"
 STUDENT_ATTEMPTS = "0001_student_attempts"
+MIGRATIONS = (STUDENT_ATTEMPTS,)  # in order; the last one is what `apply` brings a database to
+
+# Supported writing-schema range of this image (ADR-033 R2), written into its OCI labels and release manifest.
+# SCHEMA_MIN: the oldest schema this image runs on (it refuses to start on anything older); SCHEMA_MAX: the
+# newest it knows. Both are migration numbers; change them together with MIGRATIONS.
+SCHEMA_MIN = "0001"
+SCHEMA_MAX = "0001"
 
 LEDGER_SQL = """
 CREATE TABLE IF NOT EXISTS writing.schema_migration (
