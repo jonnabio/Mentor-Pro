@@ -3,7 +3,7 @@
 ## Session Metadata
 
 - **Last Updated:** 2026-10-29 (T044 = I4 merged as `8b3fc44`; I5
-  design merged as `148b918`; T045 = I5 implemented, PR #23 review corrections applied)
+  design merged as `148b918`; T045 = I5 merged as `ca20f6c`, `dev` CI green)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -96,8 +96,7 @@ provenance (stored manifest or `adopt-legacy`, plus a prior OK run). ACE
 gate 754 passed; PR CI 40890220768 green (646 passed).
 [T044 result](../progress/task_T044_result.md).
 
-**T045 — ADR-033 I5: implemented, PR #23 into `dev` for PO review, not
-merged.** Design PR #22 merged as `148b918`. PO decisions: no published
+**T045 — ADR-033 I5: merged and verified on `dev`.** Design PR #22 merged as `148b918`. PO decisions: no published
 ports; final rehearsal in the same window on the exact migration backup;
 app and tutor stopped before it; files under
 `/var/lib/mentor-pro/rehearsal`; 60-minute downtime, 40-minute
@@ -112,8 +111,11 @@ data, server, migration, deployment, GHCR, `main`. PO review of PR #23
 (2026-10-29): conditionally approved; corrections applied (window
 identity bound through `maintenance start`, `rehearse`, `migrate` and
 `maintenance end`; incomplete or malformed rehearsal timing refuses the
-migration). Merge into `dev` authorized once the ACE gate and the final
-PR CI pass; T045 counts as integrated only after the post-merge `dev` CI.
+migration). ACE gate pass; PR CI 40936772958 green on head `8c0abc7`
+(762 passed, 111 skipped, Docker tests ran). **Integrated:** PR #23
+merged as `ca20f6c`; `dev` CI 40938783292 green (762 passed, 111
+skipped, `LABELS OK`, both smoke tests, `MANIFEST OK` `dev-ca20f6c`;
+publish and Tag and Release skipped).
 [T045 result](../progress/task_T045_result.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix
@@ -466,12 +468,12 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **PO review of the I5 design (T045,
-   [plan](../planning/2026-10-29-T045-migration-rehearsal-plan.md)); 5
-   decisions requested; not authorized to implement.** Owner to create
-   the `v*` tag ruleset, then verify it; validate the real GHCR digest on the first
-   authorized release. I5 needs its own approval; I6 onward change
-   production. T039 (progress counting) before any T037+T038 release;
+0. **I5 (T045) integrated in `dev`; next increment needs PO
+   authorization.** The first rehearsal on a real production backup,
+   any server run (I6 onward), the migration and deployment are
+   separately authorized. Owner to create the `v*` tag ruleset, then
+   verify it; validate the real GHCR digest on the first authorized
+   release. T039 (progress counting) before any T037+T038 release;
    both released together.
    Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).
