@@ -101,6 +101,8 @@ Conditionally approved; two corrections before merge:
 | PR CI 40914816729 | failed: seed container could not import the application (test harness); fixed |
 | PR CI 40915643538 | failed: test-project cleanup bug (test harness); fixed |
 | PR CI [40916932558](https://github.com/jonnabio/Mentor-Pro/actions/runs/40916932558) (head `49ebfdc`) | success: 734 passed, 111 skipped with Docker mandatory (+88: 85 unit + 2 Docker + 1 POSIX test; skips unchanged, so both Docker tests ran and passed); `LABELS OK`; both smoke tests; `MANIFEST OK` (`pr23-49ebfdc`); publish and release skipped |
+| ACE gate after the review corrections | `VERIFY_RESULT=pass` (log `.ace/logs/verify/20261029-125146-933`) |
+| PR CI [40935391123](https://github.com/jonnabio/Mentor-Pro/actions/runs/40935391123) (head `9e38d8b`, corrections) | success: 762 passed (+28 new cases), 111 skipped (unchanged, so both Docker tests ran and passed); `LABELS OK`; both smoke tests; `MANIFEST OK`; publish and release skipped |
 
 The Docker tests build a real image from this repository, push it with a
 label-less pre-T036 stand-in to a local registry, and seed a synthetic
