@@ -88,7 +88,11 @@ refused), registry digest and tag mapping, labels, read-only live schema
 backup evidence bound to the deployment, compatibility rechecked in the
 lock, window and PO references recorded (not verified), app and tutor
 only, manual rollback only. PR CI 40811750620 green (636 passed; Docker
-cycle test with local registry ran). Nothing run on the server.
+cycle test with local registry ran). Nothing run on the server. PO
+corrections (2026-10-29) applied in `70fa714`: compose failures recorded
+as FAILED, final registry identity check under the lock, rollback
+provenance (stored manifest or `adopt-legacy`, plus a prior OK run). ACE
+gate 754 passed; PR CI 40890220768 green (646 passed).
 [T044 result](../progress/task_T044_result.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix

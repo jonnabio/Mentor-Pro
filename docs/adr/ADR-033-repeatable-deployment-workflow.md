@@ -146,6 +146,13 @@ found:
   `deploy/mentorpro_deploy.py` (python3 standard library). It changes
   only `release.env` (previous kept) and the `app` and `tutor`
   containers; never PostgreSQL, its volume, network or migrations.
+- PO corrections (2026-10-29): a failed `docker compose` is recorded as
+  `FAILED` (target, previous configuration, error), never as success;
+  `deploy` re-verifies registry content, tag mapping, labels, commit and
+  schema range under the lock, so a preflight record alone never
+  authorizes a deployment; a rollback target needs provenance, either a
+  stored release manifest or the pre-script image captured once by
+  `adopt-legacy`, and an earlier successful run recorded in `RELEASES`.
 
 ## Not decided here
 

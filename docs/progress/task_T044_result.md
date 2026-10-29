@@ -3,8 +3,9 @@
 - **Date:** 2026-10-28
 - **Role:** Developer
 - **Branch:** `feature/T044-deploy-rollback` (from `dev` at `0bcf64d`)
-- **Status:** implemented; PR #21 to `dev` awaiting PO approval. Nothing
-  run on the server or production; nothing published.
+- **Status:** PO corrections applied and verified; PR #21 to `dev`
+  (merge authorized once corrections pass). Nothing run on the server
+  or production; nothing published.
 
 ## Thought
 
@@ -79,6 +80,38 @@ The Docker cycle test, in project `mentorpro-i4test-<id>` with a local
   unchanged.
 
 Parallel locking is tested by a second process holding the lock.
+
+## PO corrections (review of PR #21, 2026-10-29)
+
+Conditional approval; three corrections before merge.
+
+1. **Compose failure.** `compose_up` returns the error; `deploy` and
+   `rollback` record `FAILED` with the target image, `previous` and
+   `error`, keep `release.env.previous`, print the proposed rollback and
+   never report OK or run a health wait. Unit test with an injected
+   failing `docker compose`; Docker test with a missing compose file.
+2. **Final identity check.** Under the lock, `deploy` re-reads the
+   registry content, the version-tag mapping, labels, commit and schema
+   range (`verify_release_image`), then compatibility, preflight and
+   backup evidence. An unreachable registry is a refusal. Docker test:
+   tag moved after preflight, and registry stopped after preflight; both
+   refused with containers unchanged.
+3. **Rollback provenance.** A target needs a stored, valid release
+   manifest, or the pre-script image captured once by the new
+   `adopt-legacy` command (release.env pins it by digest, app and tutor
+   run exactly it and are healthy, local image carries the repository
+   digest; PO references recorded; no container change). Either way the
+   target must have an `OK` or `UNCHANGED` line in `RELEASES`. Unit
+   tests: ordinary manifest, approved legacy, unknown image, never-OK
+   target, failed previous deployment, another repository, a tag.
+   Docker test: adopted legacy candidate refused across `0001`;
+   `release.env.previous` naming the failed release refused.
+
+| Check | Result |
+| --- | --- |
+| Unit tests (local) | 77 passed, Docker test skipped |
+| `bash .ace/scripts/verify.sh` | `VERIFY_RESULT=pass gate=all`, 754 passed, 3 skipped (Docker), 205 s (log `.ace/logs/verify/20261029-081844-49`) |
+| PR CI [40890220768](https://github.com/jonnabio/Mentor-Pro/actions/runs/40890220768) (head `70fa714`) | success: 646 passed, 111 skipped, Docker mandatory (+10 unit tests; skips unchanged, so the Docker cycle ran and passed); `LABELS OK`; both smoke tests; `MANIFEST OK`; publish and release skipped |
 
 ## Not verified
 
