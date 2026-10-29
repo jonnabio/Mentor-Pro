@@ -65,6 +65,33 @@ checkpoint, no automatic restore or rollback.
 - ADR-033 "I5 decisions"; plan status, PO decisions and implementation
   changes.
 
+### PO review corrections (PR #23, 2026-10-29)
+
+Conditionally approved; two corrections before merge:
+
+- Window binding: `maintenance start` records a window identity
+  (reference, start time, random id). `rehearse` now needs the open
+  window and records its reference and id; `migrate` accepts only a
+  rehearsal from the open window; `maintenance end`, `rehearse` and
+  `migrate` refuse a `--window` that does not name the open window (or a
+  window without an identity) before any service, database or file
+  changes. References remain recorded as given
+  (`authorization_verified=no`).
+- Timing evidence: `timing_problems` requires a measured duration for
+  each remaining step (dry run, apply, verify, start app and tutor,
+  smoke) that is a finite, non-negative number; missing, negative,
+  nonnumeric, boolean, NaN or infinite values refuse the migration
+  ("incomplete timing evidence"). The 40-minute checkpoint and the
+  60-minute projection are unchanged.
+- Tests: 28 new unit cases (mismatched reference and missing identity
+  at all three gates with state, `RELEASES` and rehearsal directory
+  unchanged; rehearsal from another window; each malformed duration);
+  the Docker window test checks the recorded window identity and that a
+  mismatched `maintenance end`, `rehearse` and `migrate` keep app and
+  tutor stopped, start nothing and leave the evidence unchanged, and
+  that missing or negative durations and another window's evidence are
+  refused.
+
 ## Observation
 
 | Check | Result |

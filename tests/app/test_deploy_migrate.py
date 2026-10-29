@@ -119,15 +119,18 @@ def test_migration_report_problems(report, reason):
 
 # ------------------------------------------------------------------ evidence binding and time limits
 
+WINDOW = {"window": "W-1", "window_id": "2026-11-02T13:50:00Z/0123456789abcdef"}
+
+
 def rehearsal(**change):
     record = {"result": "REHEARSAL OK", "digest": DIGEST, "dump_sha256": DUMP_SHA, "cleanup": "verified",
-              "schema_after": "current 0001", "finished_at": "2026-11-02T14:00:00Z"}
+              "schema_after": "current 0001", "finished_at": "2026-11-02T14:00:00Z", **WINDOW}
     record.update(change)
     return record
 
 
 def test_rehearsal_evidence_accepted():
-    mm.check_rehearsal(rehearsal(), DIGEST, DUMP_SHA, NOW)
+    mm.check_rehearsal(rehearsal(), DIGEST, DUMP_SHA, NOW, WINDOW)
 
 
 @pytest.mark.parametrize("record, reason", [
@@ -140,10 +143,13 @@ def test_rehearsal_evidence_accepted():
     (rehearsal(finished_at="2026-11-02T08:59:59Z"), "older than six hours"),
     (rehearsal(finished_at="2026-11-02T16:00:00Z"), "future"),
     (rehearsal(finished_at="soon"), "timestamp"),
+    (rehearsal(window="W-2"), "another maintenance window"),
+    (rehearsal(window_id="2026-11-02T13:50:00Z/fedcba9876543210"), "another maintenance window"),
+    (rehearsal(window=None, window_id=None), "another maintenance window"),  # pre-correction evidence
 ])
 def test_rehearsal_evidence_is_bound_and_fresh(record, reason):
     with pytest.raises(md.Refused, match=reason):
-        mm.check_rehearsal(record, DIGEST, DUMP_SHA, NOW)
+        mm.check_rehearsal(record, DIGEST, DUMP_SHA, NOW, WINDOW)
 
 
 @pytest.mark.parametrize("state, ok", [("legacy none", True), ("current 0001", True), ("fresh none", False),
@@ -165,10 +171,36 @@ DURATIONS = {"restore": 50, "dry run": 30, "apply": 30, "verify": 10, "start app
     (40.1, DURATIONS, "40-minute checkpoint"),
     (30, {**DURATIONS, "apply": 900}, "projected downtime"),  # 30 + 2 x 15.3 min > 60
     (55, {"apply": 1}, "checkpoint"),
+    (10, {**DURATIONS, "dry run": 0}, None),  # zero is a measurement
 ])
 def test_downtime_window(minutes, durations, reason):
     problems = mm.window_problems(NOW - timedelta(minutes=minutes), NOW, durations)
     assert (problems == []) if reason is None else any(reason in p for p in problems), problems
+
+
+@pytest.mark.parametrize("durations, reason", [
+    ({}, "'dry run' is missing"),
+    (None, "no measured durations"),
+    ([30, 30], "no measured durations"),
+    ({k: v for k, v in DURATIONS.items() if k != "smoke"}, "'smoke' is missing"),
+    ({**DURATIONS, "apply": None}, "'apply' is missing"),
+    ({**DURATIONS, "apply": -1}, "'apply' is not a valid"),
+    ({**DURATIONS, "apply": "30"}, "'apply' is not a valid"),
+    ({**DURATIONS, "apply": True}, "'apply' is not a valid"),
+    ({**DURATIONS, "apply": float("nan")}, "'apply' is not a valid"),
+    ({**DURATIONS, "apply": float("inf")}, "'apply' is not a valid"),
+    ({**DURATIONS, "verify": float("-inf")}, "'verify' is not a valid"),
+    ({**DURATIONS, "start app and tutor": {"s": 1}}, "is not a valid"),
+])
+def test_incomplete_timing_evidence_never_permits_migration(durations, reason):
+    problems = mm.window_problems(NOW - timedelta(minutes=1), NOW, durations)
+    assert any(reason in p for p in problems), problems
+    assert any("incomplete timing evidence" in p for p in problems)
+
+
+def test_timing_evidence_parsed_from_json_rejects_nonfinite():
+    durations = json.loads('{"dry run": NaN, "apply": Infinity, "verify": 1, "start app and tutor": 1, "smoke": 1}')
+    assert len(mm.timing_problems(durations)) == 2
 
 
 def test_window_constants_are_the_po_decision():
@@ -372,7 +404,7 @@ def test_migrate_needs_an_open_window(tmp_path):
 def test_window_with_a_started_migration_needs_a_recovery_decision(tmp_path):
     state = tmp_path / "state"
     state.mkdir()
-    (state / "maintenance.json").write_text(json.dumps({"started_at": "2026-11-02T14:00:00Z", "window": "W-1",
+    (state / "maintenance.json").write_text(json.dumps({"started_at": "2026-11-02T14:00:00Z", **WINDOW,
                                                         "state": "legacy", "schema": "none", "image": "x"}))
     (state / "migration.json").write_text("{}")
     for args in (["maintenance", "end"], ["migrate", "m.json", "--backup", "d"]):
@@ -380,6 +412,38 @@ def test_window_with_a_started_migration_needs_a_recovery_decision(tmp_path):
         assert out.returncode == 1 and "DATABASE RECOVERY DECISION REQUIRED" in out.stdout, out.stdout
     out = cli(tmp_path, "migrate", "m.json", "--backup", "d", "--window", "W-2", "--authorization", "PO-1")
     assert "not the open maintenance window" in out.stdout
+
+
+GATES = [["maintenance", "end"], ["rehearse", "m.json", "d.dump"], ["migrate", "m.json", "--backup", "d.dump"]]
+
+
+@pytest.mark.parametrize("args, window_id", [
+    *[(gate + ["--window", "W-2"], window_id) for gate in GATES for window_id in (WINDOW["window_id"], None)],
+    *[(gate + ["--window", "W-1"], None) for gate in GATES],  # right reference, window without identity
+])
+def test_window_mismatch_changes_nothing_at_every_gate(tmp_path, args, window_id):
+    state = tmp_path / "state"
+    state.mkdir()
+    record = {"started_at": "2026-11-02T14:00:00Z", "window": "W-1", "window_id": window_id, "state": "legacy",
+              "schema": "none", "image": "x", "authorization": "PO-1"}
+    (state / "maintenance.json").write_text(json.dumps(record))
+    out = cli(tmp_path, *args, "--authorization", "PO-1")
+    expected = "not the open maintenance window" if args[-1] == "W-2" else "has no identity"
+    assert out.returncode == 1 and expected in out.stdout and "nothing changed" in out.stdout, out.stdout
+    assert json.loads((state / "maintenance.json").read_text()) == record
+    assert sorted(p.name for p in state.iterdir() if p.suffix == ".json") == ["maintenance.json"]
+    assert not (tmp_path / "R").exists() and not (tmp_path / "rehearsal").exists()
+
+
+def test_rehearse_needs_an_open_window(tmp_path):
+    out = cli(tmp_path, "rehearse", "m.json", "d.dump", "--window", "W-1", "--authorization", "PO-1")
+    assert out.returncode == 1 and "no maintenance window is open" in out.stdout
+    assert not (tmp_path / "rehearsal").exists()
+
+
+def test_maintenance_start_gives_the_window_an_identity():
+    text = (REPO / "deploy" / "mentorpro_migrate.py").read_text(encoding="utf-8")
+    assert '"window_id": f"{md.stamp(now)}/{secrets.token_hex(8)}"' in text
 
 
 def test_deploy_lock_is_reentrant_in_one_process_only(tmp_path):
@@ -706,6 +770,9 @@ def test_docker_rehearsal_and_migration_window(stack, tmp_path):
         assert record["attempts"]["attempts"] == 3 and record["attempts_created"] == 3
         for key in ("restore", "dry run", "apply", "verify", "start app and tutor", "smoke", "cleanup", "total"):
             assert key in record["durations"], record["durations"]
+        open_window = json.loads((prod.state / "maintenance.json").read_text(encoding="utf-8"))
+        assert (record["window"], record["window_id"]) == ("W-2026-11-02-i5", open_window["window_id"])
+        assert mm.timing_problems(record["durations"]) == []
         if os.environ.get("GITHUB_STEP_SUMMARY"):
             with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
                 summary.write(f"T045 synthetic rehearsal durations (s): {json.dumps(record['durations'])}\n")
@@ -717,7 +784,13 @@ def test_docker_rehearsal_and_migration_window(stack, tmp_path):
         assert code == 1 and "no rehearsal of this release on this dump" in out, out
         good = record_path.read_text(encoding="utf-8")
         for key, value, reason in (("finished_at", md.stamp(md.utc_now() - timedelta(hours=7)), "older than six hours"),
-                                   ("durations", {**record["durations"], "apply": 1800}, "projected downtime")):
+                                   ("durations", {**record["durations"], "apply": 1800}, "projected downtime"),
+                                   ("durations", {k: v for k, v in record["durations"].items() if k != "apply"},
+                                    "incomplete timing evidence"),
+                                   ("durations", {**record["durations"], "smoke": -1}, "incomplete timing evidence"),
+                                   ("window_id", "2026-11-02T00:00:00Z/0000000000000000",
+                                    "another maintenance window"),
+                                   ("window", "W-other", "another maintenance window")):
             record_path.write_text(json.dumps({**record, key: value}), encoding="utf-8")
             code, out = prod.run("migrate", manifest, "--backup", str(dump), *REFS)
             assert code == 1 and reason in out, out
@@ -740,6 +813,13 @@ def test_docker_rehearsal_and_migration_window(stack, tmp_path):
         code, out = prod.run("migrate", manifest, "--backup", str(dump), "--window", "W-other",
                              "--authorization", "PO-T045-test")
         assert code == 1 and "not the open maintenance window" in out, out
+        other_refs = ["--window", "W-other", "--authorization", "PO-T045-test"]
+        code, out = prod.run("maintenance", "end", *other_refs)  # a mismatch never restarts the services
+        assert code == 1 and "not the open maintenance window" in out, out
+        assert prod.inspect("app")[2] == prod.inspect("tutor")[2] == "false"
+        code, out = prod.run("rehearse", manifest, str(dump), *other_refs)
+        assert code == 1 and "not the open maintenance window" in out and rehearsal_resources() == [], out
+        assert record_path.read_text(encoding="utf-8") == good
         code, out = prod.run("migrate", manifest, "--backup", str(dump), "--window", "W-2026-11-02-i5")
         assert code == 1 and "--authorization reference is required" in out, out
         assert prod.schema() == ("legacy", "none")

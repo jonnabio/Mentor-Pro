@@ -192,6 +192,15 @@ found:
   app and tutor, keeps them stopped and requires a separate
   database-recovery decision. There is no automatic restore or rollback,
   and a pre-T036 image never runs on a migrated database.
+- PO review of PR #23 (2026-10-29), corrections: `maintenance start`
+  gives the window an identity (reference, start time, random id);
+  `rehearse`, `migrate` and `maintenance end` refuse a `--window` that
+  does not name the open window before changing anything; the rehearsal
+  record carries the window identity and `migrate` accepts only evidence
+  from the open window. Every remaining step (dry run, apply, verify,
+  start app and tutor, smoke) needs a finite, non-negative measured
+  duration; missing or malformed timing evidence refuses the migration.
+  References stay recorded, not verified.
 - Not authorized: rehearsals on real production data, server changes,
   the production migration, deployment, GHCR publication, merge into
   `main`.

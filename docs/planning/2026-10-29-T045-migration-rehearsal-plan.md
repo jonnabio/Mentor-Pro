@@ -199,3 +199,7 @@ ruleset and the real GHCR release (open release prerequisites).
   the migrated counts and attempts to equal the rehearsal's.
 - The downtime projection uses the rehearsal's measured dry run, apply,
   verification, startup and smoke times, doubled.
+- PR #23 review corrections: the maintenance window has an identity
+  that `rehearse` records and `migrate` and `maintenance end` check; a
+  `rehearse` needs the open window; missing, negative, nonnumeric or
+  non-finite durations refuse the migration.

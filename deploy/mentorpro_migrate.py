@@ -9,7 +9,10 @@ Run through `deploy/mentorpro`.
 
 Standard library only; uses the T044 helper (identity, schema, evidence, lock, RELEASES, deploy).
 
-Rules (PO, 2026-10-29):
+Rules (PO, 2026-10-29; corrections of the PR #23 review):
+- window: `maintenance start` gives the window an identity (reference, start time, random id); `rehearse`,
+  `migrate` and `maintenance end` refuse a --window that does not name the open window before changing anything,
+  and `migrate` accepts only rehearsal evidence recorded in that same window;
 - rehearse: the release migrates and runs on a copy of this dump in a private compose project
   mentorpro-rehearsal-<id>: internal network, own volume, no published ports, generated credentials, never a
   production env file, network, volume or database; smoke tests from a short-lived checker on that network; every
@@ -24,7 +27,8 @@ Rules (PO, 2026-10-29):
   migrated data against the rehearsal and the scope of the change are verified, then the T044 deploy path (health,
   smoke);
 - time: at most 60 minutes of student downtime; the migration does not begin after the 40-minute checkpoint, or
-  when the projection from the rehearsal's measured durations exceeds 60 minutes (abort and reassess);
+  when the projection from the rehearsal's measured durations exceeds 60 minutes (abort and reassess); every
+  remaining step needs a finite, non-negative measured duration, and incomplete timing evidence refuses;
 - recovery: a failure before `apply` leaves the old schema; `maintenance end` restarts the previous release after
   checking it. A failure during or after `apply` stops app and tutor, keeps them stopped and requires a separate
   database-recovery decision; there is no automatic restore or rollback, and a pre-T036 image never runs on a
@@ -38,6 +42,7 @@ import argparse
 import contextlib
 import hashlib
 import json
+import math
 import os
 import re
 import secrets
@@ -218,7 +223,7 @@ def read_json(path: Path) -> dict | None:
         return None
 
 
-def check_rehearsal(record: dict | None, digest: str, dump_sha: str, now: datetime) -> None:
+def check_rehearsal(record: dict | None, digest: str, dump_sha: str, now: datetime, window: dict) -> None:
     if not record:
         raise md.Refused("no rehearsal of this release on this dump; run `mentorpro rehearse <manifest> <dump>`")
     if record.get("result") != "REHEARSAL OK":
@@ -226,6 +231,9 @@ def check_rehearsal(record: dict | None, digest: str, dump_sha: str, now: dateti
                          f"{record.get('reason')})")
     if record.get("digest") != digest or record.get("dump_sha256") != dump_sha:
         raise md.Refused("rehearsal record is for another release digest or another dump")
+    if (record.get("window"), record.get("window_id")) != (window.get("window"), window.get("window_id")):
+        raise md.Refused(f"rehearsal was made in another maintenance window ({record.get('window')} "
+                         f"{record.get('window_id')}); rehearse again in this window")
     if record.get("cleanup") != "verified":
         raise md.Refused("rehearsal cleanup was not verified")
     if record.get("schema_after") != f"current {TARGET}":
@@ -237,14 +245,31 @@ def check_rehearsal(record: dict | None, digest: str, dump_sha: str, now: dateti
     md.fresh_enough(finished, now, "rehearsal")
 
 
-def window_problems(started: datetime, now: datetime, durations: dict) -> list[str]:
+def timing_problems(durations) -> list[str]:
+    """Every remaining step needs a measured, finite, non-negative duration; incomplete evidence never passes."""
+    if not isinstance(durations, dict):
+        return ["rehearsal record has no measured durations"]
+    problems = []
+    for key in REMAINING:
+        value = durations.get(key)
+        if value is None:
+            problems.append(f"rehearsal duration of {key!r} is missing")
+        elif isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            problems.append(f"rehearsal duration of {key!r} is not a valid measurement ({value!r})")
+    return problems
+
+
+def window_problems(started: datetime, now: datetime, durations) -> list[str]:
     """The 40-minute checkpoint and the 60-minute limit, projected from the rehearsal's measured durations."""
     elapsed = now - started
     minutes = round(elapsed.total_seconds() / 60, 1)
     if elapsed > CHECKPOINT:
         return [f"40-minute checkpoint passed ({minutes} min since maintenance start) and the migration has not "
                 "begun: abort and reassess"]
-    remaining = timedelta(seconds=PROJECTION_FACTOR * sum(float(durations.get(k, 0)) for k in REMAINING))
+    problems = timing_problems(durations)
+    if problems:
+        return problems + ["incomplete timing evidence: the 60-minute projection cannot be made; rehearse again"]
+    remaining = timedelta(seconds=PROJECTION_FACTOR * sum(durations[k] for k in REMAINING))
     if elapsed + remaining > DOWNTIME_LIMIT:
         total = round((elapsed + remaining).total_seconds() / 60, 1)
         return [f"projected downtime {total} min ({minutes} elapsed + {PROJECTION_FACTOR} x the rehearsal) exceeds "
@@ -514,6 +539,7 @@ def copy_private(source: Path, target: Path) -> str:
 def rehearse(args, cfg: dict) -> int:
     md.check_references(args.window, args.authorization)
     with md.deploy_lock(cfg):
+        window = open_window(cfg, args.window)
         manifest, _ = md.load_manifest(Path(args.manifest), cfg["repository"])
         digest = manifest["image"]["digest"]
         ref = f"{cfg['repository']}@{digest}"
@@ -546,7 +572,7 @@ def rehearse(args, cfg: dict) -> int:
                         "dump_sha256": dump_sha, "database": cfg["pg_db"],
                         "schema_before": f"{before_state[0]} {before_state[1]}", "migration": migration,
                         "started_at": md.stamp(md.utc_now()), "operator": md.operator(), "window": args.window,
-                        "authorization": args.authorization, "authorization_verified": "no"}
+                        "window_id": window["window_id"], "authorization": args.authorization, "authorization_verified": "no"}
         times: dict = {}
         started, failure = time.monotonic(), None
         print(f"rehearsal {project}: release {manifest['release']} on {dump.name} ({before_state[0]})")
@@ -673,6 +699,17 @@ def read_maintenance(cfg: dict) -> dict:
     return record
 
 
+def open_window(cfg: dict, ref: str) -> dict:
+    """The open maintenance window, only when --window names it; nothing changes on a mismatch."""
+    record = read_maintenance(cfg)
+    if record.get("window") != ref:
+        raise md.Refused(f"--window {ref} is not the open maintenance window ({record.get('window')}); "
+                         "nothing changed")
+    if not record.get("window_id"):
+        raise md.Refused("the open maintenance window has no identity; nothing changed")
+    return record
+
+
 def maintenance(args, cfg: dict) -> int:
     md.check_references(args.window, args.authorization)
     refs = {"window": args.window, "authorization": args.authorization, "authorization_verified": "no"}
@@ -683,7 +720,7 @@ def maintenance(args, cfg: dict) -> int:
             live = md.read_live(cfg)
             md.require_ok_state(live)
             now = md.utc_now()
-            record = {"started_at": md.stamp(now), "image": md.current_image(cfg) or "none", "state": live[0],
+            record = {"started_at": md.stamp(now), "window_id": f"{md.stamp(now)}/{secrets.token_hex(8)}", "image": md.current_image(cfg) or "none", "state": live[0],
                       "schema": live[1], "operator": md.operator(), **refs}
             maintenance_path(cfg).parent.mkdir(parents=True, exist_ok=True)
             maintenance_path(cfg).write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8")
@@ -694,13 +731,14 @@ def maintenance(args, cfg: dict) -> int:
                 print(f"MAINTENANCE START FAILED: {error}; the window stays open, nothing else changed")
                 return 1
             md.record_release(cfg, action="maintenance-start", result="OK", image=record["image"],
+                              window_id=record["window_id"],
                               schema=f"{live[0]}:{live[1]}", **refs)
             print(f"MAINTENANCE STARTED {record['started_at']}: app and tutor stopped, PostgreSQL running; "
                   f"migration must begin by {md.stamp(now + CHECKPOINT)} (40-minute checkpoint), "
                   f"planned end by {md.stamp(now + DOWNTIME_LIMIT)} (60 minutes)")
             return 0
 
-        record = read_maintenance(cfg)
+        record = open_window(cfg, args.window)
         if marker_path(cfg).exists():
             raise md.Refused("a migration was started in this window; the database may be migrated. DATABASE "
                              "RECOVERY DECISION REQUIRED (separate PO authorization); services stay stopped")
@@ -764,9 +802,7 @@ def migrate(args, cfg: dict) -> int:
     md.check_references(args.window, args.authorization)
     refs = {"window": args.window, "authorization": args.authorization, "authorization_verified": "no"}
     with md.deploy_lock(cfg):
-        window = read_maintenance(cfg)
-        if window.get("window") != args.window:
-            raise md.Refused(f"--window {args.window} is not the open maintenance window ({window.get('window')})")
+        window = open_window(cfg, args.window)
         if marker_path(cfg).exists():
             raise md.Refused("a migration was already started in this window; DATABASE RECOVERY DECISION REQUIRED")
         started, now = md.parse_stamp(window["started_at"]), md.utc_now()
@@ -796,7 +832,7 @@ def migrate(args, cfg: dict) -> int:
         if taken < started:
             raise md.Refused("the backup was taken before the maintenance window started (services were running)")
         rehearsal = read_json(rehearsal_path(cfg, digest, backup_sha))
-        check_rehearsal(rehearsal, digest, backup_sha, now)
+        check_rehearsal(rehearsal, digest, backup_sha, now, window)
         before_fp = psql(cfg, cfg["pg_container"], FINGERPRINT_SQL)
         if fingerprint_digest(before_fp) != record.get("fingerprint"):
             raise md.Refused("live data changed since the backup; take a new backup and rehearse again")
