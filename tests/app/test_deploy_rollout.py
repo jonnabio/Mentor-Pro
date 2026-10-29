@@ -286,6 +286,97 @@ def test_backup_record_carries_the_deploy_evidence():
     assert "verified %s\\nresult BACKUP OK" in text
 
 
+# ------------------------------------------------------------------ compose failure (PO correction 1)
+
+FAKE_DOCKER = '''import sys
+if sys.argv[1] == "compose":
+    sys.stderr.write("service app: no such image\\n")
+    sys.exit(17)
+sys.exit(1)  # inspect: no container
+'''
+
+
+def state_cfg(tmp_path, docker=None):
+    return {"repository": REPOSITORY, "release_env": tmp_path / "release.env", "releases": tmp_path / "RELEASES",
+            "state": tmp_path / "state", "compose": tmp_path / "compose.yml", "project": "mentorpro-unit",
+            "docker": docker or ["no-docker-here"], "health_timeout": 1}
+
+
+def test_compose_failure_is_reported_and_recorded(tmp_path, monkeypatch, capsys):
+    fake = tmp_path / "fake_docker.py"
+    fake.write_text(FAKE_DOCKER, encoding="utf-8")
+    cfg = state_cfg(tmp_path, [sys.executable, str(fake)])
+    old, new = f"{REPOSITORY}@{DIGEST}", f"{REPOSITORY}@sha256:" + "b" * 64
+    cfg["release_env"].write_text(f"MENTOR_PRO_IMAGE={old}\n", encoding="utf-8")
+    assert md.compose_up(cfg, False).startswith("compose up exited 17: service app: no such image")
+
+    def never(*a, **k):
+        raise AssertionError("no health wait or smoke after a failed compose")
+
+    monkeypatch.setattr(md, "wait_healthy", never)
+    monkeypatch.setattr(md, "smoke", never)
+    args = type("A", (), {"window": "W-1", "authorization": "PO-1"})
+    assert md.change(cfg, args, "deploy", new, "v2026.11.02-2", CURRENT, "c" * 64) == 1
+    out = capsys.readouterr().out
+    assert "DEPLOY FAILED: compose up exited 17" in out and "PROPOSED MANUAL ROLLBACK (not executed)" in out
+    assert "DEPLOY OK" not in out
+    (line,) = md.releases(cfg)
+    assert line["result"] == "FAILED" and line["image"] == new and line["previous"] == old
+    assert line["error"].startswith("compose up exited 17")
+    assert md.previous_image(cfg) == old  # kept for manual recovery
+
+
+# ------------------------------------------------------------------ rollback provenance (PO correction 3)
+
+def provenance_cfg(tmp_path, results=(), manifest_for=None, legacy_for=None):
+    cfg = state_cfg(tmp_path)
+    lines = [f"mentorpro\ttime=2026-11-02T12:00:00Z\taction=deploy\tresult={result}\timage={image}"
+             for image, result in results]
+    cfg["releases"].write_text("".join(f"{line}\n" for line in lines), encoding="utf-8")
+    if manifest_for:
+        (cfg["state"] / "manifests").mkdir(parents=True)
+        data = manifest(image={"repository": REPOSITORY, "digest": manifest_for, "image_id": None})
+        (cfg["state"] / "manifests" / "v2026.11.02-1.json").write_text(json.dumps(data), encoding="utf-8")
+    if legacy_for:
+        path = md.legacy_path(cfg, legacy_for)
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({"image": f"{REPOSITORY}@{legacy_for}", "verified": "running",
+                                    "schema": ["none", "none"]}), encoding="utf-8")
+    return cfg
+
+
+REF = f"{REPOSITORY}@{DIGEST}"
+
+
+def test_ordinary_rollback_needs_a_stored_manifest(tmp_path):
+    kind, source = md.provenance(provenance_cfg(tmp_path, [(REF, "OK")], manifest_for=DIGEST), REF)
+    assert kind == "manifest" and source["release"] == "v2026.11.02-1"
+
+
+def test_approved_legacy_candidate(tmp_path):
+    kind, source = md.provenance(provenance_cfg(tmp_path, [(REF, "OK")], legacy_for=DIGEST), REF)
+    assert kind == "legacy" and source["schema"] == ["none", "none"]
+
+
+@pytest.mark.parametrize("results, manifest_for, legacy_for, ref, reason", [
+    ([(REF, "OK")], None, None, REF, "no provenance"),  # unknown image, even if it once ran
+    ([], None, None, REF, "never ran successfully"),
+    ([(REF, "FAILED")], DIGEST, None, REF, "never ran successfully"),  # previous config was a failed deploy
+    ([(REF, "REFUSED")], None, DIGEST, REF, "never ran successfully"),
+    ([], None, None, "ghcr.io/someone/else@" + DIGEST, "pinned by digest"),  # arbitrary image
+    ([], None, None, f"{REPOSITORY}:v2026.11.02-1", "pinned by digest"),  # a tag, not a digest
+])
+def test_rollback_without_provenance_is_refused(tmp_path, results, manifest_for, legacy_for, ref, reason):
+    with pytest.raises(md.Refused, match=reason):
+        md.provenance(provenance_cfg(tmp_path, results, manifest_for, legacy_for), ref)
+
+
+def test_adopt_legacy_needs_references(tmp_path):
+    out = cli(tmp_path, "adopt-legacy", "--window", "W-1")
+    assert out.returncode == 1 and "--authorization reference is required" in out.stdout
+    assert not (tmp_path / "state" / "legacy").exists()
+
+
 # ------------------------------------------------------------------ Docker: the whole cycle, isolated
 
 DOCKER_REQUIRED = os.environ.get("MENTORPRO_REQUIRE_DOCKER") == "1"
@@ -410,8 +501,9 @@ def test_docker_deploy_and_rollback_cycle(docker, tmp_path):
            "MENTORPRO_APP_URL": f"http://127.0.0.1:{app_port}", "MENTORPRO_TUTOR_URL": f"http://127.0.0.1:{tutor_port}",
            "MENTORPRO_WIFI_ADDR": "", "MENTORPRO_HEALTH_TIMEOUT": "90"}
 
-    def run(*args):
-        out = subprocess.run([SH, str(SCRIPT), *args], env=env, capture_output=True, text=True, timeout=900)
+    def run(*args, **extra):
+        out = subprocess.run([SH, str(SCRIPT), *args], env={**env, **extra}, capture_output=True, text=True,
+                             timeout=900)
         return out.returncode, out.stdout + out.stderr
 
     def psql(sql):
@@ -422,14 +514,17 @@ def test_docker_deploy_and_rollback_cycle(docker, tmp_path):
     def running(service="app"):
         return sh("docker", "inspect", f"{project}-{service}-1", "--format", "{{.Id}} {{.Config.Image}}").stdout.split()
 
+    def wait_registry():
+        for _ in range(30):
+            if sh("docker", "exec", f"{project}-registry", "wget", "-qO-", "http://127.0.0.1:5000/v2/").returncode == 0:
+                return
+            time.sleep(1)
+
     refs = ["--window", "W-2026-11-02", "--authorization", "PO-T044-test"]
     try:
         assert sh("docker", "run", "-d", "--name", f"{project}-registry", "-p", f"127.0.0.1:{reg_port}:5000",
                   "registry:2").returncode == 0
-        for _ in range(30):
-            if sh("docker", "exec", f"{project}-registry", "wget", "-qO-", "http://127.0.0.1:5000/v2/").returncode == 0:
-                break
-            time.sleep(1)
+        wait_registry()
         legacy = image("legacy")  # pre-T036 stand-in: no labels
         r1 = image("r1", "v2026.11.02-1")
         r2 = image("r2", "v2026.11.02-2")
@@ -443,6 +538,8 @@ def test_docker_deploy_and_rollback_cycle(docker, tmp_path):
                 str(release_env), "up", "-d", "--wait")
         assert up.returncode == 0, up.stderr
         postgres_id = running("postgres")[0]
+        code, out = run("adopt-legacy", *refs)  # once: the pre-script image becomes a known rollback candidate
+        assert code == 0 and "ADOPTED legacy rollback candidate" in out, out
         psql("CREATE SCHEMA writing; CREATE TABLE writing.draft (id int); CREATE TABLE writing.submission "
              "(exercise_id int); CREATE UNIQUE INDEX uq_submission_exercise ON writing.submission (exercise_id);")
 
@@ -505,10 +602,33 @@ def test_docker_deploy_and_rollback_cycle(docker, tmp_path):
             code, out = run("deploy", m2, "--backup", dump, *refs)
             assert code == 1 and reason in out, out
         verify.write_text(good, encoding="utf-8")
+
+        # Registry identity changes between preflight and deploy: the final check under the lock refuses.
+        sh("docker", "tag", f"{repo}:legacy", f"{repo}:v2026.11.02-2")
+        push(f"{repo}:v2026.11.02-2")
+        code, out = run("deploy", m2, "--backup", dump, *refs)
+        assert code == 1 and "retagged" in out and running()[1] == f"{repo}@{r1}", out
+        sh("docker", "tag", f"{repo}@{r2}", f"{repo}:v2026.11.02-2")
+        assert push(f"{repo}:v2026.11.02-2") == r2
+        sh("docker", "stop", f"{project}-registry")
+        code, out = run("deploy", m2, "--backup", dump, *refs)
+        assert code == 1 and "registry not reachable" in out and running()[1] == f"{repo}@{r1}", out
+        sh("docker", "start", f"{project}-registry")
+        wait_registry()
+
         code, out = run("deploy", m2, "--backup", dump, *refs)
         assert code == 0 and "DEPLOY OK" in out and running()[1] == f"{repo}@{r2}", out
 
         code, out = run("rollback", "--to", "v2026.11.02-1", "--backup", dump, *refs)
+        assert code == 0 and "ROLLBACK OK" in out and running()[1] == f"{repo}@{r1}", out
+
+        # Compose failure: FAILED, never OK; previous configuration kept; no automatic rollback.
+        app_id = running()[0]
+        code, out = run("deploy", m2, "--backup", dump, *refs, MENTORPRO_COMPOSE=_posix(tmp_path / "missing.yml"))
+        assert code == 1 and "DEPLOY FAILED: compose up exited" in out and "DEPLOY OK" not in out, out
+        assert running()[0] == app_id and Path(str(release_env) + ".previous").read_text(
+            encoding="utf-8") == f"MENTOR_PRO_IMAGE={repo}@{r1}\n"
+        code, out = run("rollback", "--backup", dump, *refs)
         assert code == 0 and "ROLLBACK OK" in out and running()[1] == f"{repo}@{r1}", out
 
         # Registry identity: retagged version, unknown digest, mismatched and dry-run manifests.
@@ -534,10 +654,13 @@ def test_docker_deploy_and_rollback_cycle(docker, tmp_path):
         assert running()[1] == f"{repo}@{rfail}"  # nothing rolled back by itself
         code, out = run("rollback", "--backup", dump, *refs)
         assert code == 0 and "ROLLBACK OK" in out and running()[1] == f"{repo}@{r1}", out
+        # release.env.previous now names the failed release: never a rollback target.
+        code, out = run("rollback", "--backup", dump, *refs)
+        assert code == 1 and "never ran successfully" in out and running()[1] == f"{repo}@{r1}", out
 
         lines = [line for line in (tmp_path / "RELEASES").read_text(encoding="utf-8").splitlines()]
         results = [re.search(r"result=(\w+)", line).group(1) for line in lines]
-        assert results == ["OK", "UNCHANGED", "REFUSED", "OK", "OK", "FAILED", "OK"], results
+        assert results == ["OK", "OK", "UNCHANGED", "REFUSED", "OK", "OK", "FAILED", "OK", "FAILED", "OK"], results
         assert all("authorization=PO-T044-test" in line and "authorization_verified=no" in line for line in lines)
         assert running("postgres")[0] == postgres_id
     finally:

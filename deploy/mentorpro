@@ -12,6 +12,8 @@
 #   deploy/mentorpro deploy <manifest.json> --backup <dump> --window <ref> --authorization <ref>
 #   deploy/mentorpro rollback [--to <version>] --backup <dump> --window <ref> --authorization <ref>
 #                             app and tutor only, by digest; never PostgreSQL; no automatic rollback
+#   deploy/mentorpro adopt-legacy --window <ref> --authorization <ref>
+#                             once: record the running pre-script image as a rollback candidate
 #
 # status and smoke change nothing and can be rerun at any time; backup only
 # adds a new dump and its record. Output is
@@ -413,6 +415,6 @@ case "${1:-}" in
   verify-backup)
     [ $# -eq 2 ] || { echo "usage: mentorpro verify-backup <dump>" >&2; exit 2; }
     verify_backup "$2" ;;
-  preflight|deploy|rollback) exec "$PYTHON" "$HELPER" "$@" ;;
+  preflight|deploy|rollback|adopt-legacy) exec "$PYTHON" "$HELPER" "$@" ;;
   *) echo "usage: mentorpro status|smoke|backup|verify-backup <dump>|preflight|deploy|rollback" >&2; exit 2 ;;
 esac

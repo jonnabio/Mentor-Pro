@@ -3,6 +3,7 @@
     deploy/mentorpro preflight <manifest.json>
     deploy/mentorpro deploy <manifest.json> --backup <dump> --window <ref> --authorization <ref>
     deploy/mentorpro rollback [--to <version>] --backup <dump> --window <ref> --authorization <ref>
+    deploy/mentorpro adopt-legacy --window <ref> --authorization <ref>   (once: the pre-script image)
 
 Standard library only (the server needs python3, Docker and the compose plugin; no GitHub credential). The
 manifest is the GitHub Release asset, downloaded by the operator and passed as a local file.
@@ -250,6 +251,8 @@ def registry_manifest(repository: str, reference: str) -> bytes:
         challenge = exc.headers.get("WWW-Authenticate", "") if exc.code == 401 else ""
         if not challenge.lower().startswith("bearer "):
             raise Refused(f"registry answered {exc.code} for {repository}:{reference}") from None
+    except (urllib.error.URLError, OSError) as exc:
+        raise Refused(f"registry not reachable for {repository}:{reference}: {exc}") from None
     params = dict(re.findall(r'(\w+)="([^"]*)"', challenge))
     query = "&".join(f"{k}={params[k]}" for k in ("service", "scope") if k in params)
     try:
@@ -483,14 +486,23 @@ def smoke() -> bool:
     return out.returncode == 0
 
 
-def compose_up(cfg: dict, recreate: bool) -> None:
+def one_line(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()[:300]
+
+
+def compose_up(cfg: dict, recreate: bool) -> str:
+    """Empty on success, otherwise a one-line error; a failed compose is never reported as a deployment."""
     env = {k: v for k, v in os.environ.items() if k != "MENTOR_PRO_IMAGE"}  # release.env is the only source
     cmd = [*cfg["docker"], "compose", "-p", cfg["project"], "-f", str(cfg["compose"]), "--env-file",
            str(cfg["release_env"]), "up", "-d", "--no-deps", *(["--force-recreate"] if recreate else []),
            "app", "tutor"]
-    out = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=600)
+    try:
+        out = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=600)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return one_line(f"compose up did not run: {exc}")
     if out.returncode != 0:
-        print(f"compose up failed: {out.stderr.strip()[:500]}")
+        return one_line(f"compose up exited {out.returncode}: {out.stderr.strip() or out.stdout.strip()}")
+    return ""
 
 
 # ---------------------------------------------------------------- commands
@@ -533,15 +545,18 @@ def change(cfg: dict, args, action: str, ref: str, version: str, live: tuple, ba
             return 0
     recreate = current_image(cfg) == ref
     before = current_image(cfg)
+    common["previous"] = before or "none"
     write_release_env(cfg, ref)
-    compose_up(cfg, recreate)
-    healthy = wait_healthy(cfg, ref)
-    if healthy and smoke():
-        record_release(cfg, result="OK", **common)
-        print(f"{action.upper()} OK: {version} running and healthy, smoke passed")
-        return 0
-    record_release(cfg, result="FAILED", **common)
-    print(f"{action.upper()} FAILED: {'smoke test failed' if healthy else 'app or tutor not healthy in time'}")
+    error = compose_up(cfg, recreate)
+    if not error:
+        healthy = wait_healthy(cfg, ref)
+        if healthy and smoke():
+            record_release(cfg, result="OK", **common)
+            print(f"{action.upper()} OK: {version} running and healthy, smoke passed")
+            return 0
+        error = "smoke test failed" if healthy else "app or tutor not healthy in time"
+    record_release(cfg, result="FAILED", error=error, **common)
+    print(f"{action.upper()} FAILED: {error}")
     print("No automatic rollback (PO decision). release.env.previous holds the earlier configuration"
           f" ({before or 'none'}).")
     print("PROPOSED MANUAL ROLLBACK (not executed):")
@@ -563,8 +578,9 @@ def deploy(args, cfg: dict) -> int:
         live = read_live(cfg)  # inside the lock, immediately before any change
         require_ok_state(live)
         check_preflight(record, digest, manifest_sha, live, now)
-        labels = pull_and_inspect(cfg, ref, digest)  # local image, same digest, labels re-read
-        verdict = compatibility(image_range(labels), live[1])
+        # Final identity check under the lock: a preflight record alone never authorizes a deployment when the
+        # registry content, the version tag, the labels or the commit changed since.
+        verdict = compatibility(verify_release_image(cfg, manifest), live[1])
         if verdict != "compatible":
             raise Refused(f"{verdict} on live schema {live[1]}")
         backup_sha = check_backup(Path(args.backup), read_backup_record(Path(args.backup)), cfg["pg_db"], live, now)
@@ -586,6 +602,71 @@ def stored_manifest(cfg: dict, version: str | None = None, digest: str | None = 
     return None
 
 
+def releases(cfg: dict) -> list[dict]:
+    """The RELEASES lines written by this script; hand-written lines are ignored."""
+    try:
+        text = cfg["releases"].read_text(encoding="utf-8")
+    except OSError:
+        return []
+    return [dict(f.split("=", 1) for f in line.split("\t")[1:] if "=" in f)
+            for line in text.splitlines() if line.startswith("mentorpro\t")]
+
+
+def legacy_path(cfg: dict, digest: str) -> Path:
+    return cfg["state"] / "legacy" / (digest.split(":", 1)[1] + ".json")
+
+
+def provenance(cfg: dict, ref: str) -> tuple[str, dict]:
+    """Why a rollback target can be trusted: ('manifest', manifest) for a stored, valid release manifest, or
+    ('legacy', record) for the pre-script image captured by `adopt-legacy`. Either way it must have run
+    successfully here before (an OK or UNCHANGED line in RELEASES). Anything else is refused."""
+    match = re.fullmatch(r"(.+)@(sha256:[0-9a-f]{64})", ref)
+    if not match or match.group(1) != cfg["repository"]:
+        raise Refused(f"rollback target is not a {cfg['repository']} image pinned by digest: {ref}")
+    if not any(r.get("image") == ref and r.get("result") in ("OK", "UNCHANGED") for r in releases(cfg)):
+        raise Refused(f"{ref} never ran successfully under this script (no OK record in RELEASES); "
+                      "choose a known-good release with --to <version>")
+    found = stored_manifest(cfg, digest=match.group(2))
+    if found:
+        return "manifest", found[0]
+    try:
+        record = json.loads(legacy_path(cfg, match.group(2)).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        record = None
+    if record and record.get("image") == ref and record.get("verified") == "running":
+        return "legacy", record
+    raise Refused(f"no provenance for {ref}: neither a stored release manifest nor an adopted legacy record")
+
+
+def adopt_legacy(args, cfg: dict) -> int:
+    """Once, before the first scripted deployment: record the image running now as a rollback candidate.
+
+    release.env must pin it by digest, app and tutor must both run exactly it and be healthy, and the local image
+    must carry that repository digest. Changes no container."""
+    check_references(args.window, args.authorization)
+    with deploy_lock(cfg):
+        ref = current_image(cfg) or ""
+        match = re.fullmatch(r"(.+)@(sha256:[0-9a-f]{64})", ref)
+        if not match or match.group(1) != cfg["repository"]:
+            raise Refused(f"release.env does not pin a {cfg['repository']} image by digest: {ref or 'none'}")
+        if stored_manifest(cfg, digest=match.group(2)):
+            raise Refused("this image is a published release; it needs no legacy adoption")
+        if not running_healthy(cfg, ref):
+            raise Refused("app and tutor are not both running this image and healthy")
+        declared = image_range(pull_and_inspect(cfg, ref, match.group(2)))
+        path = legacy_path(cfg, match.group(2))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"image": ref, "verified": "running", "schema": list(declared),
+                                    "adopted_at": stamp(utc_now()), "operator": operator(),
+                                    "window": args.window, "authorization": args.authorization}, indent=1) + "\n",
+                        encoding="utf-8")
+        record_release(cfg, action="adopt-legacy", result="OK", version="legacy", image=ref,
+                       schema=f"{declared[0]}..{declared[1]}", window=args.window,
+                       authorization=args.authorization, authorization_verified="no")
+        print(f"ADOPTED legacy rollback candidate {ref} (schema {declared[0]}..{declared[1]}); nothing changed")
+        return 0
+
+
 def rollback(args, cfg: dict) -> int:
     check_references(args.window, args.authorization)
     with deploy_lock(cfg):
@@ -598,19 +679,17 @@ def rollback(args, cfg: dict) -> int:
             ref = previous_image(cfg) or ""
             if not ref:
                 raise Refused("no previous configuration (release.env.previous) to roll back to")
-        match = re.fullmatch(r"(.+)@(sha256:[0-9a-f]{64})", ref)
-        if not match:
-            raise Refused(f"rollback target is not pinned by digest: {ref}")
         if ref == current_image(cfg):
             raise Refused("the rollback target is the configuration already in release.env")
-        digest = match.group(2)
-        found = found if args.to else stored_manifest(cfg, digest=digest)
-        if found:
-            declared = verify_release_image(cfg, found[0])
-            version = found[0]["release"]
-        else:  # e.g. the image running before scripted deployments: digest and labels only
-            declared = image_range(pull_and_inspect(cfg, ref, digest))
-            version = "unversioned"
+        kind, source = provenance(cfg, ref)
+        if kind == "manifest":
+            declared = verify_release_image(cfg, source)
+            version = source["release"]
+        else:
+            declared = image_range(pull_and_inspect(cfg, ref, ref.rsplit("@", 1)[1]))
+            if list(declared) != source.get("schema"):
+                raise Refused("legacy image labels differ from what was adopted")
+            version = "legacy"
         live = read_live(cfg)
         require_ok_state(live)
         verdict = compatibility(declared, live[1])
@@ -641,6 +720,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--to")
     for name in ("--backup", "--window", "--authorization"):
         p.add_argument(name)
+    p = sub.add_parser("adopt-legacy")
+    for name in ("--window", "--authorization"):
+        p.add_argument(name)
     sub.add_parser("schema-sql")
     sub.add_parser("classify")
     args = parser.parse_args(argv)
@@ -655,7 +737,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command in ("deploy", "rollback") and not args.backup:
             raise Refused("--backup <restore-verified dump> is required")
-        return {"preflight": preflight, "deploy": deploy, "rollback": rollback}[args.command](args, cfg)
+        return {"preflight": preflight, "deploy": deploy, "rollback": rollback,
+                "adopt-legacy": adopt_legacy}[args.command](args, cfg)
     except Refused as exc:
         print(f"{args.command.upper()} REFUSED: {exc}")
         return 1
