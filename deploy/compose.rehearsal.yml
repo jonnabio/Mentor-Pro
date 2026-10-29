@@ -1,0 +1,79 @@
+# Mentor Pro migration rehearsal (ADR-033 increment I5, T045).
+#
+# Started only by `deploy/mentorpro rehearse`, as compose project
+# mentorpro-rehearsal-<id>. Isolation (PO 2026-10-29):
+#   - no published ports on any service; smoke tests run from a short-lived
+#     checker container on the internal network;
+#   - one network with `internal: true` (no route to the host, the
+#     production network or the internet) and one private volume;
+#   - generated env files in the rehearsal directory (random database
+#     password and tutor token); never /etc/mentor-pro/*.env.
+# The script checks the resolved configuration and the running containers
+# against these rules before and after start, and removes every container,
+# volume and network of the project afterwards (never `down -v`).
+#
+#   MENTOR_PRO_IMAGE  the release image, by digest
+#   REHEARSAL_DIR     /var/lib/mentor-pro/rehearsal/<project> (root, 0700)
+
+services:
+  postgres:
+    image: postgres:17.6
+    restart: "no"
+    env_file:
+      - ${REHEARSAL_DIR:?set by mentorpro rehearse}/postgres.env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - rehearsal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  app:
+    image: ${MENTOR_PRO_IMAGE:?set by mentorpro rehearse}
+    restart: "no"
+    env_file:
+      - ${REHEARSAL_DIR:?set by mentorpro rehearse}/app.env
+    environment:
+      CURRICULUM_BASELINE: PNE2026-SUM-v1.0
+      MENTOR_PRO_DEV_ENDPOINTS: "false"
+    networks:
+      - rehearsal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/', timeout=3)"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  tutor:
+    image: ${MENTOR_PRO_IMAGE:?set by mentorpro rehearse}
+    command: ["python", "-m", "app.tutor_main"]
+    restart: "no"
+    env_file:
+      - ${REHEARSAL_DIR:?set by mentorpro rehearse}/app.env
+      - ${REHEARSAL_DIR:?set by mentorpro rehearse}/tutor.env
+    environment:
+      MENTOR_PRO_DEV_ENDPOINTS: "false"
+    networks:
+      - rehearsal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # As in production: a healthy tutor service refuses /tutor to a client that is not an allowed host.
+      test: ["CMD", "python", "-c", "import sys, urllib.request as u, urllib.error as e\ntry: u.urlopen('http://127.0.0.1:8000/tutor', timeout=3)\nexcept e.HTTPError as x: sys.exit(0 if x.code == 403 else 1)\nexcept Exception: sys.exit(1)\nsys.exit(1)"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+networks:
+  rehearsal:
+    internal: true
+
+volumes:
+  pgdata:

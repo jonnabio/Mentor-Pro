@@ -14,6 +14,13 @@
 #                             app and tutor only, by digest; never PostgreSQL; no automatic rollback
 #   deploy/mentorpro adopt-legacy --window <ref> --authorization <ref>
 #                             once: record the running pre-script image as a rollback candidate
+# I5 (deploy/mentorpro_migrate.py), all in one maintenance window:
+#   deploy/mentorpro maintenance start --window <ref> --authorization <ref>   stop app and tutor
+#   deploy/mentorpro rehearse <manifest.json> <dump> --window <ref> --authorization <ref>
+#                             migrate and run a copy of the dump in an isolated project; REHEARSAL OK
+#   deploy/mentorpro migrate <manifest.json> --backup <dump> --window <ref> --authorization <ref>
+#                             gate G2: explicit migration, then deploy; no automatic restore or rollback
+#   deploy/mentorpro maintenance end --window <ref> --authorization <ref>     only while the schema is unchanged
 #
 # status and smoke change nothing and can be rerun at any time; backup only
 # adds a new dump and its record. Output is
@@ -30,6 +37,7 @@
 #   MENTORPRO_DOCKER       docker
 #   MENTORPRO_PYTHON       python3
 #   MENTORPRO_STATE        /opt/mentor-pro/state  (preflight records, manifests, lock, history)
+#   MENTORPRO_REHEARSAL_DIR  /var/lib/mentor-pro/rehearsal  (root, 0700; emptied after each rehearsal)
 set -u
 
 APP_URL=${MENTORPRO_APP_URL:-http://127.0.0.1:8080}
@@ -416,5 +424,6 @@ case "${1:-}" in
     [ $# -eq 2 ] || { echo "usage: mentorpro verify-backup <dump>" >&2; exit 2; }
     verify_backup "$2" ;;
   preflight|deploy|rollback|adopt-legacy) exec "$PYTHON" "$HELPER" "$@" ;;
-  *) echo "usage: mentorpro status|smoke|backup|verify-backup <dump>|preflight|deploy|rollback" >&2; exit 2 ;;
+  rehearse|maintenance|migrate) exec "$PYTHON" "$(dirname "$0")/mentorpro_migrate.py" "$@" ;;
+  *) echo "usage: mentorpro status|smoke|backup|verify-backup <dump>|preflight|deploy|rollback|maintenance|rehearse|migrate" >&2; exit 2 ;;
 esac
