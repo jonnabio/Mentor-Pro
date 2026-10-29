@@ -2,8 +2,9 @@
 
 - **Date:** 2026-10-28
 - **Role:** Architect
-- **Status:** PROPOSED for PO review. Not authorized for implementation.
-  No server, production, GHCR or `main` change is part of this plan.
+- **Status:** APPROVED (PO, 2026-10-28) with the decisions below;
+  implemented on `feature/T044-deploy-rollback` (PR #21 to `dev`, merge
+  needs PO approval). No server, production, GHCR or `main` change.
 - **Decision record:** [ADR-033](../adr/ADR-033-repeatable-deployment-workflow.md)
   decisions 2, 4, 6 and 7; refinements R1, R2, R3 and R7
 - **Builds on:** T041 (`status`, `smoke`, `deploy/compose.yml`), T042
@@ -151,7 +152,20 @@ T039, automated retention.
   before the first release.
 - Partial-release recovery outside automated tests (T043).
 
-## PO decisions requested
+## PO decisions (2026-10-28)
+
+1. Manifest supplied by the operator as a local file; the server needs
+   no GitHub credential. APPROVED.
+2. Preflight and verified-backup evidence expire after six hours.
+   APPROVED.
+3. Manual rollback only; no automatic rollback. APPROVED.
+4. Every deploy and rollback needs a release-window reference **and** a
+   PO authorization reference (stronger than proposed). REQUIRED. They
+   are recorded, not verified.
+5. Implementation on a feature branch, PR to `dev`. APPROVED; merge
+   needs separate approval.
+
+## Decisions as proposed
 
 1. **Manifest source on the server:** the operator downloads the
    release manifest and passes the file (proposed; the server needs no

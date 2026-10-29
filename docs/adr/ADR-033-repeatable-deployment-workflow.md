@@ -124,6 +124,36 @@ found:
   below a threshold; nothing is deleted automatically. A manual
   retention review is scheduled after the first migration release.
 
+## I4 decisions (PO, 2026-10-28; task T044)
+
+- The operator supplies the GitHub Release manifest as a local file; the
+  server holds no GitHub credential. The registry is read anonymously.
+- Preflight and restore-verified backup evidence expire after six hours
+  and are bound to the deployment: preflight to the digest, the manifest
+  file and the live schema state; the backup to the database, its
+  archive checksum and the live schema state.
+- `deploy` and `rollback` require a release-window reference and a PO
+  authorization reference. The script records them as given
+  (`authorization_verified=no`); it cannot prove an approval.
+- No automatic rollback: a failed health check or smoke test is reported
+  with a proposed `rollback` command, never executed by the script.
+- Images are chosen by digest only. Preflight checks the registry
+  content hash, the version-tag mapping, commit and OCI labels; images
+  without schema labels count as `none..none`. Compatibility is rechecked
+  inside the deploy lock just before containers change. Drifted, corrupt
+  and unreadable schema states refuse every command.
+- Implementation: `deploy/mentorpro preflight|deploy|rollback` through
+  `deploy/mentorpro_deploy.py` (python3 standard library). It changes
+  only `release.env` (previous kept) and the `app` and `tutor`
+  containers; never PostgreSQL, its volume, network or migrations.
+- PO corrections (2026-10-29): a failed `docker compose` is recorded as
+  `FAILED` (target, previous configuration, error), never as success;
+  `deploy` re-verifies registry content, tag mapping, labels, commit and
+  schema range under the lock, so a preflight record alone never
+  authorizes a deployment; a rollback target needs provenance, either a
+  stored release manifest or the pre-script image captured once by
+  `adopt-legacy`, and an earlier successful run recorded in `RELEASES`.
+
 ## Not decided here
 
 The storage warning threshold and the date of the retention review.

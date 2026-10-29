@@ -1,11 +1,19 @@
 #!/bin/sh
-# Mentor Pro deployment commands (ADR-033). I1: status, smoke (read-only); I2: backup.
+# Mentor Pro deployment commands (ADR-033). I1: status, smoke (read-only); I2: backup;
+# I4: preflight, deploy, rollback (deploy/mentorpro_deploy.py, python3 standard library).
 #
 #   deploy/mentorpro status   what is running: images, health, schema, releases, backups;
 #                             exit 0 HEALTHY, 1 UNHEALTHY, 3 INCOMPLETE (something unknown)
 #   deploy/mentorpro smoke    HTTP checks of the student and tutor services; exit 1 on any FAIL
 #   deploy/mentorpro backup   new dump, restored and compared in a disposable PostgreSQL; BACKUP OK
 #   deploy/mentorpro verify-backup <dump>   re-check an earlier dump against its record
+#   deploy/mentorpro preflight <manifest.json>   check a published release against the registry
+#                             and the live schema; writes a preflight record valid six hours
+#   deploy/mentorpro deploy <manifest.json> --backup <dump> --window <ref> --authorization <ref>
+#   deploy/mentorpro rollback [--to <version>] --backup <dump> --window <ref> --authorization <ref>
+#                             app and tutor only, by digest; never PostgreSQL; no automatic rollback
+#   deploy/mentorpro adopt-legacy --window <ref> --authorization <ref>
+#                             once: record the running pre-script image as a rollback candidate
 #
 # status and smoke change nothing and can be rerun at any time; backup only
 # adds a new dump and its record. Output is
@@ -20,6 +28,8 @@
 #   MENTORPRO_RELEASES     /opt/mentor-pro/RELEASES
 #   MENTORPRO_BACKUPS      /var/backups/mentor-pro
 #   MENTORPRO_DOCKER       docker
+#   MENTORPRO_PYTHON       python3
+#   MENTORPRO_STATE        /opt/mentor-pro/state  (preflight records, manifests, lock, history)
 set -u
 
 APP_URL=${MENTORPRO_APP_URL:-http://127.0.0.1:8080}
@@ -29,6 +39,8 @@ RELEASE_ENV=${MENTORPRO_RELEASE_ENV:-/opt/mentor-pro/release.env}
 RELEASES=${MENTORPRO_RELEASES:-/opt/mentor-pro/RELEASES}
 BACKUPS=${MENTORPRO_BACKUPS:-/var/backups/mentor-pro}
 DOCKER=${MENTORPRO_DOCKER:-docker}
+PYTHON=${MENTORPRO_PYTHON:-python3}
+HELPER="$(dirname "$0")/mentorpro_deploy.py"
 
 # HTTP status code of a GET, or 000 when nothing answers.
 code() {
@@ -336,6 +348,10 @@ backup() {
   # noclobber: an existing dump is never overwritten.
   if ! (set -C; : >"$dump") 2>/dev/null; then echo "BACKUP FAILED: $dump already exists"; return 1; fi
   printf 'dump %s\ncreated %s\noperator %s\nschemas %s\n' "$(basename "$dump")" "$(now)" "$(id -un)" "$SCHEMAS" >"$record"
+  # Evidence for deploy (I4): which database, and its writing-schema state (read-only query).
+  if [ "$PROVIDER" = local ]; then db_name=$(basename "${LIVE_URL%%\?*}"); else db_name=$PG_DB; fi
+  schema_state=$("$PYTHON" "$HELPER" schema-sql | live_psql 2>/dev/null | "$PYTHON" "$HELPER" classify 2>/dev/null)
+  printf 'database %s\nschema_state %s\n' "$db_name" "${schema_state:-unreadable -}" >>"$record"
 
   if ! scope=$(check_scope live_psql); then reason=$scope
   elif ! before=$(fingerprint live_psql); then reason="live database not readable"
@@ -363,7 +379,7 @@ backup() {
     echo "BACKUP FAILED: $reason ($dump)"
     return 1
   fi
-  printf 'restore pass\nresult BACKUP OK\n' >>"$record"
+  printf 'restore pass\nverified %s\nresult BACKUP OK\n' "$(now)" >>"$record"
   echo "dump: $(tables "$before") tables, $(rows "$before") rows, $(wc -c <"$dump" | tr -d ' ') bytes"
   echo "BACKUP OK $dump sha256:$(sha256sum "$dump" | cut -d' ' -f1)"
 }
@@ -399,5 +415,6 @@ case "${1:-}" in
   verify-backup)
     [ $# -eq 2 ] || { echo "usage: mentorpro verify-backup <dump>" >&2; exit 2; }
     verify_backup "$2" ;;
-  *) echo "usage: mentorpro status|smoke|backup|verify-backup <dump>" >&2; exit 2 ;;
+  preflight|deploy|rollback|adopt-legacy) exec "$PYTHON" "$HELPER" "$@" ;;
+  *) echo "usage: mentorpro status|smoke|backup|verify-backup <dump>|preflight|deploy|rollback" >&2; exit 2 ;;
 esac
