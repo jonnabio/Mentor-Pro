@@ -618,8 +618,8 @@ class Production:
         return [(line["action"], line["result"]) for line in md.releases({"releases": self.tmp / "RELEASES"})]
 
     def remove(self):
-        for kind, ls, rm in ((("ps", "-aq"), ("rm", "-f", "-v")), (("volume", "ls", "-q"), ("volume", "rm")),
-                             (("network", "ls", "-q"), ("network", "rm"))):
+        for ls, rm in ((("ps", "-aq"), ("rm", "-f", "-v")), (("volume", "ls", "-q"), ("volume", "rm")),
+                       (("network", "ls", "-q"), ("network", "rm"))):
             ids = sh("docker", *ls, "--filter", f"label=com.docker.compose.project={self.project}").stdout.split()
             if ids:
                 sh("docker", *rm, *ids)

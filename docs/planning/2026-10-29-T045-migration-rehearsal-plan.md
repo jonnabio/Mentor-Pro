@@ -2,8 +2,10 @@
 
 - **Date:** 2026-10-29
 - **Role:** Architect
-- **Status:** PROPOSED for PO review. Not authorized for implementation
-  or for any run on the server or against production data.
+- **Status:** APPROVED by the PO (2026-10-29) with decisions and
+  safeguards recorded in ADR-033 "I5 decisions"; implemented in T045
+  (synthetic data only). Not authorized: any run on the server, real
+  production data, the production migration or deployment.
 - **Decision record:** [ADR-033](../adr/ADR-033-repeatable-deployment-workflow.md)
   decision 6 (G2), PO decision 4 (rehearsal on a production dump copy,
   in principle), refinements R4 to R7; ADR-032 (migration `0001`);
@@ -166,3 +168,34 @@ ruleset and the real GHCR release (open release prerequisites).
 5. Approve I5 as task T045 on a feature branch, PR to `dev`, synthetic
    data only; the first rehearsal on a real production dump is a
    separate authorization.
+
+## PO decisions (2026-10-29)
+
+1. No published ports; smoke tests inside the isolated network: APPROVED.
+2. Final rehearsal in the same window, on the exact backup intended for
+   the migration: APPROVED.
+3. Stop both student and tutor services before the final backup:
+   REQUIRED. Planned student downtime at most 60 minutes, including
+   backup, rehearsal, migration, startup and smoke tests; checkpoint at
+   40 minutes if the migration has not begun; abort and reassess when the
+   window cannot be met.
+4. Rehearsal files under `/var/lib/mentor-pro/rehearsal`, root-owned,
+   restricted, verified cleanup: APPROVED.
+5. I5 as T045 on a feature branch, PR into `dev`, synthetic data only:
+   APPROVED. Rehearsals on real production data, server changes, the
+   production migration, deployment, GHCR publication and merge into
+   `main` remain NOT AUTHORIZED.
+
+## Changes from the design during implementation
+
+- `rehearse` also requires window and PO authorization references
+  (recorded like the others).
+- `rehearse` does not run `verify-backup` again: it checks the backup
+  record (BACKUP OK, database, schema state, six hours, archive
+  checksum), then the restore into the rehearsal must reproduce the
+  record's data fingerprint, which is the same proof.
+- `migrate` additionally requires the backup to be taken after the
+  window started, the live writing counts to equal the rehearsal's, and
+  the migrated counts and attempts to equal the rehearsal's.
+- The downtime projection uses the rehearsal's measured dry run, apply,
+  verification, startup and smoke times, doubled.
