@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-28 (T044 = I4 implemented; PR #21 to `dev`
-  for review)
+- **Last Updated:** 2026-10-29 (T044 = I4 merged into `dev` as
+  `8b3fc44`; I5 design T045 proposed)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -80,8 +80,9 @@ passed; PR CI 40792928230 green (first `pull_request` run into `dev`).
 authorized release. [T043 plan](../planning/2026-10-28-T043-release-metadata-plan.md),
 [T043 result](../progress/task_T043_result.md).
 
-**T044 — ADR-033 I4: implemented, PR #21 to `dev` awaiting PO
-approval.** PR #20 merged as `0bcf64d`. `deploy/mentorpro
+**T044 — ADR-033 I4: merged and verified on `dev`.** PR #21 merged as
+`8b3fc44`; `dev` CI 40892027308 green (646 passed, Docker deploy and
+rollback cycle ran; publish and release skipped). PR #20 merged as `0bcf64d`. `deploy/mentorpro
 preflight|deploy|rollback` by digest: manifest file validated (dry-run
 refused), registry digest and tag mapping, labels, read-only live schema
 (fresh/legacy/current/drifted/corrupt/unreadable), six-hour preflight and
@@ -445,8 +446,10 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **PO review of PR #21 (T044, I4).** Owner to create the `v*` tag
-   ruleset, then verify it; validate the real GHCR digest on the first
+0. **PO review of the I5 design (T045,
+   [plan](../planning/2026-10-29-T045-migration-rehearsal-plan.md)); 5
+   decisions requested; not authorized to implement.** Owner to create
+   the `v*` tag ruleset, then verify it; validate the real GHCR digest on the first
    authorized release. I5 needs its own approval; I6 onward change
    production. T039 (progress counting) before any T037+T038 release;
    both released together.

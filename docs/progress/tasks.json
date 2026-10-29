@@ -1351,7 +1351,7 @@
       "id": "T044",
       "name": "Preflight, compatibility, deploy and rollback (ADR-033 I4)",
       "objective": "deploy/mentorpro preflight, deploy and rollback by digest with the schema compatibility rule checked before any container change, safe refusal of incompatible rollbacks, append-only RELEASES; tested in an isolated project with a local registry and synthetic data.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1376,7 +1376,29 @@
       "attempts": 2,
       "result_file": "docs/progress/task_T044_result.md",
       "failures": [],
-      "notes": "Plan proposed 2026-10-28 for PO review; implementation NOT authorized. PO approved 2026-10-28 (manifest as local file, 6 h evidence, manual rollback only, window + PO authorization references required). PR #20 merged as 0bcf64d. Implemented; PR #21 to dev; PR CI 40811750620 green (636 passed, Docker cycle test ran). Not merged without PO approval; nothing run on the server. PO review 2026-10-29: conditional approval; corrections applied in 70fa714 (compose failure FAILED with previous and error; final registry/tag/label identity check under the lock; rollback provenance via stored manifest or adopt-legacy plus prior OK record). ACE gate 754 passed; PR CI 40890220768 green (646 passed, Docker cycle ran)."
+      "notes": "Plan proposed 2026-10-28 for PO review; implementation NOT authorized. PO approved 2026-10-28 (manifest as local file, 6 h evidence, manual rollback only, window + PO authorization references required). PR #20 merged as 0bcf64d. Implemented; PR #21 to dev; PR CI 40811750620 green (636 passed, Docker cycle test ran). Not merged without PO approval; nothing run on the server. PO review 2026-10-29: conditional approval; corrections applied in 70fa714 (compose failure FAILED with previous and error; final registry/tag/label identity check under the lock; rollback provenance via stored manifest or adopt-legacy plus prior OK record). ACE gate 754 passed; PR CI 40890220768 green (646 passed, Docker cycle ran). PR #21 (head 19275cc, T044 scope only) merged as 8b3fc44; dev CI 40892027308 green: 646 passed, 111 skipped (Docker mandatory; deploy/rollback cycle ran), LABELS OK, both smoke tests, MANIFEST OK dev-8b3fc44; GHCR login, refuse-taken, publish and Tag and Release skipped; no v* tag or release."
+    },
+    {
+      "id": "T045",
+      "name": "Isolated migration rehearsal and gated migration (ADR-033 I5)",
+      "objective": "mentorpro rehearse (restore a dump copy into an isolated, unpublished compose project, migrate with the target image, smoke, verified cleanup, REHEARSAL OK) and maintenance start/end plus migrate (G2) bound to the same digest and dump, PO references recorded. Synthetic data only.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/planning/2026-10-29-T045-migration-rehearsal-plan.md"
+        ],
+        "modify": []
+      },
+      "depends_on": [
+        "T044"
+      ],
+      "complexity": "L",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T045_result.md",
+      "failures": [],
+      "notes": "Plan proposed 2026-10-29 for PO review; implementation, server runs and real production dumps NOT authorized."
     }
   ]
 }
