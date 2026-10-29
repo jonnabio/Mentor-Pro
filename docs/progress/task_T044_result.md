@@ -3,9 +3,9 @@
 - **Date:** 2026-10-28
 - **Role:** Developer
 - **Branch:** `feature/T044-deploy-rollback` (from `dev` at `0bcf64d`)
-- **Status:** PO corrections applied and verified; PR #21 to `dev`
-  (merge authorized once corrections pass). Nothing run on the server
-  or production; nothing published.
+- **Status:** done; merged into `dev` as `8b3fc44` (PR #21) after the PO
+  corrections; `dev` CI green. Nothing run on the server or production;
+  nothing published.
 
 ## Thought
 
@@ -113,6 +113,21 @@ Conditional approval; three corrections before merge.
 | `bash .ace/scripts/verify.sh` | `VERIFY_RESULT=pass gate=all`, 754 passed, 3 skipped (Docker), 205 s (log `.ace/logs/verify/20261029-081844-49`) |
 | PR CI [40890220768](https://github.com/jonnabio/Mentor-Pro/actions/runs/40890220768) (head `70fa714`) | success: 646 passed, 111 skipped, Docker mandatory (+10 unit tests; skips unchanged, so the Docker cycle ran and passed); `LABELS OK`; both smoke tests; `MANIFEST OK`; publish and release skipped |
 
+## Integration
+
+PO merge authorization (2026-10-29) conditional on the corrections; all
+passed. PR head `19275cc`, changed files limited to T044 (11 files).
+PR #21 merged as `8b3fc44`.
+
+| Check | Result |
+| --- | --- |
+| `dev` push CI [40892027308](https://github.com/jonnabio/Mentor-Pro/actions/runs/40892027308) | success |
+| Tests | 646 passed, 111 skipped, Docker mandatory (deploy and rollback cycle ran) |
+| Image | `LABELS OK`; `GET /` 200; tutor entrypoint smoke passed |
+| Manifest | `MANIFEST OK` (`dev-8b3fc44`), dry run |
+| Skipped | GHCR login, refuse-taken-version, publish, `Tag and Release` |
+| Remote state | no `v20*` tag; no GitHub Release |
+
 ## Not verified
 
 - Nothing ran on the server; python3, the compose plugin and anonymous
@@ -123,5 +138,6 @@ Conditional approval; three corrections before merge.
 
 ## Next
 
-PO review of PR #21. I5 (rehearsal, migration) needs its own approval;
+I5 design proposed as T045 for PO review; implementation needs its own
+approval;
 T039 remains a release prerequisite; T032/T033 acceptance pending.
