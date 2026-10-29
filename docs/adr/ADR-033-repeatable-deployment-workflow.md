@@ -154,6 +154,57 @@ found:
   stored release manifest or the pre-script image captured once by
   `adopt-legacy`, and an earlier successful run recorded in `RELEASES`.
 
+## I5 decisions (PO, 2026-10-29; task T045)
+
+- Rehearsal with no published ports, in a private compose project
+  `mentorpro-rehearsal-<id>` (`deploy/compose.rehearsal.yml`): internal
+  network, own volume, generated credentials, no production env file,
+  network, volume or database. Smoke tests run from a short-lived checker
+  container inside that network, which also confirms the production
+  database and outside addresses are unreachable.
+- The final rehearsal runs in the same maintenance window, on the exact
+  backup used for the migration. App and tutor stop before that backup;
+  PostgreSQL keeps running.
+- Rehearsal files only under `/var/lib/mentor-pro/rehearsal` (owned by
+  the operator account, mode 0700, dump copy 0600). Every container,
+  volume, network and the copy are removed and the removal verified, on
+  success and failure. Backups are never deleted. Free space for the
+  copy, the restore estimate, the migration and the Docker volumes is
+  checked per filesystem first; insufficient space refuses.
+- Planned student downtime at most 60 minutes. The migration does not
+  begin after the 40-minute checkpoint, or when the elapsed time plus
+  twice the rehearsal's measured remaining steps exceeds 60 minutes.
+- `migrate` (gate G2) runs under the T044 lock (re-entrant in one process,
+  so the deploy path runs inside it). It needs the open window with the
+  same reference, no running app or tutor and no other database session,
+  `BACKUP OK` taken after the window started, `REHEARSAL OK` for the same
+  release digest and dump checksum (both at most six hours old), the live
+  schema `legacy` with data unchanged since that dump, the full image
+  identity check, and window and PO authorization references (recorded,
+  not verified). Only the explicit `python -m app.writing.migrate apply`
+  changes the schema, after a dry run; it then verifies the transition,
+  the writing records and their relationships, the attempt-1 backfill,
+  and that nothing outside the migration changed, against the rehearsal,
+  before the T044 deploy path.
+- Recovery: a failure before `apply` leaves the old schema; `maintenance
+  end` restarts the previous release once it confirms the schema and
+  `release.env` are unchanged. A failure during or after `apply` stops
+  app and tutor, keeps them stopped and requires a separate
+  database-recovery decision. There is no automatic restore or rollback,
+  and a pre-T036 image never runs on a migrated database.
+- PO review of PR #23 (2026-10-29), corrections: `maintenance start`
+  gives the window an identity (reference, start time, random id);
+  `rehearse`, `migrate` and `maintenance end` refuse a `--window` that
+  does not name the open window before changing anything; the rehearsal
+  record carries the window identity and `migrate` accepts only evidence
+  from the open window. Every remaining step (dry run, apply, verify,
+  start app and tutor, smoke) needs a finite, non-negative measured
+  duration; missing or malformed timing evidence refuses the migration.
+  References stay recorded, not verified.
+- Not authorized: rehearsals on real production data, server changes,
+  the production migration, deployment, GHCR publication, merge into
+  `main`.
+
 ## Not decided here
 
 The storage warning threshold and the date of the retention review.

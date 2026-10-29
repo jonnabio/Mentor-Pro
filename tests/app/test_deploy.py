@@ -213,5 +213,5 @@ def test_status_separates_healthy_unhealthy_and_unknown(services, tmp_path, tuto
 def test_unknown_command_is_refused():
     if not SH:
         pytest.skip("sh is needed")
-    result = subprocess.run([SH, str(SCRIPT), "migrate"], capture_output=True, text=True)  # I5, not yet a command
+    result = subprocess.run([SH, str(SCRIPT), "restore"], capture_output=True, text=True)  # G3: never a script command
     assert result.returncode == 2 and "usage: mentorpro status|smoke" in result.stderr

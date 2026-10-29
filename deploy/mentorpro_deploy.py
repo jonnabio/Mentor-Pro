@@ -340,7 +340,7 @@ def read_backup_record(dump: Path) -> dict:
         key, _, value = line.partition(" ")
         if key == "reverified":
             fields["reverified"].append(value)
-        elif key in ("database", "sha256", "schema_state", "verified", "result"):
+        elif key in ("database", "sha256", "schema_state", "verified", "result", "created", "fingerprint"):
             fields[key] = value  # the last one counts
     return fields
 
@@ -386,8 +386,18 @@ def check_references(window: str | None, authorization: str | None) -> None:
 
 # ---------------------------------------------------------------- state, lock and records
 
+_LOCK_DEPTH = [0]  # re-entrant within one process: `migrate` (I5) runs the deploy path under its own lock
+
+
 @contextlib.contextmanager
 def deploy_lock(cfg: dict):
+    if _LOCK_DEPTH[0]:
+        _LOCK_DEPTH[0] += 1
+        try:
+            yield
+        finally:
+            _LOCK_DEPTH[0] -= 1
+        return
     cfg["state"].mkdir(parents=True, exist_ok=True)
     handle = open(cfg["state"] / "deploy.lock", "a+")
     try:
@@ -401,9 +411,11 @@ def deploy_lock(cfg: dict):
     except OSError:
         handle.close()
         raise Refused("another deploy or rollback holds the lock; nothing changed") from None
+    _LOCK_DEPTH[0] = 1
     try:
         yield
     finally:
+        _LOCK_DEPTH[0] = 0
         handle.close()
 
 
@@ -523,17 +535,24 @@ def preflight(args, cfg: dict) -> int:
     if verdict == "incompatible":
         print("REFUSED: the image cannot run on the live schema")
         return 1
-    path = preflight_path(cfg, digest)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"digest": digest, "release": manifest["release"], "commit": manifest["commit"],
-                                "manifest_sha256": manifest_sha, "state": live[0], "schema": live[1],
-                                "checked_at": stamp(utc_now()), "result": "DEPLOY COMPATIBLE"}, indent=1) + "\n",
-                    encoding="utf-8")
+    path = write_preflight(cfg, manifest, manifest_sha, live)
     print(f"PREFLIGHT OK: DEPLOY COMPATIBLE (record {path}, valid six hours)")
     return 0
 
 
-def change(cfg: dict, args, action: str, ref: str, version: str, live: tuple, backup_sha: str) -> int:
+def write_preflight(cfg: dict, manifest: dict, manifest_sha: str, live: tuple) -> Path:
+    """Only after the identity and compatibility checks passed."""
+    path = preflight_path(cfg, manifest["image"]["digest"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"digest": manifest["image"]["digest"], "release": manifest["release"],
+                                "commit": manifest["commit"], "manifest_sha256": manifest_sha, "state": live[0],
+                                "schema": live[1], "checked_at": stamp(utc_now()), "result": "DEPLOY COMPATIBLE"},
+                               indent=1) + "\n", encoding="utf-8")
+    return path
+
+
+def change(cfg: dict, args, action: str, ref: str, version: str, live: tuple, backup_sha: str,
+           propose_rollback: bool = True) -> int:
     """The only code that changes containers: release.env, then app and tutor. Never PostgreSQL."""
     common = {"action": action, "version": version, "image": ref, "schema": f"{live[0]}:{live[1]}",
               "backup_sha256": backup_sha, "window": args.window, "authorization": args.authorization,
@@ -559,35 +578,43 @@ def change(cfg: dict, args, action: str, ref: str, version: str, live: tuple, ba
     print(f"{action.upper()} FAILED: {error}")
     print("No automatic rollback (PO decision). release.env.previous holds the earlier configuration"
           f" ({before or 'none'}).")
-    print("PROPOSED MANUAL ROLLBACK (not executed):")
-    print("  deploy/mentorpro rollback --backup <verified dump> --window <ref> --authorization <ref>")
+    if propose_rollback:
+        print("PROPOSED MANUAL ROLLBACK (not executed):")
+        print("  deploy/mentorpro rollback --backup <verified dump> --window <ref> --authorization <ref>")
     return 1
 
 
 def deploy(args, cfg: dict) -> int:
     check_references(args.window, args.authorization)
     with deploy_lock(cfg):
-        manifest, manifest_sha = load_manifest(Path(args.manifest), cfg["repository"])
-        digest = manifest["image"]["digest"]
-        ref = f"{cfg['repository']}@{digest}"
-        try:
-            record = json.loads(preflight_path(cfg, digest).read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            record = None
-        now = utc_now()
-        live = read_live(cfg)  # inside the lock, immediately before any change
-        require_ok_state(live)
-        check_preflight(record, digest, manifest_sha, live, now)
-        # Final identity check under the lock: a preflight record alone never authorizes a deployment when the
-        # registry content, the version tag, the labels or the commit changed since.
-        verdict = compatibility(verify_release_image(cfg, manifest), live[1])
-        if verdict != "compatible":
-            raise Refused(f"{verdict} on live schema {live[1]}")
-        backup_sha = check_backup(Path(args.backup), read_backup_record(Path(args.backup)), cfg["pg_db"], live, now)
-        manifests = cfg["state"] / "manifests"
-        manifests.mkdir(parents=True, exist_ok=True)
-        (manifests / f"{manifest['release']}.json").write_bytes(Path(args.manifest).read_bytes())
-        return change(cfg, args, "deploy", ref, manifest["release"], live, backup_sha)
+        return deploy_locked(args, cfg)
+
+
+def deploy_locked(args, cfg: dict, backup_live: tuple | None = None, propose_rollback: bool = True) -> int:
+    """The deploy checks and change; the caller holds the lock. `migrate` (I5) passes the pre-migration schema its
+    backup was taken on, and no rollback proposal (an application rollback across a migration is refused)."""
+    manifest, manifest_sha = load_manifest(Path(args.manifest), cfg["repository"])
+    digest = manifest["image"]["digest"]
+    ref = f"{cfg['repository']}@{digest}"
+    try:
+        record = json.loads(preflight_path(cfg, digest).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        record = None
+    now = utc_now()
+    live = read_live(cfg)  # inside the lock, immediately before any change
+    require_ok_state(live)
+    check_preflight(record, digest, manifest_sha, live, now)
+    # Final identity check under the lock: a preflight record alone never authorizes a deployment when the
+    # registry content, the version tag, the labels or the commit changed since.
+    verdict = compatibility(verify_release_image(cfg, manifest), live[1])
+    if verdict != "compatible":
+        raise Refused(f"{verdict} on live schema {live[1]}")
+    backup_sha = check_backup(Path(args.backup), read_backup_record(Path(args.backup)), cfg["pg_db"],
+                              backup_live or live, now)
+    manifests = cfg["state"] / "manifests"
+    manifests.mkdir(parents=True, exist_ok=True)
+    (manifests / f"{manifest['release']}.json").write_bytes(Path(args.manifest).read_bytes())
+    return change(cfg, args, "deploy", ref, manifest["release"], live, backup_sha, propose_rollback)
 
 
 def stored_manifest(cfg: dict, version: str | None = None, digest: str | None = None) -> tuple[dict, str] | None:

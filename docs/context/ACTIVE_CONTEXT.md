@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-29 (T044 = I4 merged into `dev` as
-  `8b3fc44`; I5 design T045 proposed)
+- **Last Updated:** 2026-10-29 (T044 = I4 merged as `8b3fc44`; I5
+  design merged as `148b918`; T045 = I5 implemented, PR #23 review corrections applied)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -95,6 +95,26 @@ as FAILED, final registry identity check under the lock, rollback
 provenance (stored manifest or `adopt-legacy`, plus a prior OK run). ACE
 gate 754 passed; PR CI 40890220768 green (646 passed).
 [T044 result](../progress/task_T044_result.md).
+
+**T045 — ADR-033 I5: implemented, PR #23 into `dev` for PO review, not
+merged.** Design PR #22 merged as `148b918`. PO decisions: no published
+ports; final rehearsal in the same window on the exact migration backup;
+app and tutor stopped before it; files under
+`/var/lib/mentor-pro/rehearsal`; 60-minute downtime, 40-minute
+checkpoint; no automatic restore or rollback. `deploy/mentorpro
+maintenance start|end`, `rehearse` (private unpublished project, verified
+isolation and cleanup, REHEARSAL OK bound to digest and dump checksum)
+and `migrate` (G2, under the re-entrant T044 lock, explicit `apply`,
+verification against the rehearsal, then deploy). ACE gate pass; PR CI
+40916932558 green (734 passed, 111 skipped; both Docker tests on a real
+image and synthetic legacy data ran). Not authorized: real production
+data, server, migration, deployment, GHCR, `main`. PO review of PR #23
+(2026-10-29): conditionally approved; corrections applied (window
+identity bound through `maintenance start`, `rehearse`, `migrate` and
+`maintenance end`; incomplete or malformed rehearsal timing refuses the
+migration). Merge into `dev` authorized once the ACE gate and the final
+PR CI pass; T045 counts as integrated only after the post-merge `dev` CI.
+[T045 result](../progress/task_T045_result.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix
 progress counting of repeated attempts first; the T036 migration needs a
