@@ -96,7 +96,8 @@ provenance (stored manifest or `adopt-legacy`, plus a prior OK run). ACE
 gate 754 passed; PR CI 40890220768 green (646 passed).
 [T044 result](../progress/task_T044_result.md).
 
-**T045 — ADR-033 I5: merged and verified on `dev`.** Design PR #22 merged as `148b918`. PO decisions: no published
+**T045 — ADR-033 I5: merged and verified on `dev`.** Design PR #22
+merged as `148b918`. PO decisions: no published
 ports; final rehearsal in the same window on the exact migration backup;
 app and tutor stopped before it; files under
 `/var/lib/mentor-pro/rehearsal`; 60-minute downtime, 40-minute
