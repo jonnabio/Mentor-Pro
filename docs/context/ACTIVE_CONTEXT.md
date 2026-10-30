@@ -472,12 +472,13 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **T039 implemented; PR into `dev` for PO review, not merged**
+0. **T039 implemented; PR #26 into `dev` for PO review, not merged**
    ([plan](../planning/2026-10-29-T039-writing-progress-plan.md),
    [result](../progress/task_T039_result.md)). Plan PR #25 merged as
    `b192f01`; `dev` CI 40987035330 green. Exercises counted once,
    improvements apart, criterion comparison for student and tutor;
-   existing fields unchanged. Required before the next production
+   existing fields unchanged. ACE gate 878 passed; PR CI 40991209450
+   green (773 passed, 111 skipped). Required before the next production
    application release (with T037 and T038).
 1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,

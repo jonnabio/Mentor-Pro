@@ -3,7 +3,7 @@
 - **Date:** 2026-10-29
 - **Role:** Developer
 - **Branch:** `feature/T039-writing-progress` (from `dev` at `b192f01`)
-- **Status:** implemented; PR into `dev` for PO review, not merged.
+- **Status:** implemented; PR #26 into `dev` for PO review, not merged.
   Synthetic data only (`mentor_pro_test`); nothing deployed, migrated
   or published.
 
@@ -60,6 +60,7 @@ it as another "entregado" exercise, which blocked the T037+T038 release.
 | --- | --- |
 | New and existing writing tests | 11 new passed; writing and tutor suites passed; migration test `test_migration_backfills_attempt_one_and_preserves_every_record` passes (progress identical before and after `0001`) |
 | `bash .ace/scripts/verify.sh` | `VERIFY_RESULT=pass gate=all`, 878 passed, 6 skipped (log `.ace/logs/verify/20261029-201008-439`) |
+| PR CI [40991209450](https://github.com/jonnabio/Mentor-Pro/actions/runs/40991209450) (head `1d7b558`) | success: 773 passed (+11), 111 skipped (unchanged); `LABELS OK`; both smoke tests; `MANIFEST OK`; publish and release skipped |
 | Browser e2e (`scripts/dev/practice_e2e.py`, `mentor_pro_test`) | `E2E=pass (485 checks, 0 failed)`, desktop and mobile, including the 4 T039 checks |
 
 ## Not verified
