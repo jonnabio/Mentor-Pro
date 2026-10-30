@@ -1468,7 +1468,7 @@
       "attempts": 0,
       "result_file": "docs/progress/task_T046_result.md",
       "failures": [],
-      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. Design pending PO approval; not implemented."
+      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented."
     }
   ]
 }
