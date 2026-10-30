@@ -2,7 +2,10 @@
 
 - **Date:** 2026-10-29
 - **Role:** Architect
-- **Status:** PROPOSED for PO review. Implementation NOT authorized.
+- **Status:** APPROVED by the PO (2026-10-29, PR #25 merged as
+  `b192f01`) with refinements: existing fields stay backward compatible;
+  comparisons carry the Spanish criterion descriptions. Implemented in
+  T039 (feature branch, PR into `dev` for separate review).
 - **Decision record:** ADR-032 "Progress semantics" and T038 amendment
   ("T039 must stop repeated attempts from being counted as additional
   exercises"); ADR-025 (writing progress dashboard); ADR-019 (rubric
@@ -222,3 +225,24 @@ change); any grade, total or weighted score.
 4. Approve T039 on a feature branch from `dev`, PR into `dev`, synthetic
    data only; release still with T037 and T038 under separate
    authorization.
+
+## PO decisions (2026-10-29)
+
+Approved: exercise-based counting, separate attempt and evaluation
+counters, criterion-level comparison for the student and the tutor, T039
+on a feature branch. Refinements: backward-compatible existing fields
+and Spanish criterion descriptions.
+
+## Changes from the design during implementation
+
+- Decision 1 refined (backward compatibility): `activity.submitted`,
+  `levels[].submitted`/`evaluated` and `criteria[].pending` keep their
+  previous meaning; the exercise-based counts are new fields
+  (`exercises_submitted`, `exercises_evaluated`, per level the same),
+  and the dashboard uses them.
+- The attempt order in the progress read comes from the submission order
+  per exercise instead of a join on `writing.student_attempt`, so the
+  migration test that compares progress before and after `0001` still
+  reads the legacy schema.
+- The student page avoids the word "rúbrica" (existing rule: no rubric
+  shown to the student); the comparison text says "criterios".

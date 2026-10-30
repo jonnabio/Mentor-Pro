@@ -211,7 +211,15 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
         typed and reviewed, exercise not quarantined). One revision per exercise (store.MAX_ATTEMPTS)."""
         later = [a for a in store.attempts(row["exercise_id"]) if a["attempt_number"] > 1]
         if later:
-            return {"available": False, "attempt": attempt_view(store, row, later[-1])}
+            view = attempt_view(store, row, later[-1])
+            # T039: per-criterion change against the first version, once both reviews are completed.
+            improved = store.attempt_submission(later[-1]["attempt_id"])
+            improved_eval = store.evaluation_for(improved["submission_id"]) if improved else None
+            view["comparison"] = None if improved_eval is None or improved_eval["status"] != "completed" or \
+                evaluation is None or evaluation["status"] != "completed" else progress.compare(
+                    {"exercise_revision": submission["exercise_revision"], "evaluation": evaluation["record"]},
+                    {"exercise_revision": improved["exercise_revision"], "evaluation": improved_eval["record"]})
+            return {"available": False, "attempt": view}
         available = bool(row["eligible"]) and submission is not None and submission["evidence_mode"] == "typed" \
             and evaluation is not None and evaluation["status"] == "completed"
         return {"available": available, "attempt": None}

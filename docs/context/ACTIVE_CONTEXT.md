@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-29 (T045 = I5 integrated: `ca20f6c`, record
-  PR #24 as `513e545`, `dev` CI green; T039 plan proposed for PO review)
-- **Active Role:** Architect
+- **Last Updated:** 2026-10-29 (T039 plan PR #25 merged as `b192f01`,
+  `dev` CI green; T039 implemented, PR into `dev` for PO review)
+- **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
   GHCR) and 2026-10-26 to 2026-10-27 (deployment Stages 6.1–6.3: RCA-005,
@@ -472,12 +472,13 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **T039 plan for PO review**
-   ([plan](../planning/2026-10-29-T039-writing-progress-plan.md)): count
-   progress by exercise, separate first attempts and improvements,
-   student and tutor comparison; 4 decisions requested; implementation
-   not authorized. Required before the next production application
-   release.
+0. **T039 implemented; PR into `dev` for PO review, not merged**
+   ([plan](../planning/2026-10-29-T039-writing-progress-plan.md),
+   [result](../progress/task_T039_result.md)). Plan PR #25 merged as
+   `b192f01`; `dev` CI 40987035330 green. Exercises counted once,
+   improvements apart, criterion comparison for student and tutor;
+   existing fields unchanged. Required before the next production
+   application release (with T037 and T038).
 1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,
    any server run (I6 onward), the migration and deployment are

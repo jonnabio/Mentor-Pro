@@ -195,6 +195,34 @@ unchanged); additive fields, no new route:
 - Progress comparison stays in T039. **Before release** (PO): T039 must
   stop repeated attempts from being counted as additional exercises.
 
+### T039 amendment: progress and revision comparison (PO approved 2026-10-29)
+
+Plan: [T039](../planning/2026-10-29-T039-writing-progress-plan.md).
+Additive only; no schema change:
+
+- `GET /api/writing/progress`: existing fields keep their meaning
+  (submissions and evaluations). New: `activity.exercises_submitted`,
+  `exercises_evaluated`, `first_attempts`, `improvements`,
+  `improvements_pending`; per level `exercises_submitted`,
+  `exercises_evaluated`; per criterion `exercises`,
+  `improvements_pending`; `revisions` (one comparison per revised
+  exercise). The dashboard shows exercises, counted once, and
+  improvements apart.
+- Comparison (`progress.compare`): a change per criterion only when
+  both completed evaluations score it with the same rubric ID and
+  checksum and the same pinned exercise revision; otherwise "No
+  comparable". Not-evaluable and missing scores have no number; a
+  pending, in-progress or voided improvement shows "Tu mejora está
+  pendiente de revisión" and no change. No total, average or grade.
+  Each row carries the official Spanish criterion statement.
+- Student: "Mis mejoras" in the writing progress and
+  `revision_attempt.attempt.comparison` on the exercise page; tutor:
+  `comparison` in `GET /api/tutor/submissions/{id}` once both
+  evaluations are completed (tutor service, ADR-031 unchanged).
+- Attempt order in progress comes from the submission order per
+  exercise, so the same read works on the legacy and migrated schemas
+  (historical progress unchanged by migration `0001`).
+
 ## Progress semantics
 
 Maintain ADR-025's criterion-based coverage, latest/best and dimension indicators based **only on completed evaluations**; distinguish attempts from unique exercises and avoid treating attempts as additional coverage. Add an exercise-level comparison:
