@@ -69,19 +69,31 @@ acceptance (PO: no disruptive restarts without explicit operational
 approval). Step 8 checks persistence from the user side; the restart check
 is listed as "not performed" unless separately approved.
 
+### Result
+
+**Functional acceptance PASSED (steps 1–8)** on 2026-10-30, on
+`sha256:5d69fe6c…1137`. Not performed: step 9 (optional Wi-Fi refusal
+of the tutor port) and the `docker restart` persistence check (needs
+operational approval). New finding: T046, tutor page has no navigation
+back to Mentor Pro (usability, not safety; T035 deferral unchanged).
+
 ### Evidence record
+
+Source: the PO's acceptance report of 2026-10-30 (observed by the
+student and the parent; the agent did not observe the session). Times
+were not reported.
 
 | # | Date and time | Observed | Pass / fail / not performed | Notes |
 | --- | --- | --- | --- | --- |
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
-| 4 | | | | |
-| 5 | | | | |
-| 6 | | | | |
-| 7 | | | | |
-| 8 | | | | |
-| 9 | | | | |
+| 1 | 2026-10-30 | Exercise opened and completed | pass | Implied by the submission (PO report) |
+| 2 | 2026-10-30 | Autosave | pass | PO report: draft autosave |
+| 3 | 2026-10-30 | Text kept after reload | pass | PO report: autosave and reload |
+| 4 | 2026-10-30 | Submitted, pending tutor review | pass | PO report; the double-submit check was not reported separately |
+| 5 | 2026-10-30 | Tutor reached over the tunnel, submission in queue | pass | Implied by the completed evaluation |
+| 6 | 2026-10-30 | Evaluation completed | pass | PO report and screenshot; finding T046 (no way back to Mentor Pro) |
+| 7 | 2026-10-30 | Feedback and writing progress visible | pass | PO report |
+| 8 | 2026-10-30 | Still shown after reopening the browser | pass | PO report |
+| 9 | 2026-10-30 | — | not performed | Optional Wi-Fi refusal check of port 8081 |
 
 Do not record the student's text, the token or screenshots showing
 either. Acceptance is complete only when steps 1–8 pass from observation.

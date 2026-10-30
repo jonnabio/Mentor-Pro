@@ -4,7 +4,9 @@
 - **Role:** Developer
 - **Status:** verified locally; published (`main` `2f6a4b3`,
   `sha256:5d69fe6c…1137`); deployed to production 2026-10-28 (runbook
-  J; technical checks passed); real-user acceptance pending
+  J; technical checks passed); functional real-user
+  acceptance passed 2026-10-30 (optional restart and Wi-Fi checks not
+  performed; [evidence](../planning/2026-10-30-release-acceptance-and-inspection-plan.md))
 
 ## Thought
 

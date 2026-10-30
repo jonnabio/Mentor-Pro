@@ -490,7 +490,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    Step A done read-only
    ([inspection](../progress/2026-10-30-server-inspection.md)): no
    blocker for step B; A1/A2 (`sudo` listings) before I6. Acceptance
-   checklist ready; not yet performed, nothing recorded as accepted.
+   checklist done: functional acceptance passed 2026-10-30 (steps 1–8,
+   PO report); T046 tutor navigation defect registered, not implemented.
+   `v*` ruleset still not configured (API `[]`).
 1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,
    any server run (I6 onward), the migration and deployment are
@@ -542,8 +544,10 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   until T039.
 - Production practice generation takes about 5 minutes per new set and
   may return `partial` (4 of 5 in the test) until the bank fills.
-- **Blocker for closing the release:** the real-user acceptance test
-  (student and parent) has not been performed; nothing is marked accepted.
+- T032/T033 functional real-user acceptance passed 2026-10-30 (PO
+  report; optional restart and Wi-Fi checks not performed).
+- T046 (usability, pending PO approval of the design): the tutor page has
+  no navigation back to Mentor Pro.
 - T035 (maintenance, pending): a tutor token of 1–15 characters refuses
   startup but exits 1 (`ValueError` while importing `app.main`) instead of
   78. Consistency defect; no listener starts; no authentication bypass.
