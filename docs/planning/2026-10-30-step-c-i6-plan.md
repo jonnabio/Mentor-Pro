@@ -18,12 +18,52 @@ denied`. Nothing was bypassed (no `sudo`, no Docker mounts).
 | Check | Result | Needed |
 | --- | --- | --- |
 | A1 backup folder | INCONCLUSIVE: `/var/backups/mentor-pro` `root:root 700`, contents not readable | administrator: `sudo ls -l /var/backups/mentor-pro` |
-| A2 env key names | INCONCLUSIVE: `/etc/mentor-pro` `root:root 700`, not readable | administrator: `sudo sed -E 's/=.*/=<set>/' /etc/mentor-pro/app.env /etc/mentor-pro/tutor.env /etc/mentor-pro/postgres.env` |
+| A2 env key names | INCONCLUSIVE: `/etc/mentor-pro` `root:root 700`, not readable | the key-name-only check below, with `sudo` |
 
-A2 passes when `app.env` holds no `MENTOR_PRO_TUTOR_*` key and
-`tutor.env` holds exactly `MENTOR_PRO_TUTOR_TOKEN` and
-`MENTOR_PRO_TUTOR_ALLOWED_HOSTS`. A1 passes when the folder holds the
-2026-10-28 dump (about 127,791 bytes). Both run as step C1 below.
+A1 passes when the folder holds the 2026-10-28 dump (about 127,791
+bytes). Both run as step C1 below.
+
+### A2 check (PO amendment 2026-10-30)
+
+`awk` reads the files as root; values stay in memory and are never
+printed. Blank lines and `#` comments are skipped; every other line must
+be `KEY=…`. A malformed line is reported by file and line number only.
+The program is sent on standard input; nothing is written on the server.
+
+```awk
+{ n = split(FILENAME, p, "/"); f = p[n] }
+/^[ \t]*$/ || /^[ \t]*#/ { next }
+/^[A-Za-z_][A-Za-z0-9_]*=/ {
+  k = substr($0, 1, index($0, "=") - 1)
+  seen[f, k]++; keys[f] = keys[f] " " k
+  next
+}
+{ print "A2 MALFORMED " f " line " FNR " (content not shown)"; bad++ }
+END {
+  for (x in seen) { split(x, q, SUBSEP)
+    if (seen[x] > 1) { print "A2 DUPLICATE " q[1] " " q[2]; bad++ }
+    if (q[1] == "app.env" && q[2] ~ /^MENTOR_PRO_TUTOR_/) { print "A2 TUTOR KEY IN app.env: " q[2]; bad++ }
+    if (q[1] == "tutor.env" && q[2] != "MENTOR_PRO_TUTOR_TOKEN" && q[2] != "MENTOR_PRO_TUTOR_ALLOWED_HOSTS") { print "A2 UNEXPECTED KEY in tutor.env: " q[2]; bad++ }
+  }
+  if (!seen["tutor.env", "MENTOR_PRO_TUTOR_TOKEN"]) { print "A2 MISSING tutor.env MENTOR_PRO_TUTOR_TOKEN"; bad++ }
+  if (!seen["tutor.env", "MENTOR_PRO_TUTOR_ALLOWED_HOSTS"]) { print "A2 MISSING tutor.env MENTOR_PRO_TUTOR_ALLOWED_HOSTS"; bad++ }
+  if (!("app.env" in keys)) { print "A2 MISSING app.env keys"; bad++ }
+  for (f in keys) print "A2 KEYS " f ":" keys[f]
+  print (bad ? "A2 FAIL (" bad " issue(s))" : "A2 PASS")
+  exit (bad ? 1 : 0)
+}
+```
+
+```bash
+ssh jonnabio@100.64.84.15 'sudo -n awk -f /dev/stdin /etc/mentor-pro/app.env /etc/mentor-pro/tutor.env /etc/mentor-pro/postgres.env' < a2.awk
+```
+
+A2 passes (`A2 PASS`, exit 0) when every line is well formed, no key
+repeats, `app.env` holds no `MENTOR_PRO_TUTOR_*` key, and `tutor.env`
+holds exactly `MENTOR_PRO_TUTOR_TOKEN` and
+`MENTOR_PRO_TUTOR_ALLOWED_HOSTS`. Tested locally on sample files with
+marker values: no value appeared in the output in either the passing or
+the failing case.
 
 ## Deviation D1: `adopt-legacy` cannot run in I6 (decision needed)
 
