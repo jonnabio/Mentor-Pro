@@ -88,6 +88,7 @@ async function openSubmission(id) {
     `revisión ${data.exercise_revision} · ` + (data.attempt_number > 1 ? `Mejora (versión ${data.attempt_number}) · ` : "") +
     `entregado el ${new Date(data.submitted_at).toLocaleString("es-CR")}`;
   renderPrevious(data.previous);
+  renderComparison(data.comparison);
   $("tutor-title").textContent = ex.title_es || ex.topic_es;
   $("tutor-situation").textContent = ex.communicative_situation_es;
   $("tutor-instructions").replaceChildren(...ex.instructions_es.map((t) => el("li", {}, t)));
@@ -171,6 +172,17 @@ function renderPrevious(previous) {
   $("tutor-previous-next").textContent = evaluation.feedback_es.next_step
     ? `Próximo paso: ${evaluation.feedback_es.next_step}` : "";
   $("tutor-previous-next").hidden = !evaluation.feedback_es.next_step;
+}
+
+// T039: first versus improved version per criterion, once both evaluations are completed.
+function renderComparison(comparison) {
+  $("tutor-comparison").hidden = !comparison;
+  if (!comparison) return;
+  $("tutor-comparison-summary").textContent = comparison.summary_es;
+  $("tutor-comparison-criteria").replaceChildren(...comparison.criteria.map((c) => el("li", { "data-criterion": c.code },
+    el("span", { class: "objective-text" }, `${c.code}. ${c.statement_es}`),
+    el("strong", { class: "feedback-points" }, c.change_es),
+    el("span", { class: "meta-line" }, `Primera: ${c.first_points ?? "sin puntaje"} · Mejora: ${c.improved_points ?? "sin puntaje"}`))));
 }
 
 function payload(complete) {

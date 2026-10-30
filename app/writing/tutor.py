@@ -24,7 +24,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, Request
 from pydantic import BaseModel, Field
 
-from app.writing import contracts
+from app.writing import contracts, progress
 from app.writing.routes import SECTION_LABEL_ES, WritingService
 from app.writing.store import GUIDED_SECTIONS
 from app.writing.store import EvaluationLocked, InvalidRecord
@@ -98,6 +98,22 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
                     "status": evaluation["status"], "evaluated_at": evaluation["record"].get("evaluated_at"),
                     "scores": scores, "feedback_es": evaluation["record"]["feedback_es"]}}
 
+    def comparison_view(store: Any, attempt: dict[str, Any], sub: dict[str, Any],
+                        evaluation: dict[str, Any] | None) -> dict[str, Any] | None:
+        """T039: first versus improved version per criterion, only once both evaluations are completed."""
+        if not attempt["previous_attempt_id"] or evaluation is None or evaluation["status"] != "completed":
+            return None
+        first = store.attempt(attempt["previous_attempt_id"])
+        while first["previous_attempt_id"]:
+            first = store.attempt(first["previous_attempt_id"])
+        first_sub = store.attempt_submission(first["attempt_id"])
+        first_eval = store.evaluation_for(first_sub["submission_id"])
+        if first_eval is None or first_eval["status"] != "completed":
+            return None
+        return progress.compare(
+            {"exercise_revision": first_sub["exercise_revision"], "evaluation": first_eval["record"]},
+            {"exercise_revision": sub["exercise_revision"], "evaluation": evaluation["record"]})
+
     @router.get("/queue")
     def queue() -> dict[str, Any]:
         store = service.get()
@@ -125,6 +141,7 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
             "evidence_mode": sub["evidence_mode"], "student_text": sub["text_es"],
             "sections": sections_view(sub),
             "attempt_number": attempt["attempt_number"], "previous": previous_view(store, attempt),
+            "comparison": comparison_view(store, attempt, sub, evaluation),
             "exercise": {"title_es": record.get("title_es"), "topic_es": record["topic_es"],
                          "level_es": _level_label(record), "exercise_type": record["exercise_type"],
                          "communicative_situation_es": record["communicative_situation_es"],

@@ -1239,7 +1239,19 @@ def scenario_revision(page: Page, tutor: Page, report: Report, viewport: str, ou
                  and page.locator("#writing-revision-status").inner_text().startswith("Mi mejora: Revisado por el tutor")
                  and "2 de 4" in page.locator("#writing-feedback").inner_text(),
                  f"[{name}] student sees the review of the improvement; the first review stays")
+    comparison = page.locator("#writing-comparison").inner_text()
+    report.check("+1 punto en EE03" in comparison and "+1 punto en EE04" in comparison
+                 and "Mejoraste en 2" in comparison and "calificación" not in comparison.lower(),
+                 f"[{name}] T039: comparison with the first version per criterion")
     page.screenshot(path=str(out / f"{name}-reviewed.png"), full_page=True)
+    tutor.goto(BASE + "tutor")
+    tutor.locator("#tutor-token").fill(TUTOR_TOKEN)
+    tutor.get_by_role("button", name="Entrar").click()
+    tutor.locator(".exercise-choice", has=tutor.locator(".tutor-badge.revision")).filter(
+        has_text="La alimentación saludable").click()
+    expect(tutor.locator("#tutor-comparison")).to_be_visible()
+    report.check("+1 punto en EE03" in tutor.locator("#tutor-comparison").inner_text(),
+                 f"[{name}] T039: tutor sees the per-criterion comparison once both reviews are completed")
 
     # L1: starts from the student's correction; no restore; failed save, retry; tab hidden flushes the draft.
     open_reviewed("writing_conventions", REFERENCE_TUTOR_ID)

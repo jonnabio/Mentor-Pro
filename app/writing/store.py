@@ -651,21 +651,31 @@ class WritingStore:
     # ------------------------------------------------------------ student progress (T027)
 
     PROGRESS_SQL = """
-        SELECT s.submission_id, s.submitted_at, e.level, v.status AS evaluation_status, v.record AS evaluation,
+        SELECT s.submission_id, s.submitted_at, s.exercise_id, s.exercise_revision, e.level,
+               -- T039: attempt order from the submissions themselves (a revision is submitted only after the
+               -- reviewed first attempt), so the same query reads legacy and migrated schemas.
+               row_number() OVER (PARTITION BY s.exercise_id ORDER BY s.submitted_at, s.submission_id)
+                   AS attempt_number,
+               COALESCE(e.record->>'title_es', e.record->>'topic_es') AS title_es,
+               v.status AS evaluation_status, v.record AS evaluation,
                COALESCE((SELECT r.record FROM writing.exercise_revision r WHERE r.exercise_id = s.exercise_id
                          AND r.revision = s.exercise_revision), e.record)->'evaluation'->'parameters' AS parameters
         FROM writing.submission s JOIN writing.exercise e USING (exercise_id)
         LEFT JOIN writing.evaluation v USING (submission_id)
-        ORDER BY s.submitted_at"""
+        ORDER BY s.submitted_at, s.submission_id"""
 
     def progress_inputs(self) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
         """Read-only: completed evaluation records, every submission with its evaluation status and scorable
-        criteria (from the exercise revision answered), and the last draft save."""
+        criteria (from the exercise revision answered), and the last draft save. T039: each submission also names
+        its exercise, attempt number and pinned exercise revision, with its completed evaluation for comparisons."""
         with self._connect() as conn:
             rows = conn.execute(self.PROGRESS_SQL).fetchall()
             last_draft = conn.execute("SELECT MAX(updated_at) AS at FROM writing.draft").fetchone()["at"]
         submissions = [{"submission_id": r["submission_id"], "submitted_at": r["submitted_at"].isoformat(),
                         "level": r["level"], "evaluation_status": r["evaluation_status"],
+                        "exercise_id": r["exercise_id"], "exercise_revision": r["exercise_revision"],
+                        "attempt_number": r["attempt_number"], "title_es": r["title_es"],
+                        "evaluation": r["evaluation"] if r["evaluation_status"] == "completed" else None,
                         "scorable_criteria": [p["criterion"] for p in r["parameters"]
                                               if p["applicability"] == "scored" and not p.get("optional")]}
                        for r in rows]

@@ -1414,18 +1414,24 @@
       "name": "Writing progress and revision comparison (ADR-032)",
       "objective": "Count writing progress by unique exercise, track first attempts and improvements separately, show students and tutor a per-criterion first-versus-improved comparison when both are evaluated; existing progress API backward compatible; no schema change.",
       "status": "pending",
-      "role": "Architect",
+      "role": "Developer",
       "files": {
         "create": [
-          "docs/planning/2026-10-29-T039-writing-progress-plan.md",
+          "tests/app/test_writing_progress_revisions.py",
           "docs/progress/task_T039_result.md"
         ],
         "modify": [
           "app/writing/progress.py",
           "app/writing/store.py",
+          "app/writing/routes.py",
           "app/writing/tutor.py",
           "app/static/app.js",
-          "tests/app/test_writing_progress.py"
+          "app/static/index.html",
+          "app/static/tutor.js",
+          "app/static/tutor.html",
+          "scripts/dev/practice_e2e.py",
+          "docs/adr/ADR-032-guided-writing-revision-attempts.md",
+          "docs/planning/2026-10-29-T039-writing-progress-plan.md"
         ]
       },
       "depends_on": [
@@ -1435,10 +1441,10 @@
       ],
       "complexity": "M",
       "acceptance_cmd": "bash .ace/scripts/verify.sh",
-      "attempts": 0,
+      "attempts": 1,
       "result_file": "docs/progress/task_T039_result.md",
       "failures": [],
-      "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together."
+      "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together. PR #25 merged as b192f01; dev CI 40987035330 green (762 passed). PO approved implementation 2026-10-29 with refinements (backward-compatible existing fields, Spanish criterion descriptions). Implemented on feature/T039-writing-progress; 11 new tests; browser e2e 485/485. PR into dev for PO review; not merged."
     }
   ]
 }

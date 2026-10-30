@@ -582,14 +582,19 @@ async function renderWritingProgress() {
   }
   const activity = data.activity;
   $("dw-notice").textContent = data.notice_es;
-  $("dw-submitted").textContent = String(activity.submitted);
   $("dw-completed").textContent = String(activity.evaluations_completed);
   $("dw-pending").textContent = String(activity.evaluations_pending);
+  // T039: exercises are counted once; an improved version is counted apart, never as another exercise.
+  $("dw-submitted").textContent = String(activity.exercises_submitted);
+  $("dw-improvements").textContent = activity.improvements_pending
+    ? `${activity.improvements} (${activity.improvements_pending} pendiente${activity.improvements_pending === 1 ? "" : "s"})`
+    : String(activity.improvements);
   $("dw-last").textContent = activity.last_practice_at ? shortDate(activity.last_practice_at) : "Todavía no hay práctica";
   $("dw-levels").replaceChildren(...activity.levels.map((level) => el("li", { "data-level": level.code },
     el("span", {}, level.label_es),
     el("span", { class: "meta-line" },
-      `${plural(level.evaluated, "evaluado", "evaluados")} · ${plural(level.submitted, "entregado", "entregados")}`))));
+      `${plural(level.exercises_evaluated, "evaluado", "evaluados")} · ` +
+      `${plural(level.exercises_submitted, "entregado", "entregados")}`))));
   const coverage = data.coverage;
   $("dw-coverage").replaceChildren(...[["evaluated", "Evaluado"], ["pending", "Evaluación pendiente"],
     ["unassessed", "Sin evaluar"]].map(([status, label]) => el("li", { class: `status crit-${status}` }, label,
@@ -606,6 +611,21 @@ async function renderWritingProgress() {
       el("h4", {}, dim.name_es), el("p", { class: "dw-dimension-summary" }, summary),
       el("ul", { class: "plain-list objective-status" }, ...byDimension[dim.ordinal].map(criterionItem)));
   }));
+  $("dw-revisions-block").hidden = !data.revisions.length;
+  $("dw-revisions").replaceChildren(...data.revisions.map((r) => el("section", { class: "dw-revision",
+    "data-exercise": r.exercise_id }, el("h4", {}, r.title_es || r.exercise_id),
+    el("p", { class: "dw-dimension-summary" }, r.summary_es),
+    el("ul", { class: "plain-list feedback-scores" }, ...comparisonItems(r)))));
+}
+
+// T039: one line per criterion; a change only where both versions were scored with the same rubric.
+function comparisonItems(comparison) {
+  if (comparison.status !== "completed") return [];
+  return comparison.criteria.map((c) => el("li", { "data-criterion": c.code },
+    el("span", { class: "objective-text" }, `${c.code}. ${c.statement_es}`),
+    el("strong", { class: "feedback-points" }, c.change_es),
+    el("span", { class: "meta-line" }, `Primera versión: ${c.first_points === null ? "sin puntaje" : `${c.first_points} de 4`}` +
+      ` · Mejora: ${c.improved_points === null ? "sin puntaje" : `${c.improved_points} de 4`}`)));
 }
 
 function criterionItem(c) {
@@ -973,6 +993,12 @@ function renderRevisionEntry(revising) {
     $("writing-revision-text").textContent = attempt.draft ? attempt.draft.text : "";
   }
   renderWritingFeedback(done ? attempt.feedback : null, "writing-revision-feedback");
+  const comparison = done ? attempt.comparison : null;
+  $("writing-comparison").hidden = !comparison;
+  if (comparison) {
+    $("writing-comparison-summary").textContent = comparison.summary_es;
+    $("writing-comparison-criteria").replaceChildren(...comparisonItems(comparison));
+  }
 }
 
 function enterRevision(attempt) {
