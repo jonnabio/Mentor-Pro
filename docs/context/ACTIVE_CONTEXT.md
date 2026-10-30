@@ -493,6 +493,8 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    done: functional acceptance passed 2026-10-30 (PO observations;
    optional security and restart checks not verified); T046 tutor
    navigation deferred.
+   PR #29 merged as `960a0bd` (`dev` CI 41072142382 green, 773 passed).
+   Step B release PR waits for the `v*` ruleset (API `[]` on 2026-10-30).
    `v*` ruleset still not configured (API `[]`).
 1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,
