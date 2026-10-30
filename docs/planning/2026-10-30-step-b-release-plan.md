@@ -2,8 +2,8 @@
 
 - **Date:** 2026-10-30
 - **Role:** Architect
-- **Status:** PROPOSED for PO review. Nothing here is authorized: no
-  merge into `main`, GHCR publication or tag until the PO approves step B.
+- **Status:** DONE and accepted by the PO (2026-10-30): release
+  `v2026.10.30-1`; evidence in "Result" below.
 - **Inputs:** [release preparation](2026-10-30-release-acceptance-and-inspection-plan.md),
   [server inspection](../progress/2026-10-30-server-inspection.md),
   `.github/workflows/ci.yml` (T043), ADR-033
@@ -100,3 +100,16 @@ No tag was created, moved or deleted; `v0.1.0` untouched.
 
 Approve step B once P2 is verified: open the release PR, check P3/P4,
 then merge into `main` and verify as above.
+
+## Result (2026-10-30)
+
+| Item | Value |
+| --- | --- |
+| PR #32 into `dev` | `7a2430c` (pinned `c6d9529`); `dev` CI 41124792786 green (773 passed, `LABELS OK`, `MANIFEST OK dev-7a2430c`) |
+| PR #33 into `main` | head `7a2430c`, PR CI 41124798131 green; merged as `094a014388ef1ba389e1a8512bae3cb7ac5b78c8` |
+| Release run | 41126138268 success (allocate, tests, refuse-taken, publish, manifest, GitHub Release) |
+| Version | `v2026.10.30-1` (annotated tag, protected, points at `094a014`) |
+| Digest | `sha256:7702469e442596d56b1425bfc5a0d189bcc1f21a2fd3972d47f079b932423538` for `:v2026.10.30-1`, `:sha-094a014…` and `:testing` (registry API), equal to the manifest |
+| OCI labels | version `v2026.10.30-1`, revision `094a014…`, created `2026-10-30T20:57:16Z`, schema `0001..0001` |
+| Manifest | smoke student and tutor pass; "Published, not authorized for deployment" |
+| Production | unchanged (same digest `5d69fe6c…1137`, start times, compose checksum, `RELEASES`) |

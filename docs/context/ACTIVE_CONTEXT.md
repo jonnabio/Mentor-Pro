@@ -500,9 +500,11 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    id 26236844, active, `refs/tags/v*`, no bypass, update, deletion and
    force push blocked, creation allowed. PR #30 (`5afbe7e`, CI
    41076093767) and PR #31 (`7ecd1da`, CI 41103503792) integrated.
-2. **Step B release PR** (`dev` → `main`) opened for PO review per the
-   [step B plan](../planning/2026-10-30-step-b-release-plan.md). Do **not**
-   merge: separate PO approval.
+2. **Step B DONE** (accepted 2026-10-30): release `v2026.10.30-1`,
+   `main` `094a014`, digest `sha256:7702469e…3538`, run 41126138268;
+   production unchanged ([evidence](../planning/2026-10-30-step-b-release-plan.md)).
+   Step C plan ([I6](../planning/2026-10-30-step-c-i6-plan.md)) awaits PO
+   authorization; A1/A2 INCONCLUSIVE without `sudo`.
 3. Then, each separately authorized: C I6 adoption (first the
    administrator's A1/A2 `sudo` listings), D timing rehearsal on a real
    backup (short outage), E I7 window, F revision cycle by the student
@@ -549,8 +551,8 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - T034 (maintenance, pending):
   `test_transient_failure_then_success_completes` is nondeterministic with
   parallel slots (failed once in CI 40534292823; the rerun passed).
-- Step B awaits PO approval of the release PR (merge into `main`
-  publishes to GHCR and creates the first `v*` tag).
+- Step C: A1/A2 need the administrator (`sudo`); `adopt-legacy` cannot
+  run on containers without health checks (D1, omit recommended).
 - Before I6: administrator `sudo` listings A1 (backups) and A2 (env key
   names, masked); server Python 3.14 vs CI 3.12 (tooling parses on 3.14).
 - Step D timing rehearsal required before the release window (no
