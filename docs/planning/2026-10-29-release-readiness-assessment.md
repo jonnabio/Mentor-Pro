@@ -2,7 +2,9 @@
 
 - **Date:** 2026-10-29
 - **Role:** Architect
-- **Status:** PROPOSED for PO review. Assessment only: no server,
+- **Status:** DECIDED by the PO on 2026-10-30 (sequence reordered; see
+  [release preparation](2026-10-30-release-acceptance-and-inspection-plan.md)).
+  Assessment only: no server,
   migration, deployment, GHCR publication or merge into `main` is
   authorized by it.
 - **Inputs:** ADR-030 (production), ADR-031 (tutor), ADR-032 (attempts,

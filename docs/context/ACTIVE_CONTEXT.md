@@ -472,14 +472,18 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **Release-readiness assessment for PO review**
-   ([assessment](../planning/2026-10-29-release-readiness-assessment.md)):
-   T039 integrated (PR #26 merged as `e22d59d`; `dev` CI 40993295690
-   green, 773 passed, Docker tests, labels and smoke OK, publish and tag
-   skipped). Proposed sequence: real-user acceptance, `v*` ruleset,
-   first real release from `main`, I6 adoption, timing rehearsal, I7
-   window, revision check, I8. No feature development started; nothing
-   authorized beyond `dev`.
+0. **Release preparation (PO decision 2026-10-30)**
+   ([plan](../planning/2026-10-30-release-acceptance-and-inspection-plan.md)):
+   assessment PR #27 merged as `c3dc5da`. Approved now: T032/T033
+   real-user acceptance on the current production (no service restarts)
+   and owner-configured `v*` tag protection. Then, each separately
+   authorized: A read-only server inspection; B release `dev` → `main`,
+   GHCR publication and verification; C I6 adoption; D separate timing
+   rehearsal on real data (required, no waiver); E I7 window; F full
+   revision cycle by the student and the parent; G I8. Recovery owner:
+   PO; decision target 10 minutes after a failure during or after
+   `migrate apply`; no automatic restore, rollback or forward correction.
+   T035 deferred. Scope frozen to the writing revision milestone.
 1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,
    any server run (I6 onward), the migration and deployment are
@@ -497,7 +501,8 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    token from `sudo cat /etc/mentor-pro/tutor.env` (kept in a password
    manager); score the rubric, save feedback, mark complete; the student
    sees it.
-4. **Persistence.** `sudo docker restart mentor-pro-app-1`; the submission
+4. **Persistence.** (Restart needs separate operational approval; acceptance
+   uses a browser reopen instead.) `sudo docker restart mentor-pro-app-1`; the submission
    and evaluation are still shown. Optional: from the student device
    `http://192.168.50.229:8081/` must fail.
 5. **Record acceptance** in this file and the T032/T033 notes from observed
