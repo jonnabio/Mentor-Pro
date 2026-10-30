@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/jonnabio/Mentor-Pro/docs/release/manifest.schema.json",
+  "title": "Mentor Pro release manifest (ADR-033, T043)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest_version", "release", "dry_run", "status", "image", "commit", "ci_run", "created",
+               "schema", "smoke"],
+  "properties": {
+    "manifest_version": {"const": 1},
+    "release": {"type": "string"},
+    "dry_run": {"type": "boolean"},
+    "status": {"enum": ["Published, not authorized for deployment", "Dry run: not published"]},
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "digest", "image_id"],
+      "properties": {
+        "repository": {"const": "ghcr.io/jonnabio/mentor-pro"},
+        "digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+        "image_id": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"}
+      }
+    },
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "ci_run": {"type": "string", "pattern": "^[0-9]+$"},
+    "created": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["min", "max"],
+      "properties": {
+        "min": {"type": "string", "pattern": "^\\d{4}$"},
+        "max": {"type": "string", "pattern": "^\\d{4}$"}
+      }
+    },
+    "smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["student", "tutor"],
+      "properties": {"student": {"const": "pass"}, "tutor": {"const": "pass"}}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"dry_run": {"const": true}}},
+      "then": {
+        "properties": {
+          "release": {"pattern": "^(dev|pr\\d+)-[0-9a-f]{7}$"},
+          "status": {"const": "Dry run: not published"},
+          "image": {"properties": {"digest": {"const": null}, "image_id": {"type": "string"}}}
+        }
+      },
+      "else": {
+        "properties": {
+          "release": {"pattern": "^v\\d{4}\\.\\d{2}\\.\\d{2}-\\d+$"},
+          "status": {"const": "Published, not authorized for deployment"},
+          "image": {"properties": {"digest": {"type": "string"}}}
+        }
+      }
+    }
+  ]
+}

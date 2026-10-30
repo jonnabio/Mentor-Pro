@@ -6,6 +6,9 @@ submitted once; handwritten (L5) exercises show their official conditions and ta
 No grading: a submission waits for the tutor.
 T028 (ADR-026): guided compositions (L4) are written in five stages; each section is saved in the draft and
 the submission keeps the planning notes apart from the four assembled paragraphs.
+T037 (ADR-032): after a completed tutor review the student may write one improved version ("Mejorar mi
+respuesta"). Revision writes go through attempt-scoped routes that name the attempt; the exercise routes keep
+reading and writing attempt 1 only.
 """
 
 from __future__ import annotations
@@ -15,11 +18,13 @@ import threading
 from typing import Any, Callable
 
 import psycopg
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from pydantic import BaseModel, Field
 
-from app.writing import contracts, progress
-from app.writing.store import GUIDED_PARAGRAPHS, GUIDED_SECTIONS, WritingStore, assemble_sections, word_count
+from app.writing import contracts, migrations, progress
+from app.writing.store import (GUIDED_PARAGRAPHS, GUIDED_SECTIONS, RevisionNotAllowed, WritingStore,
+                               assemble_sections, word_count)
+from curriculum import db
 
 MAX_TEXT = 20000
 PENDING_ES = "Pendiente de revisión del tutor"
@@ -35,6 +40,15 @@ HANDWRITTEN_ES = ("Este ejercicio se escribe a mano, como en la prueba: en una h
                   "negra (no lápiz) y con un solo tipo de letra. Entregá tu hoja al tutor. No se puede responder "
                   "escribiendo en la computadora, porque la letra también se revisa.")
 EXERCISE_ID = re.compile(r"^PE-L[1-5]-[A-Za-z0-9-]{3,60}$")
+ATTEMPT_ID = re.compile(r"^ATT-[A-Za-z0-9-]{1,80}$")
+# T037: why a revision cannot start, in the student's words (RevisionNotAllowed reasons from the store).
+REVISION_REFUSED_ES = {
+    "no submitted attempt": "Primero entregá tu respuesta.",
+    "the first attempt is not submitted": "Primero entregá tu respuesta.",
+    "only typed submissions can be revised": "Este ejercicio se escribe a mano; entregá tu hoja al tutor.",
+    "the tutor evaluation is not completed": "Podrás mejorar tu respuesta cuando el tutor termine de revisarla.",
+    "attempt limit reached": "Ya entregaste tu mejora de este ejercicio.",
+}
 # T028: code-owned guidance per stage (no model text, criteria or scores); `plan` is the index of the
 # exercise's own paragraph-plan items shown with the stage.
 GUIDED_STAGES = (
@@ -94,6 +108,17 @@ class WritingService:
             if self._store is None:
                 self._store = WritingStore(self._url_factory())
             return self._store
+
+    def check_schema(self) -> None:
+        """Startup guard (T036, ADR-032 PO 1): raise SchemaMigrationRequired when the writing tables predate the
+        current migration or an older image has changed them ('drifted'). A database that cannot be reached is
+        left to the first request (503), as before."""
+        try:
+            conn = psycopg.connect(self._url_factory(), connect_timeout=5)
+        except (psycopg.OperationalError, db.ConfigurationError):
+            return
+        with conn:
+            migrations.refuse_unless_current(conn)
 
 
 def _unit_es(unit: str, n: int) -> str:
@@ -164,6 +189,41 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
         return {"evaluated_at": record["evaluated_at"], "scores": scores, "strengths_es": feedback["strengths"],
                 "improvements_es": feedback["improvements"], "next_step_es": feedback.get("next_step")}
 
+    def draft_view(draft: dict[str, Any] | None) -> dict[str, Any] | None:
+        if draft is None:
+            return None
+        return {"text": draft["text_es"], "word_count": draft["word_count"], "sections": draft.get("sections"),
+                "saved_at": draft["updated_at"].isoformat(), "client_seq": draft.get("client_seq")}
+
+    def attempt_view(store: WritingStore, row: dict[str, Any], attempt: dict[str, Any]) -> dict[str, Any]:
+        """T037: a revision attempt as the student sees it; writable while the exercise is offered and the
+        attempt is not submitted."""
+        sub = store.attempt_submission(attempt["attempt_id"])
+        evaluation = store.evaluation_for(sub["submission_id"]) if sub else None
+        return {"attempt_id": attempt["attempt_id"], "attempt_number": attempt["attempt_number"],
+                "editable": bool(row["eligible"]) and sub is None,
+                "draft": draft_view(store.attempt_draft(attempt["attempt_id"])),
+                "submission": submission_view(sub, evaluation), "feedback": feedback_view(evaluation)}
+
+    def revision_view(store: WritingStore, row: dict[str, Any], submission: dict[str, Any] | None,
+                      evaluation: dict[str, Any] | None) -> dict[str, Any]:
+        """T037: the later attempt if one exists; otherwise whether "Mejorar mi respuesta" is offered (attempt 1
+        typed and reviewed, exercise not quarantined). One revision per exercise (store.MAX_ATTEMPTS)."""
+        later = [a for a in store.attempts(row["exercise_id"]) if a["attempt_number"] > 1]
+        if later:
+            view = attempt_view(store, row, later[-1])
+            # T039: per-criterion change against the first version, once both reviews are completed.
+            improved = store.attempt_submission(later[-1]["attempt_id"])
+            improved_eval = store.evaluation_for(improved["submission_id"]) if improved else None
+            view["comparison"] = None if improved_eval is None or improved_eval["status"] != "completed" or \
+                evaluation is None or evaluation["status"] != "completed" else progress.compare(
+                    {"exercise_revision": submission["exercise_revision"], "evaluation": evaluation["record"]},
+                    {"exercise_revision": improved["exercise_revision"], "evaluation": improved_eval["record"]})
+            return {"available": False, "attempt": view}
+        available = bool(row["eligible"]) and submission is not None and submission["evidence_mode"] == "typed" \
+            and evaluation is not None and evaluation["status"] == "completed"
+        return {"available": available, "attempt": None}
+
     @router.get("/levels")
     def levels() -> dict[str, Any]:
         counts: dict[str, int] = {}
@@ -217,11 +277,7 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
                             "requirements_es": requirements_es(record["deliverable"], record["exercise_type"]),
                             "evidence_mode": record["deliverable"]["evidence_mode"]},
             "handwritten": handwritten, "handwritten_es": HANDWRITTEN_ES if handwritten else None,
-            "draft": None if handwritten or draft is None else {"text": draft["text_es"],
-                                                                "word_count": draft["word_count"],
-                                                                "sections": draft.get("sections"),
-                                                                "saved_at": draft["updated_at"].isoformat(),
-                                                                "client_seq": draft.get("client_seq")},
+            "draft": None if handwritten else draft_view(draft),
             # T028: five-stage guided composition; the plan items are the exercise's own scaffolding.
             "guided": None if record["exercise_type"] != "guided_composition" else {
                 "stages": [{**{k: v for k, v in st.items() if k != "plan"},
@@ -231,6 +287,8 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
                 "sections": list(GUIDED_SECTIONS)},
             "submission": submission_view(submission, evaluation),
             "feedback": feedback_view(evaluation),
+            # T037: "revision" above is the exercise's editorial revision; this is the student's improved version.
+            "revision_attempt": revision_view(store, row, submission, evaluation),
         }
 
     def guided(row: dict[str, Any]) -> bool:
@@ -267,15 +325,13 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
         return {"word_count": saved["word_count"], "saved_at": saved["updated_at"].isoformat(),
                 "applied": saved["applied"], "client_seq": saved["client_seq"]}
 
-    @router.post("/exercises/{exercise_id}/submit")
-    def submit(exercise_id: str, request: SubmitRequest) -> dict[str, Any]:
-        store, row = load(exercise_id, writable=True)
-        typed_only(row)
+    def submitted_text(row: dict[str, Any], request: SubmitRequest,
+                       already_submitted: bool) -> tuple[str, dict[str, str] | None]:
+        """The text to submit (L4: assembled from the sections, which are checked unless this is a repeat)."""
         parts = None
         if guided(row):
             parts = guided_sections(row, request.sections)
-            existing = store.submission(exercise_id)
-            if existing is None:  # a repeated request returns the first submission below
+            if not already_submitted:  # a repeated request returns the first submission
                 missing = [SECTION_LABEL_ES[k] for k in GUIDED_PARAGRAPHS if not parts[k].strip()]
                 if missing:
                     raise api_error(422, "missing_sections", f"Falta escribir: {', '.join(missing)}.")
@@ -288,7 +344,73 @@ def build_writing_router(service: WritingService, api_error: type[Exception]) ->
             text = request.text
         if word_count(text) == 0:
             raise api_error(422, "empty_text", "Escribí tu texto antes de entregarlo.")
+        return text, parts
+
+    @router.post("/exercises/{exercise_id}/submit")
+    def submit(exercise_id: str, request: SubmitRequest) -> dict[str, Any]:
+        store, row = load(exercise_id, writable=True)
+        typed_only(row)
+        text, parts = submitted_text(row, request, store.submission(exercise_id) is not None)
         sub, created = store.submit_typed(exercise_id, text, request.client_request_id, parts)
+        return {"created": created, **submission_view(sub, store.evaluation_for(sub["submission_id"]))}
+
+    # ------------------------------------------------------------ T037: improved version (ADR-032)
+
+    @router.post("/exercises/{exercise_id}/revision")
+    def start_revision(exercise_id: str, response: Response) -> dict[str, Any]:
+        """Open the one revision of a reviewed exercise; repeated or parallel calls return the same attempt."""
+        store, row = load(exercise_id, writable=True)
+        typed_only(row)
+        try:
+            attempt, created = store.start_revision(exercise_id)
+        except RevisionNotAllowed as refused:
+            later = any(a["attempt_number"] > 1 for a in store.attempts(exercise_id))
+            message = REVISION_REFUSED_ES["attempt limit reached"] if later \
+                else REVISION_REFUSED_ES.get(str(refused), "No se puede mejorar este ejercicio.")
+            raise api_error(409, "revision_not_allowed", message) from None
+        response.status_code = 201 if created else 200
+        return {"created": created, **attempt_view(store, row, attempt)}
+
+    def load_attempt(attempt_id: str) -> tuple[WritingStore, dict[str, Any]]:
+        """A revision attempt the student may write; attempt 1 is written only through the exercise routes."""
+        if not ATTEMPT_ID.match(attempt_id):
+            raise api_error(422, "invalid_attempt", "La versión no es válida.")
+        store = service.get()
+        attempt = store.attempt(attempt_id)
+        if attempt is None:
+            raise api_error(404, "attempt_not_found", "No encontramos esta versión.")
+        if attempt["attempt_number"] == 1:
+            raise api_error(409, "attempt_routes_are_for_revisions", "Esta versión se guarda desde el ejercicio.")
+        _, row = load(attempt["exercise_id"], writable=True)
+        typed_only(row)
+        return store, row
+
+    @router.put("/attempts/{attempt_id}/draft")
+    def save_attempt_draft(attempt_id: str, request: DraftRequest) -> dict[str, Any]:
+        try:
+            store, row = load_attempt(attempt_id)
+            if guided(row):
+                parts = guided_sections(row, request.sections)
+                saved = store.save_attempt_draft(attempt_id, assemble_sections(parts), parts, request.client_seq)
+            else:
+                saved = store.save_attempt_draft(attempt_id, request.text, client_seq=request.client_seq)
+        except psycopg.Error:
+            raise api_error(503, "save_failed", "No se pudo guardar el borrador. Intentá de nuevo.") from None
+        except LookupError:
+            raise api_error(404, "attempt_not_found", "No encontramos esta versión.") from None
+        if saved is None:
+            raise api_error(409, "already_submitted", "Esta versión ya fue entregada; no se puede cambiar.")
+        return {"word_count": saved["word_count"], "saved_at": saved["updated_at"].isoformat(),
+                "applied": saved["applied"], "client_seq": saved["client_seq"]}
+
+    @router.post("/attempts/{attempt_id}/submit")
+    def submit_attempt(attempt_id: str, request: SubmitRequest) -> dict[str, Any]:
+        store, row = load_attempt(attempt_id)
+        text, parts = submitted_text(row, request, store.attempt_submission(attempt_id) is not None)
+        try:
+            sub, created = store.submit_attempt(attempt_id, text, request.client_request_id, parts)
+        except LookupError:
+            raise api_error(404, "attempt_not_found", "No encontramos esta versión.") from None
         return {"created": created, **submission_view(sub, store.evaluation_for(sub["submission_id"]))}
 
     return router

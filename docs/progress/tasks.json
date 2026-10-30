@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-10-24",
+  "updated": "2026-10-28",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -1073,7 +1073,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T032_result.md",
       "failures": [],
-      "notes": "Bank: 11 exported, quarantined skipped; rehearsal imported 11, rerun unchanged 11. ADR-031 tutor access Proposed. Not deployed. Suite 545; browser 447/447."
+      "notes": "Bank: 11 exported, quarantined skipped; rehearsal imported 11, rerun unchanged 11. ADR-031 tutor access proposed (accepted later, T033). Suite 545; browser 447/447. Published 2026-10-27: main 2f6a4b3, CI 40582892305, ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137. Deployed 2026-10-28 (server time): backup mentor_pro_2026-10-28_002257.dump (BACKUP OK, 127791 B, 600 root); app on sha256:5d69fe6c…1137 (endpoints 200, tutor routes 404 on both student addresses). Bank imported: dry run 11/0 rejected, import 11, re-import 11 unchanged, student records untouched; L1 3, L2 3, L3 3, L4 2. Real-user acceptance pending."
     },
     {
       "id": "T033",
@@ -1102,7 +1102,373 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T033_result.md",
       "failures": [],
-      "notes": "34 security tests; suite 579. Not deployed."
+      "notes": "34 security tests; suite 579. Published 2026-10-27: main 2f6a4b3, CI 40582892305, ghcr.io/jonnabio/mentor-pro@sha256:5d69fe6c2560626afe78a61b04e64e5c81b59eff4b2a73f6bd0327756a6e1137. Deployed 2026-10-28 (server time): backup mentor_pro_2026-10-28_002257.dump (BACKUP OK, 127791 B, 600 root); app on sha256:5d69fe6c…1137 (endpoints 200, tutor routes 404 on both student addresses). Tutor service up on 127.0.0.1:8081 only; refused on Wi-Fi/Tailscale/wired; no token/wrong/forged XFF 403, valid token 200; token not in logs. Defect: token of 1-15 chars exits 1 not 78 (T035). Real-user acceptance pending."
+    },
+    {
+      "id": "T034",
+      "name": "Deterministic test_transient_failure_then_success_completes (maintenance)",
+      "objective": "Remove the timing dependence in tests/app/test_practice_set.py::test_transient_failure_then_success_completes without changing the practice engine.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": [
+          "tests/app/test_practice_set.py"
+        ]
+      },
+      "depends_on": [],
+      "complexity": "XS",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T034_result.md",
+      "failures": [],
+      "notes": "Observed: dev CI run 40534292823 attempt 1 failed, rerun passed (2026-10-27). Cause: FlakyLlm keeps one shared counter of 6 forced 502s under the FakeLlm lock; parallel slots draw from it in scheduling order, so slot 0 may receive no failure and the assertion slots[0].requests[0]['status']=='unavailable' fails. Repro: run the test in a loop (pytest --count / for loop) under CPU load. Proposed fix: assert that some slot recorded an 'unavailable' request and that the 6 failures are all accounted for across slots, or key the failures to slot 0's prompt. Out of scope: practice-engine changes; CI pull_request trigger for dev is a separate improvement."
+    },
+    {
+      "id": "T035",
+      "name": "Tutor entrypoint: exit 78 for every refused start (tokens of 1-15 characters)",
+      "objective": "app.tutor_main must reject any token shorter than 32 characters with TutorConfigurationError and exit 78; today importing app.main builds the student app first, whose 16-character check raises ValueError (exit 1).",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": [
+          "app/tutor_main.py",
+          "tests/app/test_tutor_service.py"
+        ]
+      },
+      "depends_on": [
+        "T033"
+      ],
+      "complexity": "XS",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T035_result.md",
+      "failures": [],
+      "notes": "Found in production Stage 4 (2026-10-28): MENTOR_PRO_TUTOR_TOKEN=short -> exit 1. Fails closed (no listener), not a security exposure. Fix: remove the module-level create_app() import side effect (move STATIC_DIR/ApiError to a side-effect-free module) or validate before importing app.main; subprocess tests for 5, 16 and 31-character tokens; optional short-token case in the CI smoke."
+    },
+    {
+      "id": "T036",
+      "name": "Guided writing revision: student attempt data foundation (ADR-032)",
+      "objective": "Versioned, explicitly invoked migration 0001_student_attempts: writing.student_attempt, attempt-scoped drafts and submissions (one submission per attempt), attempt 1 backfilled with every historical record unchanged, transactional rollback; attempt-aware store methods with exercise-level methods kept on attempt 1. No student UI, tutor UI, progress or deployment changes.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/writing/migrations.py",
+          "app/writing/migrate.py",
+          "tests/app/test_writing_attempts.py",
+          "docs/progress/task_T036_result.md"
+        ],
+        "modify": [
+          "app/writing/store.py",
+          "app/writing/bank.py",
+          "docs/adr/ADR-032-guided-writing-revision-attempts.md",
+          "docs/planning/2026-10-28-guided-writing-revision-plan.md",
+          "docs/runbooks/production-deployment.md"
+        ]
+      },
+      "depends_on": [
+        "T033"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T036_result.md",
+      "failures": [],
+      "notes": "PO approved ADR-032 principles and T036 implementation on feature/T036-guided-writing-revision-design (2026-10-28). No production migration or deployment authorized. T037 (student revision UI), T038 (tutor re-evaluation), T039 (progress comparison) reserved, not registered. Verified 2026-10-28: 19 new tests, gate test 601 passed, browser 447/447. Awaiting PO confirmation of ADR-032 PO 1-3 and PR review; not merged or deployed."
+    },
+    {
+      "id": "T037",
+      "name": "Guided writing revision: student \"Mejorar mi respuesta\" workflow (ADR-032)",
+      "objective": "Additive attempt-scoped student API (start revision, attempt draft, attempt submit, revision_attempt view) and the student revision flow in the existing L1-L4 editor; attempt 1 compatibility, ordered autosave, submission immutability; no quarantined revisions; no tutor, progress or deployment changes. Released only together with T038.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_writing_revision_api.py",
+          "docs/progress/task_T037_result.md"
+        ],
+        "modify": [
+          "app/writing/routes.py",
+          "app/static/app.js",
+          "app/static/index.html",
+          "scripts/dev/practice_e2e.py",
+          "docs/adr/ADR-032-guided-writing-revision-attempts.md",
+          "docs/planning/2026-10-28-T037-student-revision-plan.md"
+        ]
+      },
+      "depends_on": [
+        "T036"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T037_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-28 after PO approval of the T037 plan, the ADR-032 amendment, quarantine rule (no revision) and joint release with T038. Not merged; not deployed. Verified 2026-10-28: 13 API tests, gate 621 passed, browser 473/473. Merged to dev as 6ed9703 (PR #13); dev CI 40745285425 green (519 passed, 102 skipped; image built and smoke-tested, not published)."
+    },
+    {
+      "id": "T038",
+      "name": "Guided writing revision: tutor re-evaluation (ADR-032)",
+      "objective": "Tutor queue and detail identify revision submissions and show the original response with its completed evaluation, the revised response and the official rubric; the new evaluation attaches only to the revision; previous evaluations immutable; the student sees the new review through the existing feedback view. ADR-031 isolation and token unchanged. No progress changes (T039).",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_writing_tutor_revision.py",
+          "scripts/dev/revision_restart_check.py",
+          "docs/progress/task_T038_result.md"
+        ],
+        "modify": [
+          "app/writing/tutor.py",
+          "app/static/tutor.js",
+          "app/static/tutor.html",
+          "app/static/app.js",
+          "app/static/index.html",
+          "scripts/dev/practice_e2e.py",
+          "docs/adr/ADR-032-guided-writing-revision-attempts.md"
+        ]
+      },
+      "depends_on": [
+        "T037"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T038_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-28 after PO approval; ID reserved by ADR-032. Released only together with T037; T039 progress semantics required before release. Verified 2026-10-28: 5 API tests, gate 626 passed, browser 481/481, live restart 10/10. PR to dev open; not merged."
+    },
+    {
+      "id": "T040",
+      "name": "Deployment process simplification and repeatability assessment",
+      "objective": "Assess ADR-030/ADR-031 architecture, the production runbook and scripts, GHCR immutable releases, the T036 explicit migration and schema compatibility, backup/restore rehearsal and verification, approval gates, health and tutor security checks, rollback and recovery, automatable manual steps and replicability on a clean isolated environment; propose a documented, minimally complex, repeatable procedure using existing Docker Compose, PostgreSQL and GitHub Actions. Assessment only: no infrastructure provisioning, no production change.",
+      "status": "done",
+      "role": "Architect",
+      "files": {
+        "create": [
+          "docs/progress/task_T040_result.md",
+          "docs/planning/2026-10-28-deployment-simplification-assessment.md",
+          "docs/adr/ADR-033-repeatable-deployment-workflow.md"
+        ],
+        "modify": []
+      },
+      "depends_on": [
+        "T037"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T040_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-28 by PO priority after T037 reached review. T038 and T039 reserved for ADR-032, hence T040."
+    },
+    {
+      "id": "T041",
+      "name": "Versioned deployment Compose configuration, read-only status and smoke checks (ADR-033 I1)",
+      "objective": "Add deploy/compose.yml (production services of ADR-030/031 with health checks, image digest from non-secret release.env) and deploy/mentorpro with read-only status and smoke commands; test only against an isolated local environment on mentor_pro_test. No server, volume, secret, release workflow or container change.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "deploy/compose.yml",
+          "deploy/mentorpro",
+          "tests/app/test_deploy.py",
+          "docs/progress/task_T041_result.md"
+        ],
+        "modify": [
+          "docs/adr/ADR-033-repeatable-deployment-workflow.md"
+        ]
+      },
+      "depends_on": [
+        "T040"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T041_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-28 after PO approval of ADR-033 (I1 only). T039 reserved by ADR-032, hence T041. Increments I2-I5 need separate tasks and approvals. PO corrections applied (tutor health check only on 403; status UNKNOWN never healthy). Merged as cf43e91 (PR #16); dev CI 40781126775 green (539 passed). Compose CLI validation not run locally (no Docker); added as a Docker-gated test in T042."
+    },
+    {
+      "id": "T042",
+      "name": "Restore-checked backups (ADR-033 I2)",
+      "objective": "deploy/mentorpro backup: pg_dump -Fc into a never-overwritten file, fingerprint the source (table counts and deterministic per-table checksums) before and after the dump, restore into a disposable PostgreSQL with its own volume and network, compare, report BACKUP OK only then; verify-backup re-checks an earlier dump; metadata without row data or secrets; cleanup verified and limited to resources the run created. Synthetic test data only.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_deploy_backup.py",
+          "docs/progress/task_T042_result.md"
+        ],
+        "modify": [
+          "deploy/mentorpro",
+          ".gitattributes"
+        ]
+      },
+      "depends_on": [
+        "T041"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T042_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-28 after PO approval of I2 following T041 integration. Separate PR to dev; not merged without PO approval. No server, volume or production change. PO pre-merge changes: full fingerprint scope with unexpected/missing schema failures; MENTORPRO_REQUIRE_DOCKER=1 in CI. Local gate 651 passed. Merged as 4efed63 (PR #17); dev CI 40787440842 green: 542 passed, 111 skipped; both Docker tests ran and passed (mandatory mode; +3 passed = 2 Docker + refusal, +9 skipped = local-cluster tests without PostgreSQL 17 tools on CI)."
+    },
+    {
+      "id": "T043",
+      "name": "Release metadata: OCI labels, immutable manifest, release tags, PR CI for dev (ADR-033 I3)",
+      "objective": "Schema range in code, OCI labels with a label check, validated release manifest and immutable vYYYY.MM.DD-N tag with GitHub Release on main only (dry-run artifact elsewhere), pull_request CI for dev. No publication or tag before an authorized main merge.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "scripts/release/release.py",
+          "docs/release/manifest.schema.json",
+          "tests/app/test_release.py",
+          "docs/progress/task_T043_result.md"
+        ],
+        "modify": [
+          ".github/workflows/ci.yml",
+          "app/writing/migrations.py",
+          "app/writing/migrate.py",
+          "docs/planning/2026-10-28-T043-release-metadata-plan.md"
+        ]
+      },
+      "depends_on": [
+        "T042"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T043_result.md",
+      "failures": [],
+      "notes": "Plan approved 2026-10-28 with refinements (identity before build, concurrency, partial-release recovery, least privilege). v* tag ruleset NOT configured (API returned [] on 2026-10-28). No main merge, publication or deployment. PO approved merge 2026-10-28: head e6a9877 unchanged, scope T043 only; PR #19 merged as 474774e; dev CI 40809496126 green: 568 passed, 111 skipped (Docker tests mandatory), identity dev-474774e, LABELS OK, both smoke tests passed, MANIFEST OK, artifact manifest-dry-run; GHCR login, refuse-taken, publish and Tag and Release skipped; no v* tag, no GitHub Release. Not release-ready: ruleset, real GHCR digest path and partial-release recovery unverified."
+    },
+    {
+      "id": "T044",
+      "name": "Preflight, compatibility, deploy and rollback (ADR-033 I4)",
+      "objective": "deploy/mentorpro preflight, deploy and rollback by digest with the schema compatibility rule checked before any container change, safe refusal of incompatible rollbacks, append-only RELEASES; tested in an isolated project with a local registry and synthetic data.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "deploy/mentorpro_deploy.py",
+          "tests/app/test_deploy_rollout.py",
+          "docs/progress/task_T044_result.md"
+        ],
+        "modify": [
+          "deploy/mentorpro",
+          "tests/app/test_deploy.py",
+          "tests/app/test_deploy_backup.py",
+          ".gitattributes",
+          "docs/adr/ADR-033-repeatable-deployment-workflow.md",
+          "docs/planning/2026-10-28-T044-deploy-rollback-plan.md"
+        ]
+      },
+      "depends_on": [
+        "T043"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 2,
+      "result_file": "docs/progress/task_T044_result.md",
+      "failures": [],
+      "notes": "Plan proposed 2026-10-28 for PO review; implementation NOT authorized. PO approved 2026-10-28 (manifest as local file, 6 h evidence, manual rollback only, window + PO authorization references required). PR #20 merged as 0bcf64d. Implemented; PR #21 to dev; PR CI 40811750620 green (636 passed, Docker cycle test ran). Not merged without PO approval; nothing run on the server. PO review 2026-10-29: conditional approval; corrections applied in 70fa714 (compose failure FAILED with previous and error; final registry/tag/label identity check under the lock; rollback provenance via stored manifest or adopt-legacy plus prior OK record). ACE gate 754 passed; PR CI 40890220768 green (646 passed, Docker cycle ran). PR #21 (head 19275cc, T044 scope only) merged as 8b3fc44; dev CI 40892027308 green: 646 passed, 111 skipped (Docker mandatory; deploy/rollback cycle ran), LABELS OK, both smoke tests, MANIFEST OK dev-8b3fc44; GHCR login, refuse-taken, publish and Tag and Release skipped; no v* tag or release."
+    },
+    {
+      "id": "T045",
+      "name": "Isolated migration rehearsal and gated migration (ADR-033 I5)",
+      "objective": "mentorpro rehearse (restore a dump copy into an isolated, unpublished compose project, migrate with the target image, smoke, verified cleanup, REHEARSAL OK) and maintenance start/end plus migrate (G2) bound to the same digest and dump, PO references recorded. Synthetic data only.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "deploy/mentorpro_migrate.py",
+          "deploy/compose.rehearsal.yml",
+          "tests/app/test_deploy_migrate.py",
+          "docs/progress/task_T045_result.md",
+          "docs/planning/2026-10-29-T045-migration-rehearsal-plan.md"
+        ],
+        "modify": [
+          "deploy/mentorpro",
+          "deploy/mentorpro_deploy.py",
+          "tests/app/test_deploy.py",
+          "docs/adr/ADR-033-repeatable-deployment-workflow.md"
+        ]
+      },
+      "depends_on": [
+        "T044"
+      ],
+      "complexity": "L",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T045_result.md",
+      "failures": [],
+      "notes": "Plan proposed 2026-10-29 for PO review; implementation, server runs and real production dumps NOT authorized. PR #22 merged as 148b918. PO approved 2026-10-29 (no published ports, same-window rehearsal on the migration backup, app and tutor stopped, /var/lib/mentor-pro/rehearsal, 60 min downtime with 40 min checkpoint, no automatic restore or rollback). Implemented on feature/T045-migration-rehearsal; ACE gate pass; PR CI 40916932558 green (734 passed, 111 skipped, both Docker tests ran). PO review 2026-10-29: conditional approval; corrections in 9e38d8b (window identity bound through maintenance start, rehearse, migrate and maintenance end; incomplete or malformed timing evidence refuses). ACE gate pass; PR CI 40935391123 and 40936772958 green (762 passed, 111 skipped, Docker tests ran). PR #23 (head 8c0abc7, T045 scope only) merged as ca20f6c; dev CI 40938783292 green: 762 passed, 111 skipped, LABELS OK, both smoke tests, MANIFEST OK dev-ca20f6c; publish and Tag and Release skipped. Synthetic data only; nothing on the server."
+    },
+    {
+      "id": "T039",
+      "name": "Writing progress and revision comparison (ADR-032)",
+      "objective": "Count writing progress by unique exercise, track first attempts and improvements separately, show students and tutor a per-criterion first-versus-improved comparison when both are evaluated; existing progress API backward compatible; no schema change.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_writing_progress_revisions.py",
+          "docs/progress/task_T039_result.md"
+        ],
+        "modify": [
+          "app/writing/progress.py",
+          "app/writing/store.py",
+          "app/writing/routes.py",
+          "app/writing/tutor.py",
+          "app/static/app.js",
+          "app/static/index.html",
+          "app/static/tutor.js",
+          "app/static/tutor.html",
+          "scripts/dev/practice_e2e.py",
+          "docs/adr/ADR-032-guided-writing-revision-attempts.md",
+          "docs/planning/2026-10-29-T039-writing-progress-plan.md"
+        ]
+      },
+      "depends_on": [
+        "T036",
+        "T037",
+        "T038"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T039_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together. PR #25 merged as b192f01; dev CI 40987035330 green (762 passed). PO approved implementation 2026-10-29 with refinements (backward-compatible existing fields, Spanish criterion descriptions). Implemented on feature/T039-writing-progress; 11 new tests; browser e2e 485/485. PR into dev for PO review; not merged. PO approved PR #26 (additive-counter design). PR #26 (head 351e087, T039 scope only) merged as e22d59d; dev CI 40993295690 green: 773 passed, 111 skipped (Docker mandatory), LABELS OK, both smoke tests, MANIFEST OK dev-e22d59d; publish and Tag and Release skipped. Not deployed."
+    },
+    {
+      "id": "T046",
+      "name": "Tutor page: visible navigation back to Mentor Pro",
+      "objective": "The tutor page (/tutor) has no way back to the student application. Add a minimal 'Volver a Mentor Pro' link in the tutor header without changing authentication, token handling, allowed hosts or the tutor service's routes; the student app still never links to the tutor (ADR-024).",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": [
+          "app/static/tutor.html",
+          "app/static/styles.css",
+          "tests/app/test_tutor_service.py"
+        ]
+      },
+      "depends_on": [
+        "T033"
+      ],
+      "complexity": "XS",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T046_result.md",
+      "failures": [],
+      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented."
     }
   ]
 }

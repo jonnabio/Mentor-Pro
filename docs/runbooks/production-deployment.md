@@ -43,7 +43,7 @@ Record the schemas that already exist. If `curriculum` already has a
 ```bash
 sudo install -d -m 700 -o root -g root /var/backups/mentor-pro
 DUMP=/var/backups/mentor-pro/mentor_pro_$(date +%F_%H%M%S).dump
-$COMPOSE exec -T postgres pg_dump -U mentor_pro_admin -d mentor_pro -Fc \
+$COMPOSE exec -T postgres pg_dump -U mentor_pro_admin -d mentor_pro -Fc </dev/null \
   | sudo sh -c "umask 077 && cat > $DUMP" \
   && sudo test -s "$DUMP" \
   && sudo chmod 600 "$DUMP" \
@@ -266,10 +266,11 @@ scp writing-bank.json jonnabio@100.64.84.15:/tmp/writing-bank.json
 On the server (after section B gives `BACKUP OK`):
 
 ```bash
-sudo install -m 600 -o root -g root /tmp/writing-bank.json /opt/mentor-pro/baseline/writing-bank.json
+# owner uid 1000 = the container user `mentor` (like the workbook); root-owned fails with Permission denied
+sudo install -m 600 -o 1000 -g 1000 /tmp/writing-bank.json /opt/mentor-pro/baseline/writing-bank.json
 rm /tmp/writing-bank.json
 bank() {
-  $COMPOSE run --rm --no-deps -v /opt/mentor-pro/baseline:/baseline:ro app     python -m app.writing.bank "$@"
+  $COMPOSE run --rm --no-deps -T -v /opt/mentor-pro/baseline:/baseline:ro app     python -m app.writing.bank "$@" </dev/null
 }
 bank inventory                                    # before: expect 0 eligible
 bank import /baseline/writing-bank.json --dry-run # expect imported 11, rejected []
@@ -375,8 +376,45 @@ ssh -N -L 8081:127.0.0.1:8081 jonnabio@100.64.84.15
 # then open http://127.0.0.1:8081/tutor and enter the token
 ```
 
-A start failure with `TutorConfigurationError` means the token or the
+A refused start exits 78 (`tutor configuration rejected: …`); a token of 1–15
+characters currently exits 1 with `ValueError` from the student module
+import (still refused; T035). A start failure with `TutorConfigurationError` means the token or the
 allowed hosts are wrong; fix `tutor.env` (never widen it to a range). If
 the compose network is recreated, recheck the gateway: a wrong address
 answers 403 to everything. `docker compose stop tutor` disables review
 without affecting students.
+
+## K. Writing schema migration 0001 (T036, ADR-032) — not yet authorized
+
+An image that contains T036 refuses to start (app: uvicorn "Application
+startup failed"; tutor service: exit 78 "tutor start refused") on a
+database whose writing tables predate migration `0001_student_attempts`
+(`SchemaMigrationRequired`); the current production image is unaffected.
+Applying it in production needs separate Product Owner approval. Planned
+order, all with the new pinned `DIGEST`:
+
+1. Section B backup (`BACKUP OK`) and an isolated restore rehearsal of that
+   dump on which `apply --dry-run` and `apply` are run first.
+2. `$COMPOSE stop app tutor` (no student writes during the migration).
+3. Dry run, then the same command without `--dry-run`:
+
+   ```bash
+   $COMPOSE run --rm -T --no-deps app \
+     python -m app.writing.migrate apply --dry-run </dev/null
+   ```
+
+   Output is counts and digests only; the
+   `before` and `after` digests must be equal. `MIGRATION FAILED (nothing
+   changed)` leaves the database as it was.
+4. Section F with the new digest; `migrate status` answers `current`.
+
+Rollback: `python -m app.writing.migrate rollback` (with the new image)
+restores the old schema only while no revision attempt exists; afterwards,
+restore the pre-migration backup in an approved window after exporting the
+revision attempts (ADR-032). Never `docker compose down -v`.
+
+Never start a pre-T036 image on a migrated database: it recreates
+`uq_submission_exercise` and its draft saves and new submissions fail
+(ADR-032, "Old image against a migrated database"). If it happened, the
+new image refuses to start with "run `python -m app.writing.migrate
+repair`"; that command drops only the recreated index.

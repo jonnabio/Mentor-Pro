@@ -165,6 +165,7 @@
           <div><dt>Ejercicios entregados</dt><dd id="dw-submitted"></dd></div>
           <div><dt>Evaluaciones completadas</dt><dd id="dw-completed"></dd></div>
           <div><dt>Evaluaciones pendientes</dt><dd id="dw-pending"></dd></div>
+          <div><dt>Mejoras entregadas</dt><dd id="dw-improvements"></dd></div>
           <div><dt>Última práctica de escritura</dt><dd id="dw-last"></dd></div>
         </dl>
         <h3>Ejercicios por nivel</h3>
@@ -178,6 +179,13 @@
           por el tutor. Los criterios «No evaluable» (letra a mano en un texto escrito en la computadora) no
           cuentan.</p>
         <div id="dw-dimensions"></div>
+        <!-- T039 (ADR-032): first versus improved version, per criterion, only when both are reviewed. -->
+        <div id="dw-revisions-block" hidden>
+          <h3>Mis mejoras</h3>
+          <p class="muted small">Compara la primera versión con la mejorada en cada criterio que el tutor
+            revisó en las dos. No es una calificación oficial.</p>
+          <div id="dw-revisions"></div>
+        </div>
         <button type="button" id="dw-open-writing" class="secondary">Ir a Producción escrita</button>
       </div>
       <button type="button" id="dashboard-menu" class="primary">Volver al menú principal</button>
@@ -219,6 +227,49 @@
           <h4>Texto para corregir</h4>
           <p id="writing-source-text" class="source-text"></p>
         </div>
+        <!-- Above the editor so that, while improving (T037), the first response and its review come first. -->
+        <div id="writing-submitted" hidden>
+          <p id="writing-pending" class="choice-notice" role="status"></p>
+          <div id="writing-feedback" hidden>
+            <h4>Revisión del tutor</h4>
+            <p id="writing-feedback-date" class="muted small"></p>
+            <ul id="writing-feedback-scores" class="plain-list feedback-scores"></ul>
+            <h4 id="writing-feedback-strengths-title">Comentarios del tutor</h4>
+            <ul id="writing-feedback-strengths"></ul>
+            <h4 id="writing-feedback-improvements-title">Para mejorar</h4>
+            <ul id="writing-feedback-improvements"></ul>
+            <p id="writing-feedback-next" class="choice-notice" hidden></p>
+          </div>
+          <h4 id="writing-submitted-title">Tu texto entregado</h4>
+          <p id="writing-submitted-text" class="submitted-text"></p>
+          <!-- T037 (ADR-032): one improved version after the tutor's review. -->
+          <div id="writing-revision" hidden>
+            <div id="writing-revision-done" hidden>
+              <h4>Mi nueva versión</h4>
+              <p id="writing-revision-status" class="choice-notice" role="status"></p>
+              <p id="writing-revision-text" class="submitted-text"></p>
+              <div id="writing-revision-feedback" hidden>
+                <h4>Revisión del tutor de mi mejora</h4>
+                <p id="writing-revision-feedback-date" class="muted small"></p>
+                <ul id="writing-revision-feedback-scores" class="plain-list feedback-scores"></ul>
+                <h4 id="writing-revision-feedback-strengths-title">Comentarios del tutor</h4>
+                <ul id="writing-revision-feedback-strengths"></ul>
+                <h4 id="writing-revision-feedback-improvements-title">Para mejorar</h4>
+                <ul id="writing-revision-feedback-improvements"></ul>
+                <p id="writing-revision-feedback-next" class="choice-notice" hidden></p>
+                <div id="writing-comparison" hidden>
+                  <h4>Comparación con mi primera versión</h4>
+                  <p id="writing-comparison-summary" class="choice-notice"></p>
+                  <ul id="writing-comparison-criteria" class="plain-list feedback-scores"></ul>
+                </div>
+              </div>
+            </div>
+            <div class="actions">
+              <button type="button" id="writing-revise" class="primary" hidden>Mejorar mi respuesta</button>
+            </div>
+          </div>
+        </div>
+        <h4 id="writing-new-title" hidden>Mi nueva versión</h4>
         <div id="writing-editor" hidden>
           <label for="writing-text" class="field-label">Tu texto</label>
           <textarea id="writing-text" rows="12" spellcheck="false" autocorrect="off" autocapitalize="off"
@@ -280,21 +331,6 @@
             <button type="button" id="guided-next" class="primary">Siguiente etapa</button>
             <button type="button" id="guided-submit" class="primary" hidden>Entregar composición</button>
           </div>
-        </div>
-        <div id="writing-submitted" hidden>
-          <p id="writing-pending" class="choice-notice" role="status"></p>
-          <div id="writing-feedback" hidden>
-            <h4>Revisión del tutor</h4>
-            <p id="writing-feedback-date" class="muted small"></p>
-            <ul id="writing-feedback-scores" class="plain-list feedback-scores"></ul>
-            <h4 id="writing-feedback-strengths-title">Comentarios del tutor</h4>
-            <ul id="writing-feedback-strengths"></ul>
-            <h4 id="writing-feedback-improvements-title">Para mejorar</h4>
-            <ul id="writing-feedback-improvements"></ul>
-            <p id="writing-feedback-next" class="choice-notice" hidden></p>
-          </div>
-          <h4>Tu texto entregado</h4>
-          <p id="writing-submitted-text" class="submitted-text"></p>
         </div>
         <button type="button" id="writing-back-list" class="secondary">Volver a los ejercicios</button>
       </div>
