@@ -1413,7 +1413,7 @@
       "id": "T039",
       "name": "Writing progress and revision comparison (ADR-032)",
       "objective": "Count writing progress by unique exercise, track first attempts and improvements separately, show students and tutor a per-criterion first-versus-improved comparison when both are evaluated; existing progress API backward compatible; no schema change.",
-      "status": "pending",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1444,7 +1444,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T039_result.md",
       "failures": [],
-      "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together. PR #25 merged as b192f01; dev CI 40987035330 green (762 passed). PO approved implementation 2026-10-29 with refinements (backward-compatible existing fields, Spanish criterion descriptions). Implemented on feature/T039-writing-progress; 11 new tests; browser e2e 485/485. PR into dev for PO review; not merged."
+      "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together. PR #25 merged as b192f01; dev CI 40987035330 green (762 passed). PO approved implementation 2026-10-29 with refinements (backward-compatible existing fields, Spanish criterion descriptions). Implemented on feature/T039-writing-progress; 11 new tests; browser e2e 485/485. PR into dev for PO review; not merged. PO approved PR #26 (additive-counter design). PR #26 (head 351e087, T039 scope only) merged as e22d59d; dev CI 40993295690 green: 773 passed, 111 skipped (Docker mandatory), LABELS OK, both smoke tests, MANIFEST OK dev-e22d59d; publish and Tag and Release skipped. Not deployed."
     }
   ]
 }

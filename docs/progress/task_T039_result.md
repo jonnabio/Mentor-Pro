@@ -3,7 +3,11 @@
 - **Date:** 2026-10-29
 - **Role:** Developer
 - **Branch:** `feature/T039-writing-progress` (from `dev` at `b192f01`)
-- **Status:** implemented; PR #26 into `dev` for PO review, not merged.
+- **Status:** integrated: PR #26 (head `351e087`) approved and merged
+  into `dev` as `e22d59d`; `dev` CI
+  [40993295690](https://github.com/jonnabio/Mentor-Pro/actions/runs/40993295690)
+  green (773 passed, 111 skipped, Docker tests ran, labels and smoke
+  tests passed, publish and tag skipped). Not deployed.
   Synthetic data only (`mentor_pro_test`); nothing deployed, migrated
   or published.
 
@@ -73,4 +77,5 @@ it as another "entregado" exercise, which blocked the T037+T038 release.
 
 ## Next
 
-PO review of the T039 PR. Merge only with approval.
+Done in `dev`. Release with T036–T038 per the release-readiness
+assessment, each step separately authorized.

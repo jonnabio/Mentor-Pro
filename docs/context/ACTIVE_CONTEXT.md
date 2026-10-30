@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-29 (T039 plan PR #25 merged as `b192f01`,
-  `dev` CI green; T039 implemented, PR into `dev` for PO review)
-- **Active Role:** Developer
+- **Last Updated:** 2026-10-29 (T039 merged as `e22d59d`, `dev` CI
+  green; release-readiness assessment proposed for PO review)
+- **Active Role:** Architect
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
   GHCR) and 2026-10-26 to 2026-10-27 (deployment Stages 6.1–6.3: RCA-005,
@@ -472,14 +472,14 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **T039 implemented; PR #26 into `dev` for PO review, not merged**
-   ([plan](../planning/2026-10-29-T039-writing-progress-plan.md),
-   [result](../progress/task_T039_result.md)). Plan PR #25 merged as
-   `b192f01`; `dev` CI 40987035330 green. Exercises counted once,
-   improvements apart, criterion comparison for student and tutor;
-   existing fields unchanged. ACE gate 878 passed; PR CI 40991209450
-   green (773 passed, 111 skipped). Required before the next production
-   application release (with T037 and T038).
+0. **Release-readiness assessment for PO review**
+   ([assessment](../planning/2026-10-29-release-readiness-assessment.md)):
+   T039 integrated (PR #26 merged as `e22d59d`; `dev` CI 40993295690
+   green, 773 passed, Docker tests, labels and smoke OK, publish and tag
+   skipped). Proposed sequence: real-user acceptance, `v*` ruleset,
+   first real release from `main`, I6 adoption, timing rehearsal, I7
+   window, revision check, I8. No feature development started; nothing
+   authorized beyond `dev`.
 1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,
    any server run (I6 onward), the migration and deployment are
