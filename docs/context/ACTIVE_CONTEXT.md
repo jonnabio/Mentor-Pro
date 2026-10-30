@@ -474,7 +474,9 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 0. **Release preparation (PO decision 2026-10-30)**
    ([plan](../planning/2026-10-30-release-acceptance-and-inspection-plan.md)):
-   assessment PR #27 merged as `c3dc5da`. Approved now: T032/T033
+   assessment PR #27 merged as `c3dc5da` (`dev` CI 41061369939 green:
+   773 passed, 111 skipped, labels, smoke and manifest OK, publish
+   skipped). Approved now: T032/T033
    real-user acceptance on the current production (no service restarts)
    and owner-configured `v*` tag protection. Then, each separately
    authorized: A read-only server inspection; B release `dev` → `main`,

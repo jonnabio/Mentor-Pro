@@ -6,7 +6,8 @@
   protection) are approved by the PO decision of 2026-10-30. Part 3 (server
   inspection) is a plan only and needs separate PO authorization.
 - **Inputs:** [release-readiness assessment](2026-10-29-release-readiness-assessment.md)
-  (PR #27, merged as `c3dc5da`), runbook sections H and J, T032/T033
+  (PR #27, merged as `c3dc5da`; `dev` CI 41061369939 green, 773
+  passed, 111 skipped, publish skipped), runbook sections H and J, T032/T033
   results.
 
 ## PO decisions of 2026-10-30
