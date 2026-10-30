@@ -1408,6 +1408,37 @@
       "result_file": "docs/progress/task_T045_result.md",
       "failures": [],
       "notes": "Plan proposed 2026-10-29 for PO review; implementation, server runs and real production dumps NOT authorized. PR #22 merged as 148b918. PO approved 2026-10-29 (no published ports, same-window rehearsal on the migration backup, app and tutor stopped, /var/lib/mentor-pro/rehearsal, 60 min downtime with 40 min checkpoint, no automatic restore or rollback). Implemented on feature/T045-migration-rehearsal; ACE gate pass; PR CI 40916932558 green (734 passed, 111 skipped, both Docker tests ran). PO review 2026-10-29: conditional approval; corrections in 9e38d8b (window identity bound through maintenance start, rehearse, migrate and maintenance end; incomplete or malformed timing evidence refuses). ACE gate pass; PR CI 40935391123 and 40936772958 green (762 passed, 111 skipped, Docker tests ran). PR #23 (head 8c0abc7, T045 scope only) merged as ca20f6c; dev CI 40938783292 green: 762 passed, 111 skipped, LABELS OK, both smoke tests, MANIFEST OK dev-ca20f6c; publish and Tag and Release skipped. Synthetic data only; nothing on the server."
+    },
+    {
+      "id": "T039",
+      "name": "Writing progress and revision comparison (ADR-032)",
+      "objective": "Count writing progress by unique exercise, track first attempts and improvements separately, show students and tutor a per-criterion first-versus-improved comparison when both are evaluated; existing progress API backward compatible; no schema change.",
+      "status": "pending",
+      "role": "Architect",
+      "files": {
+        "create": [
+          "docs/planning/2026-10-29-T039-writing-progress-plan.md",
+          "docs/progress/task_T039_result.md"
+        ],
+        "modify": [
+          "app/writing/progress.py",
+          "app/writing/store.py",
+          "app/writing/tutor.py",
+          "app/static/app.js",
+          "tests/app/test_writing_progress.py"
+        ]
+      },
+      "depends_on": [
+        "T036",
+        "T037",
+        "T038"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T039_result.md",
+      "failures": [],
+      "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together."
     }
   ]
 }

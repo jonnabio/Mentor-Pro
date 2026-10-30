@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-29 (T044 = I4 merged as `8b3fc44`; I5
-  design merged as `148b918`; T045 = I5 merged as `ca20f6c`, `dev` CI green)
-- **Active Role:** Developer
+- **Last Updated:** 2026-10-29 (T045 = I5 integrated: `ca20f6c`, record
+  PR #24 as `513e545`, `dev` CI green; T039 plan proposed for PO review)
+- **Active Role:** Architect
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
   GHCR) and 2026-10-26 to 2026-10-27 (deployment Stages 6.1–6.3: RCA-005,
@@ -116,7 +116,10 @@ migration). ACE gate pass; PR CI 40936772958 green on head `8c0abc7`
 (762 passed, 111 skipped, Docker tests ran). **Integrated:** PR #23
 merged as `ca20f6c`; `dev` CI 40938783292 green (762 passed, 111
 skipped, `LABELS OK`, both smoke tests, `MANIFEST OK` `dev-ca20f6c`;
-publish and Tag and Release skipped).
+publish and Tag and Release skipped). Integration record PR #24 (head
+`8c9b833`, docs only) merged as `513e545`; `dev` CI 40978874646 green
+(762 passed, 111 skipped, `MANIFEST OK` `dev-513e545`). No further
+deployment-tooling development authorized.
 [T045 result](../progress/task_T045_result.md).
 
 **Release constraints (PO):** T037 and T038 only together; T039 must fix
@@ -469,7 +472,13 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **I5 (T045) integrated in `dev`; next increment needs PO
+0. **T039 plan for PO review**
+   ([plan](../planning/2026-10-29-T039-writing-progress-plan.md)): count
+   progress by exercise, separate first attempts and improvements,
+   student and tutor comparison; 4 decisions requested; implementation
+   not authorized. Required before the next production application
+   release.
+1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,
    any server run (I6 onward), the migration and deployment are
    separately authorized. Owner to create the `v*` tag ruleset, then
@@ -478,34 +487,34 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    both released together.
    Do not start an image containing T036 in production; a production
    migration needs a restore rehearsal and separate approval (runbook K).
-1. **Real-user acceptance test.** On the student's own device
+2. **Real-user acceptance test.** On the student's own device
    (`http://192.168.50.229:8080`): Producción escrita → an exercise → type
    a short text → wait for "Guardado" → reload (text remains) → submit →
    status "Pendiente de revisión del tutor".
-2. **Parent tutor review.** SSH tunnel, `http://127.0.0.1:8081/tutor`,
+3. **Parent tutor review.** SSH tunnel, `http://127.0.0.1:8081/tutor`,
    token from `sudo cat /etc/mentor-pro/tutor.env` (kept in a password
    manager); score the rubric, save feedback, mark complete; the student
    sees it.
-3. **Persistence.** `sudo docker restart mentor-pro-app-1`; the submission
+4. **Persistence.** `sudo docker restart mentor-pro-app-1`; the submission
    and evaluation are still shown. Optional: from the student device
    `http://192.168.50.229:8081/` must fail.
-4. **Record acceptance** in this file and the T032/T033 notes from observed
+5. **Record acceptance** in this file and the T032/T033 notes from observed
    outcomes only; on a failure open a focused defect and keep the evidence.
-5. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
+6. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
    1–15 characters), T034 (deterministic practice-set test), then assess
    CI for PRs into `dev`; each a separate verified change.
-6. Stage 6.3 close: the student completes a five-question Matemáticas
+7. Stage 6.3 close: the student completes a five-question Matemáticas
    practice from the student's own device at `http://192.168.50.229:8080/`,
    sees the result, and the progress survives an app restart (ADR-030
    criterion 8). Record it in ACTIVE_CONTEXT.
-7. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
+8. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
    a small Matemáticas bank so practice does not wait about 5 minutes
    (writing is provisioned: 11 exercises).
-8. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
-9. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
+9. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
+10. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
    `.pre-wifi`, `.pre-t033` and `.pre-tutor` copies.
-10. Task 3 — CI maintenance (see Current Objective).
-11. Earlier backlog: L5 examination simulation candidate; reopening a
+11. Task 3 — CI maintenance (see Current Objective).
+12. Earlier backlog: L5 examination simulation candidate; reopening a
    completed evaluation; rerun `benchmark_writing_reviewers.py` when the
    free listing changes; revalidate `PE-L1-feria-ciencia-escuela-c9576f`
    (local database); `fail_interrupted()` follow-up (T018); suite slowdown.
