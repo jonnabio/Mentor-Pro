@@ -486,6 +486,11 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    PO; decision target 10 minutes after a failure during or after
    `migrate apply`; no automatic restore, rollback or forward correction.
    T035 deferred. Scope frozen to the writing revision milestone.
+   PR #28 merged as `682cba6` (`dev` CI 41064586679 green, 773 passed).
+   Step A done read-only
+   ([inspection](../progress/2026-10-30-server-inspection.md)): no
+   blocker for step B; A1/A2 (`sudo` listings) before I6. Acceptance
+   checklist ready; not yet performed, nothing recorded as accepted.
 1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,
    any server run (I6 onward), the migration and deployment are
