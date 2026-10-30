@@ -69,22 +69,30 @@ acceptance (PO: no disruptive restarts without explicit operational
 approval). Step 8 checks persistence from the user side; the restart check
 is listed as "not performed" unless separately approved.
 
+### Result
+
+**Functional acceptance PASSED** on 2026-10-30, on
+`sha256:5d69fe6c…1137`, from the PO's observations below. The optional
+security check (Wi-Fi refusal of the tutor port) and the container
+restart check are **NOT VERIFIED**. Finding T046 (no navigation from the
+tutor page back to Mentor Pro) is a usability issue, deferred by the PO.
+
 ### Evidence record
 
-| # | Date and time | Observed | Pass / fail / not performed | Notes |
-| --- | --- | --- | --- | --- |
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
-| 4 | | | | |
-| 5 | | | | |
-| 6 | | | | |
-| 7 | | | | |
-| 8 | | | | |
-| 9 | | | | |
+Source: the PO's observations of 2026-10-30 (the agent did not observe
+the session). Recorded as stated; no step is inferred.
+
+| Observation (PO) | Result |
+| --- | --- |
+| Submission | PASS |
+| Tutor evaluation | PASS |
+| Student feedback visibility | PASS |
+| Progress dashboard | PASS |
+| Autosave and browser persistence | PASS |
+| Optional security check and container restart check | NOT VERIFIED |
 
 Do not record the student's text, the token or screenshots showing
-either. Acceptance is complete only when steps 1–8 pass from observation.
+either. Acceptance is recorded only from observed results.
 A failure opens a focused defect with its evidence; if it is a material
 safety or reliability issue, the T035 deferral (PO decision 7) is
 reconsidered.

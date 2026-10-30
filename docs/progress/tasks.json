@@ -1445,6 +1445,30 @@
       "result_file": "docs/progress/task_T039_result.md",
       "failures": [],
       "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together. PR #25 merged as b192f01; dev CI 40987035330 green (762 passed). PO approved implementation 2026-10-29 with refinements (backward-compatible existing fields, Spanish criterion descriptions). Implemented on feature/T039-writing-progress; 11 new tests; browser e2e 485/485. PR into dev for PO review; not merged. PO approved PR #26 (additive-counter design). PR #26 (head 351e087, T039 scope only) merged as e22d59d; dev CI 40993295690 green: 773 passed, 111 skipped (Docker mandatory), LABELS OK, both smoke tests, MANIFEST OK dev-e22d59d; publish and Tag and Release skipped. Not deployed."
+    },
+    {
+      "id": "T046",
+      "name": "Tutor page: visible navigation back to Mentor Pro",
+      "objective": "The tutor page (/tutor) has no way back to the student application. Add a minimal 'Volver a Mentor Pro' link in the tutor header without changing authentication, token handling, allowed hosts or the tutor service's routes; the student app still never links to the tutor (ADR-024).",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": [
+          "app/static/tutor.html",
+          "app/static/styles.css",
+          "tests/app/test_tutor_service.py"
+        ]
+      },
+      "depends_on": [
+        "T033"
+      ],
+      "complexity": "XS",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 0,
+      "result_file": "docs/progress/task_T046_result.md",
+      "failures": [],
+      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented."
     }
   ]
 }

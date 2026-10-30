@@ -486,6 +486,14 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    PO; decision target 10 minutes after a failure during or after
    `migrate apply`; no automatic restore, rollback or forward correction.
    T035 deferred. Scope frozen to the writing revision milestone.
+   PR #28 merged as `682cba6` (`dev` CI 41064586679 green, 773 passed).
+   Step A done read-only
+   ([inspection](../progress/2026-10-30-server-inspection.md)): no
+   blocker for step B; A1/A2 (`sudo` listings) before I6. Acceptance
+   done: functional acceptance passed 2026-10-30 (PO observations;
+   optional security and restart checks not verified); T046 tutor
+   navigation deferred.
+   `v*` ruleset still not configured (API `[]`).
 1. **I5 (T045) integrated in `dev`; next increment needs PO
    authorization.** The first rehearsal on a real production backup,
    any server run (I6 onward), the migration and deployment are
@@ -537,8 +545,10 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   until T039.
 - Production practice generation takes about 5 minutes per new set and
   may return `partial` (4 of 5 in the test) until the bank fills.
-- **Blocker for closing the release:** the real-user acceptance test
-  (student and parent) has not been performed; nothing is marked accepted.
+- T032/T033 functional real-user acceptance passed 2026-10-30 (PO
+  observations; optional security and restart checks not verified).
+- T046 (usability, deferred by the PO): the tutor page has no navigation
+  back to Mentor Pro.
 - T035 (maintenance, pending): a tutor token of 1–15 characters refuses
   startup but exits 1 (`ValueError` while importing `app.main`) instead of
   78. Consistency defect; no listener starts; no authentication bypass.
