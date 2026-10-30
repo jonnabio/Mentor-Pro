@@ -3,7 +3,10 @@
 - **Date:** 2026-10-29
 - **Role:** Developer
 - **Branch:** `feature/T045-migration-rehearsal` (from `dev` at `148b918`)
-- **Status:** implemented; PR #23 into `dev` for PO review, not merged.
+- **Status:** integrated: PR #23 (head `8c0abc7`) merged into `dev` as
+  `ca20f6c` after the PO's conditional approval and corrections; `dev`
+  CI [40938783292](https://github.com/jonnabio/Mentor-Pro/actions/runs/40938783292)
+  green (762 passed, 111 skipped, Docker tests ran, publish skipped).
   Synthetic data only. Nothing run on the server or against production
   data; nothing published.
 
@@ -167,4 +170,6 @@ so they show the fixed cost of the steps, not the size of a real window.
 
 ## Next
 
-PO review of PR #23. Merge only with approval.
+Done in `dev`. The first rehearsal on a real production backup, any
+server run, the production migration and deployment each need separate
+PO authorization.
