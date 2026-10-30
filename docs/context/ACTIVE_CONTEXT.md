@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-29 (T039 merged as `e22d59d`, `dev` CI
-  green; release-readiness assessment proposed for PO review)
+- **Last Updated:** 2026-10-30 (session end: release preparation;
+  PRs #23–#30 merged into `dev`; step B waits for the `v*` ruleset)
 - **Active Role:** Architect
 - **Mode:** EXECUTION
 - **Session span:** 2026-10-22 to 2026-10-25 (T006–T031, CI fixes 1–3,
@@ -193,6 +193,27 @@ L5, 10–30 question sets or new features without approval.
 ## Handoff Summary
 
 ### Completed
+
+**Session 2026-10-29 to 2026-10-30 (release preparation, all in `dev`):**
+
+- PR #23 T045 I5 corrections (window binding, timing evidence) →
+  `ca20f6c`; PR #24 → `513e545`; PR #25 T039 plan → `b192f01`.
+- T039 writing progress and revision comparison (ADR-032 amendment):
+  PR #26 → `e22d59d`, `dev` CI 40993295690 green (773 passed).
+- Release-readiness assessment: PR #27 → `c3dc5da` (CI 41061369939);
+  PO decisions recorded (sequence A–G, recovery owner PO, 10-minute
+  decision target, separate timing rehearsal required, T035 deferred).
+- Release preparation plan (acceptance checklist, `v*` ruleset
+  instructions, inspection plan): PR #28 → `682cba6` (CI 41064586679).
+- Step A read-only server inspection
+  ([record](../progress/2026-10-30-server-inspection.md)): no blocker for
+  step B. T032/T033 functional acceptance PASSED (PO observations;
+  optional security and restart checks NOT VERIFIED). T046 registered and
+  deferred. Step B plan written
+  ([plan](../planning/2026-10-30-step-b-release-plan.md)). PR #29 →
+  `960a0bd` (CI 41072142382).
+- PR #30 merge record → `5afbe7e` (CI 41076093767, 773 passed, labels
+  and manifest OK).
 
 Baseline before this session: ACE 2.7.0 reset, T001 skills and checker
 (ADR-005), T002 baseline `PNE2026-SUM-v1.0` (ADR-006), T003 PostgreSQL
@@ -384,9 +405,12 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Current State
 
-- **T032/T033 are implemented, tested and deployed, but have not yet
-  passed the real-user production acceptance test.** No writing draft,
-  submission or evaluation exists in production yet.
+- **T032/T033 deployed and functionally accepted** (2026-10-30, PO
+  observations); real writing records now exist in production.
+- **`dev`** at `5afbe7e` plus this handoff: T034–T045 and T036–T039
+  merged and green; 64+ commits ahead of `main` (`2f6a4b3`). Nothing
+  released, published, migrated or deployed since 2026-10-28.
+- **`v*` tag ruleset: not configured** (API `[]`); `main` unprotected.
 - **Production (ADR-030, ADR-031):** macedonianserver, project
   `mentor-pro`, `/opt/mentor-pro/compose.deploy.yml`. `mentor-pro-app-1`
   and `mentor-pro-tutor-1` both run
@@ -472,68 +496,36 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-0. **Release preparation (PO decision 2026-10-30)**
-   ([plan](../planning/2026-10-30-release-acceptance-and-inspection-plan.md)):
-   assessment PR #27 merged as `c3dc5da` (`dev` CI 41061369939 green:
-   773 passed, 111 skipped, labels, smoke and manifest OK, publish
-   skipped). Approved now: T032/T033
-   real-user acceptance on the current production (no service restarts)
-   and owner-configured `v*` tag protection. Then, each separately
-   authorized: A read-only server inspection; B release `dev` → `main`,
-   GHCR publication and verification; C I6 adoption; D separate timing
-   rehearsal on real data (required, no waiver); E I7 window; F full
-   revision cycle by the student and the parent; G I8. Recovery owner:
-   PO; decision target 10 minutes after a failure during or after
-   `migrate apply`; no automatic restore, rollback or forward correction.
-   T035 deferred. Scope frozen to the writing revision milestone.
-   PR #28 merged as `682cba6` (`dev` CI 41064586679 green, 773 passed).
-   Step A done read-only
-   ([inspection](../progress/2026-10-30-server-inspection.md)): no
-   blocker for step B; A1/A2 (`sudo` listings) before I6. Acceptance
-   done: functional acceptance passed 2026-10-30 (PO observations;
-   optional security and restart checks not verified); T046 tutor
-   navigation deferred.
-   PR #29 merged as `960a0bd` (`dev` CI 41072142382 green, 773 passed).
-   Step B release PR waits for the `v*` ruleset (API `[]` on 2026-10-30).
-   `v*` ruleset still not configured (API `[]`).
-1. **I5 (T045) integrated in `dev`; next increment needs PO
-   authorization.** The first rehearsal on a real production backup,
-   any server run (I6 onward), the migration and deployment are
-   separately authorized. Owner to create the `v*` tag ruleset, then
-   verify it; validate the real GHCR digest on the first authorized
-   release. T039 (progress counting) before any T037+T038 release;
-   both released together.
-   Do not start an image containing T036 in production; a production
-   migration needs a restore rehearsal and separate approval (runbook K).
-2. **Real-user acceptance test.** On the student's own device
-   (`http://192.168.50.229:8080`): Producción escrita → an exercise → type
-   a short text → wait for "Guardado" → reload (text remains) → submit →
-   status "Pendiente de revisión del tutor".
-3. **Parent tutor review.** SSH tunnel, `http://127.0.0.1:8081/tutor`,
-   token from `sudo cat /etc/mentor-pro/tutor.env` (kept in a password
-   manager); score the rubric, save feedback, mark complete; the student
-   sees it.
-4. **Persistence.** (Restart needs separate operational approval; acceptance
-   uses a browser reopen instead.) `sudo docker restart mentor-pro-app-1`; the submission
-   and evaluation are still shown. Optional: from the student device
-   `http://192.168.50.229:8081/` must fail.
-5. **Record acceptance** in this file and the T032/T033 notes from observed
-   outcomes only; on a failure open a focused defect and keep the evidence.
-6. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
+1. **Check the `v*` ruleset** once the repository owner reports it:
+   `gh api repos/jonnabio/Mentor-Pro/rulesets` → target `tag`, active,
+   include `refs/tags/v*`, bypass `[]`, rules `update`, `deletion`,
+   `non_fast_forward`. Create no tags.
+2. **Prepare the step B release PR** (`dev` → `main`) per the
+   [step B plan](../planning/2026-10-30-step-b-release-plan.md). Do **not**
+   merge: separate PO approval.
+3. Then, each separately authorized: C I6 adoption (first the
+   administrator's A1/A2 `sudo` listings), D timing rehearsal on a real
+   backup (short outage), E I7 window, F revision cycle by the student
+   and the parent, G I8 runbook.
+4. **Release decisions (PO 2026-10-30):** recovery owner PO; decision
+   within 10 minutes of a failure during or after `migrate apply`; no
+   automatic restore, rollback or forward correction; scope frozen;
+   T035 and T046 deferred until after this release.
+5. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
    1–15 characters), T034 (deterministic practice-set test), then assess
    CI for PRs into `dev`; each a separate verified change.
-7. Stage 6.3 close: the student completes a five-question Matemáticas
+6. Stage 6.3 close: the student completes a five-question Matemáticas
    practice from the student's own device at `http://192.168.50.229:8080/`,
    sees the result, and the progress survives an app restart (ADR-030
    criterion 8). Record it in ACTIVE_CONTEXT.
-8. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
+7. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
    a small Matemáticas bank so practice does not wait about 5 minutes
    (writing is provisioned: 11 exercises).
-9. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
-10. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
+8. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
+9. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
    `.pre-wifi`, `.pre-t033` and `.pre-tutor` copies.
-11. Task 3 — CI maintenance (see Current Objective).
-12. Earlier backlog: L5 examination simulation candidate; reopening a
+10. Task 3 — CI maintenance (see Current Objective).
+11. Earlier backlog: L5 examination simulation candidate; reopening a
    completed evaluation; rerun `benchmark_writing_reviewers.py` when the
    free listing changes; revalidate `PE-L1-feria-ciencia-escuela-c9576f`
    (local database); `fail_interrupted()` follow-up (T018); suite slowdown.
@@ -557,8 +549,11 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - T034 (maintenance, pending):
   `test_transient_failure_then_success_completes` is nondeterministic with
   parallel slots (failed once in CI 40534292823; the rerun passed).
-- CI does not run on PRs into `dev` (only on the push after the merge);
-  separate improvement.
+- `v*` tag ruleset not configured: blocks step B (owner action).
+- Before I6: administrator `sudo` listings A1 (backups) and A2 (env key
+  names, masked); server Python 3.14 vs CI 3.12 (tooling parses on 3.14).
+- Step D timing rehearsal required before the release window (no
+  waiver).
 - No L5 writing exercises (L5 shows 0).
 - No login on the app; anyone on the house Wi-Fi can use it and see
   progress (accepted; revisit if guests join or for outside access).
@@ -601,6 +596,16 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   another project; skip it here.
 
 ### Notes
+
+- Merges: pin to the reviewed head (`gh pr merge N --merge
+  --match-head-commit <sha>`), then verify the `dev` push run. Record
+  merge SHAs and CI in the next substantive docs update, not in a
+  docs-only PR (PO 2026-10-30). Commit only after
+  `VERIFY_RESULT=pass gate=all`.
+- Server: `ssh jonnabio@100.64.84.15`; `jonnabio` is in the `docker`
+  group (read-only `docker ps`/`inspect` work without `sudo`); env files
+  and backups are root `0700`. No `sudo` by the agent.
+- On Windows, write files from Python with `newline=''` to keep LF.
 
 - App: `.venv/Scripts/python.exe -m uvicorn app.main:app --port 8000`
   (student database; reads `.env`). Restart after code changes. A server
