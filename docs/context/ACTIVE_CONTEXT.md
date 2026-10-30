@@ -410,7 +410,7 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - **`dev`** at `5afbe7e` plus this handoff: T034–T045 and T036–T039
   merged and green; 64+ commits ahead of `main` (`2f6a4b3`). Nothing
   released, published, migrated or deployed since 2026-10-28.
-- **`v*` tag ruleset: not configured** (API `[]`); `main` unprotected.
+- **`v*` tag ruleset active** (`release-tags`, id 26236844); `main` unprotected.
 - **Production (ADR-030, ADR-031):** macedonianserver, project
   `mentor-pro`, `/opt/mentor-pro/compose.deploy.yml`. `mentor-pro-app-1`
   and `mentor-pro-tutor-1` both run
@@ -496,11 +496,11 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 
 ### Next Steps
 
-1. **Check the `v*` ruleset** once the repository owner reports it:
-   `gh api repos/jonnabio/Mentor-Pro/rulesets` → target `tag`, active,
-   include `refs/tags/v*`, bypass `[]`, rules `update`, `deletion`,
-   `non_fast_forward`. Create no tags.
-2. **Prepare the step B release PR** (`dev` → `main`) per the
+1. **`v*` ruleset done** (2026-10-30, PO-authorized): `release-tags`
+   id 26236844, active, `refs/tags/v*`, no bypass, update, deletion and
+   force push blocked, creation allowed. PR #30 (`5afbe7e`, CI
+   41076093767) and PR #31 (`7ecd1da`, CI 41103503792) integrated.
+2. **Step B release PR** (`dev` → `main`) opened for PO review per the
    [step B plan](../planning/2026-10-30-step-b-release-plan.md). Do **not**
    merge: separate PO approval.
 3. Then, each separately authorized: C I6 adoption (first the
@@ -549,7 +549,8 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - T034 (maintenance, pending):
   `test_transient_failure_then_success_completes` is nondeterministic with
   parallel slots (failed once in CI 40534292823; the rerun passed).
-- `v*` tag ruleset not configured: blocks step B (owner action).
+- Step B awaits PO approval of the release PR (merge into `main`
+  publishes to GHCR and creates the first `v*` tag).
 - Before I6: administrator `sudo` listings A1 (backups) and A2 (env key
   names, masked); server Python 3.14 vs CI 3.12 (tooling parses on 3.14).
 - Step D timing rehearsal required before the release window (no

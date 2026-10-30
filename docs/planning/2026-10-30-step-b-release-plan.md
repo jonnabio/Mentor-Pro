@@ -10,7 +10,7 @@
 
 ## Scope
 
-Release PR `dev` → `main`: 64 commits, 60 files (T034 to T045 work,
+Release PR `dev` → `main`: about 75 commits, 63 files (T034 to T045 work,
 T036 to T039 writing revision milestone, deployment tooling). Scope
 frozen: no new feature work; T035 and T046 deferred.
 
@@ -23,10 +23,35 @@ after C and D.
 | # | Condition | State on 2026-10-30 |
 | --- | --- | --- |
 | P1 | T032/T033 functional acceptance | PASSED (PO observations) |
-| P2 | `v*` tag ruleset active, verified through the API | **open**: rulesets API returns `[]` |
-| P3 | `dev` CI green on the release PR head | to check on the PR |
-| P4 | Release PR scope = `origin/main..origin/dev`, nothing else | to check on the PR |
+| P2 | `v*` tag ruleset active, verified through the API | **done** 2026-10-30: ruleset `release-tags` (id 26236844), see below |
+| P3 | `dev` CI green on the release PR head | checked on the release PR |
+| P4 | Release PR scope = `origin/main..origin/dev`, nothing else | checked on the release PR (`main` is an ancestor of `dev`; nothing on `main` missing from `dev`) |
 | P5 | Server inspection: no blocker for B | done (A1, A2 needed before C only) |
+
+## P2 evidence: `v*` tag ruleset
+
+Created 2026-10-30 by the agent with the `gh` account `jonnabio`
+(repository admin) under explicit PO authorization, using the Part 2
+command of the release preparation plan unchanged. Read back with
+`gh api repos/jonnabio/Mentor-Pro/rulesets/26236844`:
+
+| Field | Value |
+| --- | --- |
+| Name, id | `release-tags`, 26236844 |
+| Target, enforcement | `tag`, `active` |
+| Include | `["refs/tags/v*"]` (exclude `[]`) |
+| Bypass actors | `[]`; `current_user_can_bypass` `never` |
+| Rules | `update`, `deletion`, `non_fast_forward` |
+| Tag creation | allowed (no `creation` rule) |
+
+No tag was created, moved or deleted; `v0.1.0` untouched.
+
+## Integration evidence since the plan
+
+| PR | Merge | `dev` CI |
+| --- | --- | --- |
+| #30 ACE merge record | `5afbe7e` | 41076093767 green (773 passed, 111 skipped, labels and manifest OK) |
+| #31 session handoff | `7ecd1da` | 41103503792 green (773 passed, 111 skipped, `MANIFEST OK dev-7ecd1da`) |
 
 ## What the merge triggers (push to `main`)
 
