@@ -503,31 +503,33 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 2. **Step B DONE** (accepted 2026-10-30): release `v2026.10.30-1`,
    `main` `094a014`, digest `sha256:7702469e…3538`, run 41126138268;
    production unchanged ([evidence](../planning/2026-10-30-step-b-release-plan.md)).
-   Step C plan ([I6](../planning/2026-10-30-step-c-i6-plan.md)) awaits PO
-   authorization; A1/A2 INCONCLUSIVE without `sudo`.
-3. Then, each separately authorized: C I6 adoption (first the
-   administrator's A1/A2 `sudo` listings), D timing rehearsal on a real
-   backup (short outage), E I7 window, F revision cycle by the student
-   and the parent, G I8 runbook.
-4. **Release decisions (PO 2026-10-30):** recovery owner PO; decision
+3. **Step C (I6) DONE** (accepted 2026-10-30): A1 and A2 PASS
+   (administrator, interactive `sudo`), `deploy/` and `release.env`
+   adopted, `status` INCOMPLETE with the 3 expected unknowns, smoke 9/9,
+   containers unchanged; PR #34 `b31f219`, CI 41133851284
+   ([evidence](../planning/2026-10-30-step-c-i6-plan.md)).
+4. **Step D plan** ([timing rehearsal](../planning/2026-10-30-step-d-rehearsal-plan.md))
+   awaits PO review (K0); then E I7 window, F revision cycle by the
+   student and the parent, G I8 runbook, each separately authorized.
+5. **Release decisions (PO 2026-10-30):** recovery owner PO; decision
    within 10 minutes of a failure during or after `migrate apply`; no
    automatic restore, rollback or forward correction; scope frozen;
    T035 and T046 deferred until after this release.
-5. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
+6. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
    1–15 characters), T034 (deterministic practice-set test), then assess
    CI for PRs into `dev`; each a separate verified change.
-6. Stage 6.3 close: the student completes a five-question Matemáticas
+7. Stage 6.3 close: the student completes a five-question Matemáticas
    practice from the student's own device at `http://192.168.50.229:8080/`,
    sees the result, and the progress survives an app restart (ADR-030
    criterion 8). Record it in ACTIVE_CONTEXT.
-7. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
+8. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
    a small Matemáticas bank so practice does not wait about 5 minutes
    (writing is provisioned: 11 exercises).
-8. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
-9. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
+9. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
+10. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
    `.pre-wifi`, `.pre-t033` and `.pre-tutor` copies.
-10. Task 3 — CI maintenance (see Current Objective).
-11. Earlier backlog: L5 examination simulation candidate; reopening a
+11. Task 3 — CI maintenance (see Current Objective).
+12. Earlier backlog: L5 examination simulation candidate; reopening a
    completed evaluation; rerun `benchmark_writing_reviewers.py` when the
    free listing changes; revalidate `PE-L1-feria-ciencia-escuela-c9576f`
    (local database); `fail_interrupted()` follow-up (T018); suite slowdown.
@@ -551,12 +553,10 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - T034 (maintenance, pending):
   `test_transient_failure_then_success_completes` is nondeterministic with
   parallel slots (failed once in CI 40534292823; the rerun passed).
-- Step C: A1/A2 need the administrator (`sudo`); `adopt-legacy` cannot
-  run on containers without health checks (D1, omit recommended).
-- Before I6: administrator `sudo` listings A1 (backups) and A2 (env key
-  names, masked); server Python 3.14 vs CI 3.12 (tooling parses on 3.14).
 - Step D timing rehearsal required before the release window (no
-  waiver).
+  waiver); plan proposed. `maintenance end` recreates app and tutor from
+  `deploy/compose.yml` (health checks), same digest: needs explicit PO
+  authorization. `sudo` steps run by the administrator interactively.
 - No L5 writing exercises (L5 shows 0).
 - No login on the app; anyone on the house Wi-Fi can use it and see
   progress (accepted; revisit if guests join or for outside access).
