@@ -1176,7 +1176,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T036_result.md",
       "failures": [],
-      "notes": "PO approved ADR-032 principles and T036 implementation on feature/T036-guided-writing-revision-design (2026-10-28). No production migration or deployment authorized. T037 (student revision UI), T038 (tutor re-evaluation), T039 (progress comparison) reserved, not registered. Verified 2026-10-28: 19 new tests, gate test 601 passed, browser 447/447. Awaiting PO confirmation of ADR-032 PO 1-3 and PR review; not merged or deployed."
+      "notes": "PO approved ADR-032 principles and T036 implementation on feature/T036-guided-writing-revision-design (2026-10-28). No production migration or deployment authorized. T037 (student revision UI), T038 (tutor re-evaluation), T039 (progress comparison) reserved, not registered. Verified 2026-10-28: 19 new tests, gate test 601 passed, browser 447/447. Awaiting PO confirmation of ADR-032 PO 1-3 and PR review; not merged or deployed. Released in v2026.10.30-1 (production 2026-10-31, migration 0001; step F accepted)."
     },
     {
       "id": "T037",
@@ -1206,7 +1206,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T037_result.md",
       "failures": [],
-      "notes": "Registered 2026-10-28 after PO approval of the T037 plan, the ADR-032 amendment, quarantine rule (no revision) and joint release with T038. Not merged; not deployed. Verified 2026-10-28: 13 API tests, gate 621 passed, browser 473/473. Merged to dev as 6ed9703 (PR #13); dev CI 40745285425 green (519 passed, 102 skipped; image built and smoke-tested, not published)."
+      "notes": "Registered 2026-10-28 after PO approval of the T037 plan, the ADR-032 amendment, quarantine rule (no revision) and joint release with T038. Not merged; not deployed. Verified 2026-10-28: 13 API tests, gate 621 passed, browser 473/473. Merged to dev as 6ed9703 (PR #13); dev CI 40745285425 green (519 passed, 102 skipped; image built and smoke-tested, not published). Released in v2026.10.30-1 (production 2026-10-31, migration 0001; step F accepted)."
     },
     {
       "id": "T038",
@@ -1238,7 +1238,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T038_result.md",
       "failures": [],
-      "notes": "Registered 2026-10-28 after PO approval; ID reserved by ADR-032. Released only together with T037; T039 progress semantics required before release. Verified 2026-10-28: 5 API tests, gate 626 passed, browser 481/481, live restart 10/10. PR to dev open; not merged."
+      "notes": "Registered 2026-10-28 after PO approval; ID reserved by ADR-032. Released only together with T037; T039 progress semantics required before release. Verified 2026-10-28: 5 API tests, gate 626 passed, browser 481/481, live restart 10/10. PR to dev open; not merged. Released in v2026.10.30-1 (production 2026-10-31, migration 0001; step F accepted)."
     },
     {
       "id": "T040",
@@ -1407,7 +1407,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T045_result.md",
       "failures": [],
-      "notes": "Plan proposed 2026-10-29 for PO review; implementation, server runs and real production dumps NOT authorized. PR #22 merged as 148b918. PO approved 2026-10-29 (no published ports, same-window rehearsal on the migration backup, app and tutor stopped, /var/lib/mentor-pro/rehearsal, 60 min downtime with 40 min checkpoint, no automatic restore or rollback). Implemented on feature/T045-migration-rehearsal; ACE gate pass; PR CI 40916932558 green (734 passed, 111 skipped, both Docker tests ran). PO review 2026-10-29: conditional approval; corrections in 9e38d8b (window identity bound through maintenance start, rehearse, migrate and maintenance end; incomplete or malformed timing evidence refuses). ACE gate pass; PR CI 40935391123 and 40936772958 green (762 passed, 111 skipped, Docker tests ran). PR #23 (head 8c0abc7, T045 scope only) merged as ca20f6c; dev CI 40938783292 green: 762 passed, 111 skipped, LABELS OK, both smoke tests, MANIFEST OK dev-ca20f6c; publish and Tag and Release skipped. Synthetic data only; nothing on the server."
+      "notes": "Plan proposed 2026-10-29 for PO review; implementation, server runs and real production dumps NOT authorized. PR #22 merged as 148b918. PO approved 2026-10-29 (no published ports, same-window rehearsal on the migration backup, app and tutor stopped, /var/lib/mentor-pro/rehearsal, 60 min downtime with 40 min checkpoint, no automatic restore or rollback). Implemented on feature/T045-migration-rehearsal; ACE gate pass; PR CI 40916932558 green (734 passed, 111 skipped, both Docker tests ran). PO review 2026-10-29: conditional approval; corrections in 9e38d8b (window identity bound through maintenance start, rehearse, migrate and maintenance end; incomplete or malformed timing evidence refuses). ACE gate pass; PR CI 40935391123 and 40936772958 green (762 passed, 111 skipped, Docker tests ran). PR #23 (head 8c0abc7, T045 scope only) merged as ca20f6c; dev CI 40938783292 green: 762 passed, 111 skipped, LABELS OK, both smoke tests, MANIFEST OK dev-ca20f6c; publish and Tag and Release skipped. Synthetic data only; nothing on the server. Released in v2026.10.30-1 (production 2026-10-31, migration 0001; step F accepted)."
     },
     {
       "id": "T039",
@@ -1444,7 +1444,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T039_result.md",
       "failures": [],
-      "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together. PR #25 merged as b192f01; dev CI 40987035330 green (762 passed). PO approved implementation 2026-10-29 with refinements (backward-compatible existing fields, Spanish criterion descriptions). Implemented on feature/T039-writing-progress; 11 new tests; browser e2e 485/485. PR into dev for PO review; not merged. PO approved PR #26 (additive-counter design). PR #26 (head 351e087, T039 scope only) merged as e22d59d; dev CI 40993295690 green: 773 passed, 111 skipped (Docker mandatory), LABELS OK, both smoke tests, MANIFEST OK dev-e22d59d; publish and Tag and Release skipped. Not deployed."
+      "notes": "Registered 2026-10-29 by PO after T045 integration (PR #24 merged as 513e545, dev CI 40978874646 green). Plan proposed for PO review; implementation NOT authorized. Required before the next production application release; T037+T038 released together. PR #25 merged as b192f01; dev CI 40987035330 green (762 passed). PO approved implementation 2026-10-29 with refinements (backward-compatible existing fields, Spanish criterion descriptions). Implemented on feature/T039-writing-progress; 11 new tests; browser e2e 485/485. PR into dev for PO review; not merged. PO approved PR #26 (additive-counter design). PR #26 (head 351e087, T039 scope only) merged as e22d59d; dev CI 40993295690 green: 773 passed, 111 skipped (Docker mandatory), LABELS OK, both smoke tests, MANIFEST OK dev-e22d59d; publish and Tag and Release skipped. Not deployed. Released in v2026.10.30-1 (production 2026-10-31, migration 0001; step F accepted)."
     },
     {
       "id": "T046",
