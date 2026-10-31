@@ -500,32 +500,49 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    id 26236844, active, `refs/tags/v*`, no bypass, update, deletion and
    force push blocked, creation allowed. PR #30 (`5afbe7e`, CI
    41076093767) and PR #31 (`7ecd1da`, CI 41103503792) integrated.
-2. **Step B release PR** (`dev` → `main`) opened for PO review per the
-   [step B plan](../planning/2026-10-30-step-b-release-plan.md). Do **not**
-   merge: separate PO approval.
-3. Then, each separately authorized: C I6 adoption (first the
-   administrator's A1/A2 `sudo` listings), D timing rehearsal on a real
-   backup (short outage), E I7 window, F revision cycle by the student
-   and the parent, G I8 runbook.
-4. **Release decisions (PO 2026-10-30):** recovery owner PO; decision
+2. **Step B DONE** (accepted 2026-10-30): release `v2026.10.30-1`,
+   `main` `094a014`, digest `sha256:7702469e…3538`, run 41126138268;
+   production unchanged ([evidence](../planning/2026-10-30-step-b-release-plan.md)).
+3. **Step C (I6) DONE** (accepted 2026-10-30): A1 and A2 PASS
+   (administrator, interactive `sudo`), `deploy/` and `release.env`
+   adopted, `status` INCOMPLETE with the 3 expected unknowns, smoke 9/9,
+   containers unchanged; PR #34 `b31f219`, CI 41133851284
+   ([evidence](../planning/2026-10-30-step-c-i6-plan.md)).
+4. **Steps D and E DONE** (2026-10-31, PO "Expedite Production
+   Upgrade"): rehearsal OK (9.3 s, downtime 0.4 min); production migrated
+   to `0001` and `v2026.10.30-1` (`7702469e…3538`) deployed, downtime
+   0.5 min, `STATUS HEALTHY`, smoke 9/9, writing records kept
+   ([evidence](../progress/2026-10-31-production-release.md)). PR #35
+   `71d6830`, CI 41220406734.
+   **Step F ACCEPTED** (PO, 2026-10-31): eight checks passed; five
+   screenshot-confirmed, re-evaluation also confirmed by read-only counts,
+   comparison and progress by PO observation only.
+   **Step G (I8) done:** runbook section 0 (`deploy/mentorpro`), schema
+   `0001`, prohibited pre-T036 rollback, protected pre-migration dump,
+   obsolete server files listed (not removed); ADR-033 Accepted; PR #36
+   `1d8748f`. Release `v2026.10.30-1` CLOSED once the I8 PR is merged
+   with green CI.
+   **Next:** T046 tutor navigation (PO 2026-10-31), one PR into `dev`;
+   no deployment without separate release authorization.
+5. **Release decisions (PO 2026-10-30):** recovery owner PO; decision
    within 10 minutes of a failure during or after `migrate apply`; no
    automatic restore, rollback or forward correction; scope frozen;
    T035 and T046 deferred until after this release.
-5. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
+6. **Maintenance after acceptance:** T035 (tutor exit 78 for tokens of
    1–15 characters), T034 (deterministic practice-set test), then assess
    CI for PRs into `dev`; each a separate verified change.
-6. Stage 6.3 close: the student completes a five-question Matemáticas
+7. Stage 6.3 close: the student completes a five-question Matemáticas
    practice from the student's own device at `http://192.168.50.229:8080/`,
    sees the result, and the progress survives an app restart (ADR-030
    criterion 8). Record it in ACTIVE_CONTEXT.
-7. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
+8. Initial content decision (ADR-030 section 7, no new ADR): pre-generate
    a small Matemáticas bank so practice does not wait about 5 minutes
    (writing is provisioned: 11 exercises).
-8. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
-9. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
+9. Stage 6.4: superseded by ADR-033 (Proposed) increments I1 to I8.
+10. Clean up on the server once stable: `*.pre-adr030`, `.bak`,
    `.pre-wifi`, `.pre-t033` and `.pre-tutor` copies.
-10. Task 3 — CI maintenance (see Current Objective).
-11. Earlier backlog: L5 examination simulation candidate; reopening a
+11. Task 3 — CI maintenance (see Current Objective).
+12. Earlier backlog: L5 examination simulation candidate; reopening a
    completed evaluation; rerun `benchmark_writing_reviewers.py` when the
    free listing changes; revalidate `PE-L1-feria-ciencia-escuela-c9576f`
    (local database); `fail_interrupted()` follow-up (T018); suite slowdown.
@@ -541,20 +558,18 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   may return `partial` (4 of 5 in the test) until the bank fills.
 - T032/T033 functional real-user acceptance passed 2026-10-30 (PO
   observations; optional security and restart checks not verified).
-- T046 (usability, deferred by the PO): the tutor page has no navigation
-  back to Mentor Pro.
+- T046 (usability, in progress 2026-10-31): the tutor page has no
+  navigation back to Mentor Pro.
 - T035 (maintenance, pending): a tutor token of 1–15 characters refuses
   startup but exits 1 (`ValueError` while importing `app.main`) instead of
   78. Consistency defect; no listener starts; no authentication bypass.
 - T034 (maintenance, pending):
   `test_transient_failure_then_success_completes` is nondeterministic with
   parallel slots (failed once in CI 40534292823; the rerun passed).
-- Step B awaits PO approval of the release PR (merge into `main`
-  publishes to GHCR and creates the first `v*` tag).
-- Before I6: administrator `sudo` listings A1 (backups) and A2 (env key
-  names, masked); server Python 3.14 vs CI 3.12 (tooling parses on 3.14).
-- Step D timing rehearsal required before the release window (no
-  waiver).
+- Production runs a T036+ image on schema `0001`: never start a pre-T036
+  image again; recovery after the migration is the G3 database restore
+  (pre-migration dump `mentor_pro_2026-10-31_170927.dump`), a separate PO
+  decision. `sudo` steps are run by the administrator interactively.
 - No L5 writing exercises (L5 shows 0).
 - No login on the app; anyone on the house Wi-Fi can use it and see
   progress (accepted; revisit if guests join or for outside access).

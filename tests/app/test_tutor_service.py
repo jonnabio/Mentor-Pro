@@ -88,6 +88,15 @@ def test_gateway_with_token_reaches_tutor_review(env):
     assert call(app, GATEWAY, "/tutor").status_code == 200
 
 
+def test_tutor_page_links_back_to_the_student_app_and_the_student_app_never_links_to_the_tutor(env):
+    app, url, schema = env
+    page = call(app, GATEWAY, "/tutor").text
+    assert '<a href="http://192.168.50.229:8080/">Volver a Mentor Pro</a>' in page  # T046
+    assert call(app, GATEWAY, "/").status_code == 404  # the link leaves the tutor service
+    student = TestClient(create_app(url, schema, SYNTHETIC, tutor_token="")).get("/").text
+    assert "/tutor" not in student and ":8081" not in student  # ADR-024
+
+
 @pytest.mark.parametrize("client_ip", ["192.168.50.23", "192.168.100.5", "172.19.0.2", "172.19.0.3",
                                        "172.17.0.1", "127.0.0.1", "100.64.84.20"])
 def test_lan_clients_and_other_containers_are_refused_even_with_the_token(env, client_ip):
