@@ -2,8 +2,8 @@
 
 - **Date:** 2026-10-30
 - **Role:** Architect
-- **Status:** PROPOSED for PO review. Nothing here is executed or
-  authorized.
+- **Status:** DONE 2026-10-31 (PO "Expedite Production Upgrade");
+  results in [the release record](../progress/2026-10-31-production-release.md).
 - **Inputs:** ADR-033 (I5), T045 (`maintenance`, `rehearse`), PO
   decision 4 of 2026-10-30 (separate timing rehearsal on real production
   data, approved short outage, no waiver), recovery policy (PO decisions

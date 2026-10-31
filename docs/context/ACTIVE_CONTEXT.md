@@ -508,9 +508,18 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    adopted, `status` INCOMPLETE with the 3 expected unknowns, smoke 9/9,
    containers unchanged; PR #34 `b31f219`, CI 41133851284
    ([evidence](../planning/2026-10-30-step-c-i6-plan.md)).
-4. **Step D plan** ([timing rehearsal](../planning/2026-10-30-step-d-rehearsal-plan.md))
-   awaits PO review (K0); then E I7 window, F revision cycle by the
-   student and the parent, G I8 runbook, each separately authorized.
+4. **Steps D and E DONE** (2026-10-31, PO "Expedite Production
+   Upgrade"): rehearsal OK (9.3 s, downtime 0.4 min); production migrated
+   to `0001` and `v2026.10.30-1` (`7702469e…3538`) deployed, downtime
+   0.5 min, `STATUS HEALTHY`, smoke 9/9, writing records kept
+   ([evidence](../progress/2026-10-31-production-release.md)). PR #35
+   `71d6830`, CI 41220406734.
+   **Step F ACCEPTED** (PO, 2026-10-31): eight checks passed; five
+   screenshot-confirmed, re-evaluation also confirmed by read-only counts,
+   comparison and progress by PO observation only.
+   **Next:** G I8 release closure
+   ([plan](../planning/2026-10-31-step-g-release-closure-plan.md)), awaiting
+   PO review.
 5. **Release decisions (PO 2026-10-30):** recovery owner PO; decision
    within 10 minutes of a failure during or after `migrate apply`; no
    automatic restore, rollback or forward correction; scope frozen;
@@ -553,10 +562,10 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
 - T034 (maintenance, pending):
   `test_transient_failure_then_success_completes` is nondeterministic with
   parallel slots (failed once in CI 40534292823; the rerun passed).
-- Step D timing rehearsal required before the release window (no
-  waiver); plan proposed. `maintenance end` recreates app and tutor from
-  `deploy/compose.yml` (health checks), same digest: needs explicit PO
-  authorization. `sudo` steps run by the administrator interactively.
+- Production runs a T036+ image on schema `0001`: never start a pre-T036
+  image again; recovery after the migration is the G3 database restore
+  (pre-migration dump `mentor_pro_2026-10-31_170927.dump`), a separate PO
+  decision. `sudo` steps are run by the administrator interactively.
 - No L5 writing exercises (L5 shows 0).
 - No login on the app; anyone on the house Wi-Fi can use it and see
   progress (accepted; revisit if guests join or for outside access).
