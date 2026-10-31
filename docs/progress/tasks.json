@@ -1450,7 +1450,7 @@
       "id": "T046",
       "name": "Tutor page: visible navigation back to Mentor Pro",
       "objective": "The tutor page (/tutor) has no way back to the student application. Add a minimal 'Volver a Mentor Pro' link in the tutor header without changing authentication, token handling, allowed hosts or the tutor service's routes; the student app still never links to the tutor (ADR-024).",
-      "status": "pending",
+      "status": "in_progress",
       "role": "Developer",
       "files": {
         "create": [],
@@ -1465,10 +1465,10 @@
       ],
       "complexity": "XS",
       "acceptance_cmd": "bash .ace/scripts/verify.sh",
-      "attempts": 0,
+      "attempts": 1,
       "result_file": "docs/progress/task_T046_result.md",
       "failures": [],
-      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented."
+      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented. Started 2026-10-31 by the PO after release v2026.10.30-1. Link to the student app on the house Wi-Fi; 1 regression test. PR into dev for PO review; not merged, not deployed (separate release authorization)."
     }
   ]
 }
