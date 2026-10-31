@@ -42,6 +42,7 @@ body {
 .brand { margin: 0; color: var(--accent); font-weight: 700; letter-spacing: 0.02em; }
 h1 { margin: 2px 0 0; font-size: 1.6rem; }
 .lead { margin: 2px 0 0; color: var(--muted); }
+.back-link { margin: 8px 0 0; }
 
 main.wrap { padding-top: 20px; padding-bottom: 40px; }
 
