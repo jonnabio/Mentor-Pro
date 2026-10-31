@@ -67,9 +67,26 @@ records; the student's progress view itself is part of step F.
   on 2026-10-30 (Python bytecode cache; harmless, left in place).
 - None in steps D or E.
 
+## Step F: real-user acceptance of the revision cycle (2026-10-31)
+
+**ACCEPTED** by the PO: all eight functional checks passed. The evidence
+is kept by source; an observation is not reported as independent
+verification.
+
+| # | Check | Evidence |
+| --- | --- | --- |
+| 1 | Original response preserved | screenshot-confirmed |
+| 2 | Version 2 submitted | screenshot-confirmed; database: attempt 2 has 1 submission, chained to attempt 1 |
+| 3 | Improvement pending tutor review | screenshot-confirmed |
+| 4 | Tutor queue recognizes version 2 | screenshot-confirmed |
+| 5 | Original evaluation remains completed | screenshot-confirmed; database: attempt 1 evaluation `completed`, 2 criterion scores |
+| 6 | Tutor re-evaluation completed | PO observation; database (read-only counts, agent): attempt 2 evaluation `completed`, 2 criterion scores |
+| 7 | Student criterion-level comparison | PO observation only |
+| 8 | Progress counters and persistence | PO observation only. App and tutor have not restarted since the deployment (started 17:09:50Z, restarts 0), so persistence across a restart is not independently verified |
+
+Database figures are counts and statuses only, read with
+`default_transaction_read_only = on`; no rows or text were read.
+
 ## Not done
 
-- Step F: the student and the parent complete a full revision cycle on
-  production (real-user acceptance). The writing revision cycle is not
-  accepted until then.
-- Step G: I8 runbook and release records.
+- Step G: I8 release closure ([plan](../planning/2026-10-31-step-g-release-closure-plan.md)).

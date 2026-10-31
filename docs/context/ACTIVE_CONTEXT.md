@@ -514,8 +514,12 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    0.5 min, `STATUS HEALTHY`, smoke 9/9, writing records kept
    ([evidence](../progress/2026-10-31-production-release.md)). PR #35
    `71d6830`, CI 41220406734.
-   **Next:** F revision cycle by the student and the parent on production
-   (acceptance not yet done), then G I8 runbook.
+   **Step F ACCEPTED** (PO, 2026-10-31): eight checks passed; five
+   screenshot-confirmed, re-evaluation also confirmed by read-only counts,
+   comparison and progress by PO observation only.
+   **Next:** G I8 release closure
+   ([plan](../planning/2026-10-31-step-g-release-closure-plan.md)), awaiting
+   PO review.
 5. **Release decisions (PO 2026-10-30):** recovery owner PO; decision
    within 10 minutes of a failure during or after `migrate apply`; no
    automatic restore, rollback or forward correction; scope frozen;
