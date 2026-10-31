@@ -1468,7 +1468,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T046_result.md",
       "failures": [],
-      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented. Started 2026-10-31 by the PO after release v2026.10.30-1. Link to the student app on the house Wi-Fi; 1 regression test. PR into dev for PO review; not merged, not deployed (separate release authorization)."
+      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented. Started 2026-10-31 by the PO after release v2026.10.30-1. Link to the student app on the house Wi-Fi; 1 regression test. PR #38 merged into dev as ec2b838 (CI 41249721154). Released in v2026.10.31-1 (main 4586a24, CI 41251160982, digest e7dd6edb…3215), deployed 2026-10-31 23:26 UTC: DEPLOY OK, smoke 9/9, STATUS HEALTHY, link present on the production tutor page."
     }
   ]
 }

@@ -2,7 +2,10 @@
 
 - **Date:** 2026-10-31
 - **Role:** Developer
-- **Status:** Development complete (PO, 2026-10-31): merged into `dev`, fixed LAN URL kept; not deployed.
+- **Status:** Done. Merged into `dev` as `ec2b838` (fixed LAN URL kept,
+  PO); released in `v2026.10.31-1` (`main` `4586a24`, digest
+  `e7dd6edb…3215`) and deployed 2026-10-31 23:26 UTC: `DEPLOY OK`, smoke
+  9/9, `STATUS HEALTHY`, link present on the production tutor page.
 
 ## Change
 
