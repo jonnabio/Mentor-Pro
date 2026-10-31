@@ -2,7 +2,7 @@
 
 - **Date:** 2026-10-31
 - **Role:** Developer
-- **Status:** PR into `dev` for PO review; not merged, not deployed.
+- **Status:** Development complete (PO, 2026-10-31): merged into `dev`, fixed LAN URL kept; not deployed.
 
 ## Change
 
@@ -29,4 +29,4 @@ unchanged.
 ## Verification
 
 - `tests/app/test_tutor_service.py`: 38 passed.
-- ACE gate: see the PR.
+- ACE gate: pass (see PR #38).

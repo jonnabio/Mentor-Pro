@@ -1450,7 +1450,7 @@
       "id": "T046",
       "name": "Tutor page: visible navigation back to Mentor Pro",
       "objective": "The tutor page (/tutor) has no way back to the student application. Add a minimal 'Volver a Mentor Pro' link in the tutor header without changing authentication, token handling, allowed hosts or the tutor service's routes; the student app still never links to the tutor (ADR-024).",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [],
