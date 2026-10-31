@@ -2,7 +2,8 @@
 
 - **Date:** 2026-10-30
 - **Role:** Architect
-- **Status:** PROPOSED for PO authorization. Nothing here is executed.
+- **Status:** DONE and accepted by the PO (2026-10-30); evidence in
+  "Result" below.
 - **Inputs:** ADR-033 (I6: "check out `deploy/`, create `release.env`
   for the running digest, `status` and `smoke` only"),
   [server inspection](../progress/2026-10-30-server-inspection.md),
@@ -187,3 +188,27 @@ service impact.
 3. Confirm the administrator runs C1, C4, C5 and the `status` part of
    C6, or explicitly authorize the agent to run those commands with
    `sudo`.
+
+## Result (2026-10-30)
+
+PR #34 (the A2 key-name check) merged into `dev` as `b31f219` (pinned
+head `db79772`); `dev` CI 41133851284 green (773 passed, 111 skipped,
+`MANIFEST OK dev-b31f219`).
+
+| Step | Who | Result |
+| --- | --- | --- |
+| C0 | agent | snapshot: app `a4a875eb…`, tutor `3a330f65…`, postgres `94bded0c…`, all `5d69fe6c…1137` / `postgres:17.6`, restarts 0; `compose.deploy.yml` `a62ce74e…`, `RELEASES` `bba0051d…`; `/var/lib/mentor-pro` absent |
+| C1, first attempt | agent | interrupted: `sudo -n` answered `interactive authentication is required` (exit 1); A2 not attempted; nothing changed. The PO accepted the stop and handed `sudo` steps to the administrator (interactive; the password was never requested or seen; no `sudo` or permission change) |
+| C1 / A1 | administrator | PASS: `mentor_pro_2026-10-26_223101.dump` (905 B) and `mentor_pro_2026-10-28_002257.dump` (125K), root 0600 |
+| C1 / A2 | administrator | PASS (exit 0): keys only. `tutor.env`: `MENTOR_PRO_TUTOR_TOKEN`, `MENTOR_PRO_TUTOR_ALLOWED_HOSTS`. `app.env`: 11 keys, no `MENTOR_PRO_TUTOR_*`. `postgres.env`: 3 keys. No malformed line, no duplicate |
+| C2 | agent | `deploy/` from `v2026.10.30-1` (`094a014`): 5 files, blob ids equal to the tag, `mentorpro` executable |
+| C3 | agent | `release.env` (0644): `MENTOR_PRO_IMAGE=…@sha256:5d69fe6c…1137` |
+| C4 | administrator | `/var/lib/mentor-pro` (root, 755) and `rehearsal/` (root, 700), empty |
+| C5 | administrator | `CONFIG OK`; services postgres, app, tutor; images the running digest twice and `postgres:17.6` |
+| C6 `status` | administrator | release digest shown; app and tutor `UNKNOWN … (no health check)`; postgres `OK running healthy`; schema `UNKNOWN`; student and tutor 200; 2 releases; dumps 2, 136K, 73G free; `STATUS INCOMPLETE (3 item(s) unknown)`, exit 3 |
+| C6 `smoke` | agent | `SMOKE PASS (9/9)`, exit 0 |
+| C7 | agent | containers, ids, digests, start times, restarts, `compose.deploy.yml` and `RELEASES` checksums equal to C0 |
+
+Deviation D1 applied: `adopt-legacy` omitted; no `RELEASES` line.
+Filesystem changes exactly as listed above; no container, image, volume,
+network, env file, backup or database change.
