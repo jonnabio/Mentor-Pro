@@ -2,8 +2,8 @@
 
 - **Date:** 2026-10-31
 - **Role:** Architect
-- **Status:** PROPOSED for PO review. Docs only; no server, migration or
-  deployment change.
+- **Status:** APPROVED (PO, 2026-10-31) and done in the I8 PR. Docs
+  only; no server, migration or deployment change.
 - **Inputs:** ADR-033 (I8: "rewrite the runbook around the commands;
   keep the manual blocks as an appendix; doc lint"),
   [release record](../progress/2026-10-31-production-release.md),

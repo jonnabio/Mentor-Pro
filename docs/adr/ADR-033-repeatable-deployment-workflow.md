@@ -1,9 +1,8 @@
 # ADR-033: Repeatable, Gated Deployment Workflow
 
-> **Status:** Accepted as the architecture direction (PO, 2026-10-28),
-> with the refinements below. Approval is not authorization to implement
-> or deploy every increment: each increment is a separate task and PR;
-> no production change is authorized.
+> **Status:** Accepted (PO, 2026-10-31). Increments I1–I8 done; first
+> used in production for release `v2026.10.30-1` (2026-10-31). Every
+> production change still needs its own PO authorization.
 > **Date:** 2026-10-28
 > **Builds on:** ADR-030 (provisioning and deployment), ADR-031 (tutor
 > service), ADR-032 (explicit writing migrations)

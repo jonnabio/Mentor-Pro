@@ -517,9 +517,13 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
    **Step F ACCEPTED** (PO, 2026-10-31): eight checks passed; five
    screenshot-confirmed, re-evaluation also confirmed by read-only counts,
    comparison and progress by PO observation only.
-   **Next:** G I8 release closure
-   ([plan](../planning/2026-10-31-step-g-release-closure-plan.md)), awaiting
-   PO review.
+   **Step G (I8) done:** runbook section 0 (`deploy/mentorpro`), schema
+   `0001`, prohibited pre-T036 rollback, protected pre-migration dump,
+   obsolete server files listed (not removed); ADR-033 Accepted; PR #36
+   `1d8748f`. Release `v2026.10.30-1` CLOSED once the I8 PR is merged
+   with green CI.
+   **Next:** T046 tutor navigation (PO 2026-10-31), one PR into `dev`;
+   no deployment without separate release authorization.
 5. **Release decisions (PO 2026-10-30):** recovery owner PO; decision
    within 10 minutes of a failure during or after `migrate apply`; no
    automatic restore, rollback or forward correction; scope frozen;
@@ -554,8 +558,8 @@ Deployment on macedonianserver (2026-10-26 to 2026-10-27)
   may return `partial` (4 of 5 in the test) until the bank fills.
 - T032/T033 functional real-user acceptance passed 2026-10-30 (PO
   observations; optional security and restart checks not verified).
-- T046 (usability, deferred by the PO): the tutor page has no navigation
-  back to Mentor Pro.
+- T046 (usability, in progress 2026-10-31): the tutor page has no
+  navigation back to Mentor Pro.
 - T035 (maintenance, pending): a tutor token of 1–15 characters refuses
   startup but exits 1 (`ValueError` while importing `app.main`) instead of
   78. Consistency defect; no listener starts; no authentication bypass.

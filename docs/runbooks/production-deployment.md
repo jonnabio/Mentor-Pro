@@ -5,6 +5,9 @@
 **Decision:** [ADR-030](../adr/ADR-030-production-provisioning-and-deployment.md)
 **Server:** macedonianserver (`100.64.84.15`, Tailscale), `/opt/mentor-pro`
 **Access:** SSH key login as `jonnabio`; compose commands with `sudo`
+**Workflow:** [ADR-033](../adr/ADR-033-repeatable-deployment-workflow.md),
+`deploy/mentorpro` (section 0). Sections A–K are the manual history and
+one-time setup; for releases, backups and rollbacks use section 0.
 
 Never paste passwords, `DATABASE_URL`, API keys or `docker compose config`
 output into logs, commits or chat. Use the redaction commands below.
@@ -15,13 +18,70 @@ digest being deployed):
 ```bash
 set -o pipefail
 cd /opt/mentor-pro
-COMPOSE="sudo docker compose -f /opt/mentor-pro/compose.deploy.yml"
+COMPOSE="sudo docker compose -p mentor-pro -f /opt/mentor-pro/deploy/compose.yml --env-file /opt/mentor-pro/release.env"
 WB=PNE-Tracker-2026-workbook.xlsx
 WB_SHA=cce57db40afacdb2f6d2492c39ba9df6c1bc398941c1c7fb9cff8ec28bcc19d3
 DIGEST=sha256:...   # e.g. the digest published by the main run
 ```
 
+Never use `compose.deploy.yml` again: it pins the pre-T036 digest
+`5d69fe6c…1137`, which must not start on the migrated database.
+
 ---
+
+## 0. Release workflow (ADR-033)
+
+Current state (2026-10-31): release `v2026.10.30-1`, digest
+`sha256:7702469e442596d56b1425bfc5a0d189bcc1f21a2fd3972d47f079b932423538`,
+writing schema `current 0001`
+([release record](../progress/2026-10-31-production-release.md)).
+
+The administrator runs every `sudo` command in an interactive SSH session
+and pastes the output; nobody else handles the password. Window and
+authorization references are recorded as given and do not prove an
+approval.
+
+```bash
+T=/opt/mentor-pro/deploy/mentorpro
+M=/opt/mentor-pro/manifests/<release>.json   # from the GitHub Release, checksum compared
+W=<window ref>; A=<PO authorization ref>
+```
+
+| Purpose | Command | Pass |
+| --- | --- | --- |
+| What runs | `sudo $T status` | `STATUS HEALTHY` |
+| Service check (read only) | `$T smoke` | `SMOKE PASS (9/9)` |
+| Backup | `sudo $T backup` | `BACKUP OK <dump> sha256:<…>` |
+| Re-check a dump | `sudo $T verify-backup <dump>` | `VERIFY OK <dump>` |
+| Compatibility | `sudo $T preflight "$M"` | `PREFLIGHT OK` |
+| Deploy, same schema | `sudo $T deploy "$M" --backup <dump> --window "$W" --authorization "$A"` | `DEPLOY OK` |
+| Application rollback, same schema | `sudo $T rollback --backup <dump> --window "$W" --authorization "$A"` | `ROLLBACK OK` |
+| Release with a migration | `maintenance start`, `backup`, `rehearse "$M" <dump>`, `migrate "$M" --backup <dump>` (each with `--window "$W" --authorization "$A"`) | `MIGRATE OK` |
+| Close a window without migrating | `sudo $T maintenance end --window "$W" --authorization "$A"` | `MAINTENANCE ENDED` |
+
+Stop on any other result and report it; do not retry or repair without
+a PO decision. Never `docker compose down -v`.
+
+**Recovery boundary.** Production runs on schema `0001`. An application
+rollback to an image older than T036 (anything before `v2026.10.30-1`,
+including `5d69fe6c…1137`) is prohibited. After a failed `migrate`
+`apply`, or any loss of the database, app and tutor stay stopped and
+there is no automatic restore or rollback: the PO decides, within 10
+minutes, on the G3 restore (ADR-030 section 6: restore into a new
+database, never over the live one). The protected pre-migration backup is
+`/var/backups/mentor-pro/mentor_pro_2026-10-31_170927.dump` (sha256
+`a8e923b9…c664`); keep it.
+
+**Retention.** Ten routine dumps plus every pre-migration dump, no
+automatic deletion (ADR-033). On 2026-10-31: 4 dumps, 528K; nothing
+deleted.
+
+**Obsolete on the server (remove later, only with separate
+authorization):** `compose.deploy.yml` and its copies `.bak`,
+`.pre-adr030`, `.pre-wifi`, `.pre-t033`, `.pre-tutor`;
+`/opt/mentor-pro/baseline/`; `deploy/__pycache__/`; the images
+`486dcc0a…` and `4ab51ff3…`. Keep `5d69fe6c…` only as evidence; it must
+not run.
 
 ## A. Pre-flight (read-only)
 
@@ -39,6 +99,8 @@ Record the schemas that already exist. If `curriculum` already has a
 `unchanged`; anything else is a stop.
 
 ## B. Backup
+
+Superseded by `mentorpro backup` (section 0, restore-checked). History only.
 
 ```bash
 sudo install -d -m 700 -o root -g root /var/backups/mentor-pro
@@ -180,6 +242,9 @@ Keep the JSON output (it holds counts and checksums, no secrets).
 
 ## F. Start and verify
 
+Superseded by `mentorpro deploy` and `smoke` (section 0). The Wi-Fi
+publication notes below still apply.
+
 ```bash
 docker rm -f mentor-pro-preview 2>/dev/null
 $COMPOSE up -d app
@@ -229,6 +294,10 @@ echo "$(date -Is) $DIGEST <git-commit> $(whoami) <result>" >> /opt/mentor-pro/RE
 ```
 
 ## G. Rollback
+
+Superseded by `mentorpro rollback` (section 0). The commands below edit
+`compose.deploy.yml` and are **prohibited**: they would start a pre-T036
+image on the migrated database.
 
 ```bash
 PREVIOUS_DIGEST=sha256:...   # from /opt/mentor-pro/RELEASES
@@ -384,37 +453,15 @@ the compose network is recreated, recheck the gateway: a wrong address
 answers 403 to everything. `docker compose stop tutor` disables review
 without affecting students.
 
-## K. Writing schema migration 0001 (T036, ADR-032) — not yet authorized
+## K. Writing schema migration 0001 (T036, ADR-032) — done
 
-An image that contains T036 refuses to start (app: uvicorn "Application
-startup failed"; tutor service: exit 78 "tutor start refused") on a
-database whose writing tables predate migration `0001_student_attempts`
-(`SchemaMigrationRequired`); the current production image is unaffected.
-Applying it in production needs separate Product Owner approval. Planned
-order, all with the new pinned `DIGEST`:
+Applied in production on 2026-10-31 with `mentorpro migrate` (window
+`stepE-2026-10-31`, `MIGRATE OK`, 1 attempt-1 record, all writing
+records kept, downtime 0.5 min); see section 0 and the
+[release record](../progress/2026-10-31-production-release.md).
 
-1. Section B backup (`BACKUP OK`) and an isolated restore rehearsal of that
-   dump on which `apply --dry-run` and `apply` are run first.
-2. `$COMPOSE stop app tutor` (no student writes during the migration).
-3. Dry run, then the same command without `--dry-run`:
-
-   ```bash
-   $COMPOSE run --rm -T --no-deps app \
-     python -m app.writing.migrate apply --dry-run </dev/null
-   ```
-
-   Output is counts and digests only; the
-   `before` and `after` digests must be equal. `MIGRATION FAILED (nothing
-   changed)` leaves the database as it was.
-4. Section F with the new digest; `migrate status` answers `current`.
-
-Rollback: `python -m app.writing.migrate rollback` (with the new image)
-restores the old schema only while no revision attempt exists; afterwards,
-restore the pre-migration backup in an approved window after exporting the
-revision attempts (ADR-032). Never `docker compose down -v`.
-
-Never start a pre-T036 image on a migrated database: it recreates
-`uq_submission_exercise` and its draft saves and new submissions fail
-(ADR-032, "Old image against a migrated database"). If it happened, the
-new image refuses to start with "run `python -m app.writing.migrate
-repair`"; that command drops only the recreated index.
+Never start a pre-T036 image on the migrated database: it recreates
+`uq_submission_exercise`, and draft saves and new submissions fail
+(ADR-032). If it happened, the new image refuses to start with "run
+`python -m app.writing.migrate repair`"; that command drops only the
+recreated index (separate PO decision).
