@@ -1499,7 +1499,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T047_result.md",
       "failures": [],
-      "notes": "PO-approved 2026-11-01 (architecture assessment, revised plan). Mocked LLM only; no live generation, no production seeding, no deployment (separate authorizations). ACE gate pass: 892 passed, 6 skipped (baseline 879); 13 new tests."
+      "notes": "PO-approved 2026-11-01 (architecture assessment, revised plan). Mocked LLM only; no live generation, no production seeding, no deployment (separate authorizations). ACE gate pass: 892 passed, 6 skipped (baseline 879); 13 new tests. PO final approval 2026-11-01; PR #42 (head 6033edb, CI 41350431996) merged into dev as 9a09d38 (dev CI 41359022505). Not released."
     }
   ]
 }

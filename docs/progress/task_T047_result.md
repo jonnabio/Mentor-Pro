@@ -2,8 +2,10 @@
 
 - **Date:** 2026-11-01
 - **Role:** Developer
-- **Status:** Done (PR into `dev`, awaiting PO review). Mocked LLM only:
-  no live generation, no production seeding, no deployment.
+- **Status:** Done. PO final approval 2026-11-01; PR #42 (head
+  `6033edb`, CI 41350431996) merged into `dev` as `9a09d38` (`dev` CI
+  41359022505). Not released. Mocked LLM only: no live generation, no
+  production seeding, no deployment.
 - **Decision record:** [ADR-034](../adr/ADR-034-question-bank-foundation.md)
 
 ## Change
