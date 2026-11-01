@@ -12,6 +12,7 @@ from app.generation.store import GenerationStore
 from app.llm.usage import MemoryUsageStore
 from app.practice import seeding
 from app.practice.bank import QuestionBank
+from app.practice.store import PracticeStore
 from conftest import SYNTHETIC
 from test_generation import MATH_ITEM, FakeLlm, bundle, catalog_conn, client_for  # noqa: F401  (fixture)
 
@@ -61,6 +62,7 @@ def clean(url):
 @pytest.fixture()
 def url(synthetic_client):
     url, _ = synthetic_client.app.state.catalog_target
+    PracticeStore(url)  # practice.item, read by QuestionBank (fresh CI database)
     QuestionBank(url)  # ensure tables
     clean(url)
     yield url

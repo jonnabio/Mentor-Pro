@@ -87,6 +87,24 @@ verification.
 Database figures are counts and statuses only, read with
 `default_transaction_read_only = on`; no rows or text were read.
 
-## Not done
+## Step G: I8 release closure
 
-- Step G: I8 release closure ([plan](../planning/2026-10-31-step-g-release-closure-plan.md)).
+Done. PR #37 merged into `dev` as `a67523b` (CI 41246270688); see the
+[plan](../planning/2026-10-31-step-g-release-closure-plan.md).
+Release `v2026.10.30-1` is closed.
+
+## Follow-up release v2026.10.31-1 (T046)
+
+- `main` `4586a24` (release PR #39, head `ec2b838`; CI 41250517110 and
+  41251160982), digest `e7dd6edb…3215`.
+- Window `t046-2026-10-31`, authorization
+  `PO-urgent-T046-release-2026-10-31`, 2026-10-31 23:26 UTC:
+  `PREFLIGHT OK`; backup `mentor_pro_2026-10-31_232534.dump` (sha256
+  `3ce142a3…427e`, `VERIFY OK`); `DEPLOY OK`; smoke 9/9;
+  `STATUS HEALTHY`. Schema stays `current 0001`.
+- Deployed unattended with `sudo -n` through the root-owned tool copy
+  in `/usr/local/lib/mentor-pro/` and the sudo rule
+  `/etc/sudoers.d/mentor-pro` (PO-authorized, `visudo -c` OK).
+- 2026-11-01, after the laptop restart: `STATUS HEALTHY`, smoke 9/9.
+  PO browser acceptance of the link passed. Release closed.
+- Handoff PR #40 merged into `dev` as `b2bc70c` (CI 41254232707).

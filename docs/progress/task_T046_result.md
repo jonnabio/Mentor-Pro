@@ -2,10 +2,11 @@
 
 - **Date:** 2026-10-31
 - **Role:** Developer
-- **Status:** Done. Merged into `dev` as `ec2b838` (fixed LAN URL kept,
-  PO); released in `v2026.10.31-1` (`main` `4586a24`, digest
-  `e7dd6edb…3215`) and deployed 2026-10-31 23:26 UTC: `DEPLOY OK`, smoke
-  9/9, `STATUS HEALTHY`, link present on the production tutor page.
+- **Status:** Verified (PO browser acceptance passed 2026-11-01).
+  Merged into `dev` as `ec2b838` (fixed LAN URL kept, PO); released
+  in `v2026.10.31-1` (`main` `4586a24`, digest `e7dd6edb…3215`) and
+  deployed 2026-10-31 23:26 UTC: `DEPLOY OK`, smoke 9/9,
+  `STATUS HEALTHY`, link present on the production tutor page.
 
 ## Change
 
@@ -33,3 +34,11 @@ unchanged.
 
 - `tests/app/test_tutor_service.py`: 38 passed.
 - ACE gate: pass (see PR #38).
+
+## Acceptance (2026-11-01)
+
+- After the laptop restart, read-only checks: `STATUS HEALTHY`, smoke
+  9/9, the link is on the production tutor page and its target returns
+  200.
+- PO browser test through the SSH tunnel: "Volver a Mentor Pro" opens
+  the student app on the house Wi-Fi. Passed.
