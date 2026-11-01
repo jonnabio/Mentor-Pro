@@ -1,9 +1,9 @@
-# Active Context: Session Handoff 2026-10-31
+# Active Context: Session Handoff 2026-11-01
 
 ## Session Metadata
 
-- **Last Updated:** 2026-10-31 (session end: release `v2026.10.30-1`
-  closed, T046 released as `v2026.10.31-1`)
+- **Last Updated:** 2026-11-01 (T046 accepted by the PO and verified;
+  release `v2026.10.31-1` closed)
 - **Active Role:** Architect
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
@@ -30,7 +30,9 @@ healthy. The next feature needs a PO decision.
     - obsolete server files listed, not removed;
     - ADR-033 Accepted.
   - Evidence: [release record](../progress/2026-10-31-production-release.md).
-- **T046 (tutor "Volver a Mentor Pro" link) done and deployed.**
+- **T046 (tutor "Volver a Mentor Pro" link) verified; release
+  `v2026.10.31-1` CLOSED.** PO browser acceptance passed 2026-11-01.
+  Handoff PR #40 merged into `dev` as `b2bc70c` (CI 41254232707).
   - Change: a link to `http://192.168.50.229:8080/` (fixed LAN URL, PO
     decision) plus one regression test. Authentication and isolation
     unchanged.
@@ -46,6 +48,8 @@ healthy. The next feature needs a PO decision.
     `STATUS HEALTHY`.
   - The link is present on the production tutor page, and its target
     returns 200. [T046 result](../progress/task_T046_result.md).
+  - 2026-11-01, after the laptop restart (read only): `STATUS HEALTHY`,
+    smoke 9/9.
 - **Unattended deployment enabled** (PO-authorized, 2026-10-31):
   - The administrator installed a root-owned copy of the tool in
     `/usr/local/lib/mentor-pro/`.
@@ -61,12 +65,15 @@ healthy. The next feature needs a PO decision.
   - Previous release `v2026.10.30-1` (`7702469e…3538`) is the allowed
     rollback target.
 - **Repository:** `dev` and `main` contain everything up to
-  `4586a24`, plus this handoff PR. No open feature branches.
-- **Tracker:** T046 `done`. T034 and T035 pending (maintenance).
+  `4586a24`; `dev` also has `b2bc70c` and this closure PR. No open
+  feature branches.
+- **Tracker:** T046 `verified`. T034 and T035 pending (maintenance).
 
 ### Next Steps
 
-1. Ask the PO for the next feature. Exactly one at a time, one PR into
+1. PO decision on the proposed next feature: an instant Matemáticas
+   practice bank (pre-generated, checked stock served immediately, kept
+   topped up). Not started. Exactly one feature at a time, one PR into
    `dev`, deployment only with a separate release authorization.
 2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
@@ -83,8 +90,12 @@ healthy. The next feature needs a PO decision.
 ### Blockers/Issues
 
 - **Pending PO decision:** the sudo rule covers every `mentorpro`
-  command, including `migrate` and `rollback`. The PO may narrow it so
-  that migrations still need the administrator.
+  command, including `migrate`, `rollback`, `maintenance`, `rehearse`
+  and `adopt-legacy`. Recommended (2026-11-01, not applied): allow
+  passwordless only `status`, `smoke`, `backup`, `verify-backup *`,
+  `preflight *` and `deploy *`, so the others fall back to the
+  password-protected rule. Applying it is an administrator change
+  (`visudo -f`, then `visudo -c` and `sudo -n -l`).
 - **Root-owned tool copy:** when a release changes `deploy/`, the
   administrator must re-run the three `sudo install` commands before
   deploying. Otherwise the old tool runs.
