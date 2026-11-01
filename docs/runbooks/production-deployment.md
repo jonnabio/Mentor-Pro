@@ -488,3 +488,31 @@ Never start a pre-T036 image on the migrated database: it recreates
 (ADR-032). If it happened, the new image refuses to start with "run
 `python -m app.writing.migrate repair`"; that command drops only the
 recreated index (separate PO decision).
+
+## L. Question bank seeding and review (T047, ADR-034)
+
+**Not authorized on production.** Running any command below against the
+production database needs a separate PO authorization (and an image that
+contains `app/practice/seed_bank.py`). The commands are the same locally
+and in the container; locally use `.venv/Scripts/python.exe`.
+
+```bash
+seed() { python -m app.practice.seed_bank "$@"; }
+seed run --subject matematicas --max-calls 20   # adopt, then generate gaps; resumable
+seed report --subject matematicas               # inventory, coverage, readiness (add --cells)
+seed review-sample --subject matematicas --out review.json
+# the tutor fills "verdict" (approved | quarantined) and "reason" per question
+seed review-record --subject matematicas --decisions review.json
+seed quarantine --request-id req-... --reason wrong_key
+```
+
+**Exit codes:** 0 done; 1 refused (nothing changed by that step);
+3 `SEED BUSY` (another run holds the subject, try later); 4 `LOCK LOST`
+(the run stopped; rerun). Rerunning is always safe: it fills only gaps.
+
+**Gates:** stop on exit 1 or 4. `run` never raises the daily budget; a
+stop at `run_call_limit` or `daily_budget` leaves the batch `open`.
+Generated questions reach practices only after `review-record` reports
+`review_status: passed`. On `failed`, stop and investigate. The review file
+holds question text; delete it after recording. Standard output holds
+counts and identifiers only.

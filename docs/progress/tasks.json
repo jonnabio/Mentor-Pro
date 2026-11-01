@@ -1469,6 +1469,37 @@
       "result_file": "docs/progress/task_T046_result.md",
       "failures": [],
       "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented. Started 2026-10-31 by the PO after release v2026.10.30-1. Link to the student app on the house Wi-Fi; 1 regression test. PR #38 merged into dev as ec2b838 (CI 41249721154). Released in v2026.10.31-1 (main 4586a24, CI 41251160982, digest e7dd6edb…3215), deployed 2026-10-31 23:26 UTC: DEPLOY OK, smoke 9/9, STATUS HEALTHY, link present on the production tutor page. PO browser acceptance passed 2026-11-01."
+    },
+    {
+      "id": "T047",
+      "name": "Question bank foundation: seeded batches, coverage, review gate (Increment 1, ADR-034)",
+      "objective": "Prepare a validated inventory of 100 questions per subject outside student requests: fixed exact-cell plan, adoption of eligible questions, resumable gap-only seeding under an advisory lock, coverage and readiness reporting, question-level quarantine and a 10-question educational review gate. Generation pipeline, writing, practice routes, student UI and LLM budget unchanged.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/seeding.py",
+          "app/practice/seed_bank.py",
+          "tests/app/test_bank_seeding.py",
+          "docs/adr/ADR-034-question-bank-foundation.md",
+          "docs/progress/task_T047_result.md"
+        ],
+        "modify": [
+          "app/practice/bank.py",
+          "docs/runbooks/production-deployment.md",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "depends_on": [
+        "T013",
+        "T014"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T047_result.md",
+      "failures": [],
+      "notes": "PO-approved 2026-11-01 (architecture assessment, revised plan). Mocked LLM only; no live generation, no production seeding, no deployment (separate authorizations). ACE gate pass: 892 passed, 6 skipped (baseline 879); 13 new tests."
     }
   ]
 }

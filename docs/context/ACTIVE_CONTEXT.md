@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-01 (T046 accepted by the PO and verified;
-  release `v2026.10.31-1` closed)
-- **Active Role:** Architect
+- **Last Updated:** 2026-11-01 (T047 in PR #42, awaiting PO review;
+  T046 closed by PR #41)
+- **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
   ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/` and
@@ -12,8 +12,11 @@
 
 ## Current Objective
 
-None open. Production runs `v2026.10.31-1` (T046) on schema `0001`,
-healthy. The next feature needs a PO decision.
+T047, question bank foundation (Increment 1,
+[ADR-034](../adr/ADR-034-question-bank-foundation.md)): PR #42 into
+`dev`, not merged, awaiting PO review. Mocked LLM only; no live
+generation, production seeding or deployment. Production runs
+`v2026.10.31-1` (T046) on schema `0001`, healthy.
 
 ## Handoff Summary
 
@@ -56,6 +59,15 @@ healthy. The next feature needs a PO decision.
   - The sudo rule `/etc/sudoers.d/mentor-pro` lets `jonnabio` run only
     that tool without a password (`visudo -c` OK).
   - The agent now deploys with `sudo -n`. Runbook section 0 updated.
+- **Closure PR #41** merged into `dev` as `2000f42` (CI green).
+- **T047 (question bank foundation) developed, PR #42.** Fixed 100-cell
+  plan, adoption, resumable gap-only seeding under an advisory lock,
+  coverage and readiness report, question quarantine, 10-question review
+  gate. The PO accepted the post-approval quarantine rule (a passed batch
+  returns to `pending`). CI run 41322277632 failed: on a fresh database
+  `practice.item` did not exist when the seeding tests ran first; the test
+  fixture now creates it (`PracticeStore`). Application code unchanged.
+  [T047 result](../progress/task_T047_result.md).
 
 ### Current State
 
@@ -64,17 +76,15 @@ healthy. The next feature needs a PO decision.
   - Schema `current 0001`; 5 dumps (732K, no automatic deletion).
   - Previous release `v2026.10.30-1` (`7702469e…3538`) is the allowed
     rollback target.
-- **Repository:** `dev` and `main` contain everything up to
-  `4586a24`; `dev` also has `b2bc70c` and this closure PR. No open
-  feature branches.
-- **Tracker:** T046 `verified`. T034 and T035 pending (maintenance).
+- **Repository:** `main` at `4586a24`; `dev` at `2000f42`. Open:
+  `feature/T047-bank-foundation` (PR #42), synchronized with `dev`.
+- **Tracker:** T046 `verified`; T047 `done` (awaiting PO review). T034
+  and T035 pending (maintenance).
 
 ### Next Steps
 
-1. PO decision on the proposed next feature: an instant Matemáticas
-   practice bank (pre-generated, checked stock served immediately, kept
-   topped up). Not started. Exactly one feature at a time, one PR into
-   `dev`, deployment only with a separate release authorization.
+1. PO review and merge decision on PR #42 (T047). Running the seeder on
+   production, a release and a deployment are separate authorizations.
 2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.
@@ -82,8 +92,8 @@ healthy. The next feature needs a PO decision.
 3. Stage 6.3 close: the student completes a five-question Matemáticas
    practice on the student's own device, and progress survives a
    restart (ADR-030 criterion 8).
-4. Content: pre-generate a small Matemáticas bank, so practice does not
-   wait about 5 minutes.
+4. Content: seed the Matemáticas bank with T047 (authorized run only)
+   and the tutor's review, so practice does not wait about 5 minutes.
 5. With separate authorization only: remove the obsolete server files
    listed in runbook section 0.
 
