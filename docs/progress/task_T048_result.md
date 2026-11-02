@@ -2,8 +2,10 @@
 
 - **Date:** 2026-11-01
 - **Role:** Developer
-- **Status:** Done (PR into `dev`, awaiting PO review). No deployment, no
-  live generation, no production seeding, budget unchanged.
+- **Status:** Done. PO final approval 2026-11-01; PR #43 (head `6776f33`,
+  CI 41376308110) merged into `dev` as `0a776f9` (`dev` CI 41383980544).
+  Not released. No deployment, no live generation, no production seeding,
+  budget unchanged.
 - **Decision record:** [ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)
 
 ## Change

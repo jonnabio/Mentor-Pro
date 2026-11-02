@@ -1537,7 +1537,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T048_result.md",
       "failures": [],
-      "notes": "PO-approved 2026-11-01 (D1-D4 approved, D5 delegated). No deployment, live generation or production seeding."
+      "notes": "PO-approved 2026-11-01 (D1-D4 approved, D5 delegated). No deployment, live generation or production seeding. Correction: bounded backtracking selection (3 regression tests). PO final approval 2026-11-01; PR #43 (head 6776f33, CI 41376308110) merged into dev as 0a776f9 (dev CI 41383980544). Not released."
     }
   ]
 }
