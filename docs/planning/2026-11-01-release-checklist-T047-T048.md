@@ -33,7 +33,8 @@ on release day; the PO accepts that coverage or waits for the pilot
 | # | Step | Pass | Stop |
 | --- | --- | --- | --- |
 | 1 | Read-only inventory (authorization needed): count accepted questions by subject, objective, evidencia, difficulty, in a read-only transaction | Counts recorded | Any write or error |
-| 2 | Release PR `dev` → `main`, pinned to `0a776f9`; protected tag, GitHub Release, manifest | CI green, manifest sha256 recorded | CI red |
+| 2 | Release PR `dev` → `main`, pinned to `69e2c39` (T047–T049); protected tag, GitHub Release, manifest | CI green, manifest sha256 recorded | CI red |
+| 2a | Administrator: `MENTOR_PRO_BANK_ONLY_ENABLED` absent from `/etc/mentor-pro/app.env` (key names only); after deploy `/api/subjects` reports `bank_only: false` | Off | Present: stop, PO decides |
 | 3 | `status`, `smoke` | `STATUS HEALTHY`, `SMOKE PASS (9/9)` | Anything else |
 | 4 | `backup`, then `verify-backup <dump>` | `BACKUP OK`, `VERIFY OK` | Anything else |
 | 5 | `preflight "$M"` | `PREFLIGHT OK` (schema `0001`) | Anything else |

@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-02 (T049 bank-only switch in a PR into `dev`;
-  production inventory assessed read-only)
-- **Active Role:** Developer
+- **Last Updated:** 2026-11-02 (T049 merged into `dev`; T047 + T048 +
+  T049 ready for release authorization)
+- **Active Role:** Architect
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
   ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/` and
@@ -12,8 +12,8 @@
 
 ## Current Objective
 
-T049, default-off switch `MENTOR_PRO_BANK_ONLY_ENABLED` for bank-only
-practice: PR into `dev`, not merged. T048 (Increment 2,
+None open. T049 (default-off switch `MENTOR_PRO_BANK_ONLY_ENABLED`), T048
+(Increment 2,
 [ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)) and T047
 (Increment 1,
 [ADR-034](../adr/ADR-034-question-bank-foundation.md)) is in `dev`,
@@ -86,8 +86,8 @@ production seeding without separate authorization. Production runs
   1.6.0, about one per cell; 31 already seen. No subject simulation can be
   filled bank-only; five-question practices only for some objective sets.
 - **Repository:** `main` at `4586a24`; `dev` at `0a776f9` (T047 +
-  T048). Open: `feature/T049-bank-only-switch` (PR into `dev`). No
-  `deploy/` or schema change since `v2026.10.31-1`.
+  T048), then `69e2c39` (T049, `dev` CI 41481451161). No open feature
+  branches. No `deploy/` or schema change since `v2026.10.31-1`.
 - **Tracker:** T046 `verified`; T047 `done` (in `dev`, not released);
   T048 `done` (in `dev`, not released): PR #43 merged as `0a776f9`
   (`dev` CI 41383980544). T034
@@ -95,8 +95,8 @@ production seeding without separate authorization. Production runs
 
 ### Next Steps
 
-1. PO review of the T049 PR, then the release decision on T047 + T048 +
-   T049 with the switch off:
+1. PO release authorization for T047 + T048 + T049 from `69e2c39`, switch
+   off (absent from `/etc/mentor-pro/app.env`):
    [release checklist](../planning/2026-11-01-release-checklist-T047-T048.md).
    Release, deployment, inventory check and seeding pilot are separate
    authorizations. No further feature work is authorized.
