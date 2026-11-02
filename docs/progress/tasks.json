@@ -1537,7 +1537,42 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T048_result.md",
       "failures": [],
-      "notes": "PO-approved 2026-11-01 (D1-D4 approved, D5 delegated). No deployment, live generation or production seeding."
+      "notes": "PO-approved 2026-11-01 (D1-D4 approved, D5 delegated). No deployment, live generation or production seeding. Correction: bounded backtracking selection (3 regression tests). PO final approval 2026-11-01; PR #43 (head 6776f33, CI 41376308110) merged into dev as 0a776f9 (dev CI 41383980544). Not released."
+    },
+    {
+      "id": "T049",
+      "name": "Default-off bank-only feature switch (MENTOR_PRO_BANK_ONLY_ENABLED)",
+      "objective": "Release T047 + T048 safely: switch off keeps the 5-question bank-first flow with generation, enforced server-side; on enables T048 configurable bank-only practice. Seeding, review, quarantine and eligibility unaffected.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T049_result.md"
+        ],
+        "modify": [
+          "app/main.py",
+          "app/practice/routes.py",
+          "app/static/index.html",
+          "app/static/app.js",
+          "app/static/styles.css",
+          "tests/app/test_bank_only_practice.py",
+          "tests/app/test_practice_api.py",
+          "tests/app/test_practice_browser.py",
+          "docs/adr/ADR-035-bank-only-configurable-practice.md",
+          "docs/planning/2026-11-01-release-checklist-T047-T048.md",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "depends_on": [
+        "T048"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T049_result.md",
+      "failures": [],
+      "notes": "PO-approved 2026-11-02 after the read-only production inventory (34 accepted questions, about one per cell; no subject simulation can be filled bank-only). No deployment, live generation or production seeding."
     }
   ]
 }

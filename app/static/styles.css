@@ -130,6 +130,7 @@ button.primary:focus-visible, label:focus-within { outline: 3px solid var(--acce
 /* ------------------------------------------------------------------ practice (T010) */
 .small { font-size: 0.85rem; }
 .segmented label.soon { opacity: 0.45; cursor: not-allowed; }
+.segmented label[hidden] { display: none; }  /* T049: hidden sizes while bank-only practice is off */
 
 button.secondary {
   width: 100%; min-height: 44px; border: 1px solid var(--accent); border-radius: var(--radius);

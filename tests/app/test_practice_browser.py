@@ -23,7 +23,7 @@ pytestmark = pytest.mark.skipif(not os.environ.get("MENTOR_PRO_BROWSER"), reason
 
 
 @pytest.fixture()
-def server(synthetic_client, url):  # noqa: F811
+def server(synthetic_client, url, request):  # noqa: F811
     import uvicorn
 
     target_url, schema = synthetic_client.app.state.catalog_target
@@ -31,7 +31,8 @@ def server(synthetic_client, url):  # noqa: F811
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         port = s.getsockname()[1]
-    srv = uvicorn.Server(uvicorn.Config(create_app(target_url, schema, SYNTHETIC, practice_runner=runner),
+    srv = uvicorn.Server(uvicorn.Config(create_app(target_url, schema, SYNTHETIC, practice_runner=runner,
+                                                   bank_only=getattr(request, "param", True)),
                                         host="127.0.0.1", port=port, log_level="warning"))
     thread = threading.Thread(target=srv.run, daemon=True)
     thread.start()
@@ -55,6 +56,7 @@ def configure(page, count):
     page.check(f'input[name="question_count"][value="{count}"]')
 
 
+@pytest.mark.parametrize("server", [True], indirect=True)
 def test_sizes_quiz_and_shortage_in_the_browser(server, url, catalog_conn):  # noqa: F811
     from playwright.sync_api import expect, sync_playwright
 
@@ -68,8 +70,8 @@ def test_sizes_quiz_and_shortage_in_the_browser(server, url, catalog_conn):  # n
         expect(sizes).to_have_count(6)
         assert [sizes.nth(i).get_attribute("value") for i in range(6)] == ["5", "10", "15", "20", "25", "30"]
         expect(page.locator('input[name="question_count"][value="5"]')).to_be_checked()
-        expect(page.get_by_text("Por ahora las prácticas tienen 5 preguntas.")).to_have_count(0)
         page.check('input[name="subject"][value="matematicas"]')
+        expect(page.locator("#count-note")).to_be_hidden()
         expect(sizes.nth(5)).to_be_enabled()  # the settings card opens once a subject is chosen
         assert all(sizes.nth(i).is_enabled() for i in range(6))
 
@@ -95,4 +97,29 @@ def test_sizes_quiz_and_shortage_in_the_browser(server, url, catalog_conn):  # n
             page.click("#next")
         shot(page, "4-summary")
         assert runner.calls == 0
+        browser.close()
+
+
+@pytest.mark.parametrize("server", [False], indirect=True)
+def test_switch_off_shows_only_five_questions_and_generates_as_before(server):
+    from playwright.sync_api import expect, sync_playwright
+
+    base, runner = server
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+        page.goto(base)
+        page.check('input[name="subject"][value="matematicas"]')
+        expect(page.locator("#count-note")).to_be_visible()
+        visible = page.locator('label:visible > input[name="question_count"]')
+        expect(visible).to_have_count(1)
+        assert visible.first.get_attribute("value") == "5" and visible.first.is_checked()
+        assert page.locator('input[name="question_count"][value="30"]').is_disabled()
+        page.check('input[name="scope"][value="subject_simulation"]')
+        shot(page, "5-switch-off-form")
+        page.click("#submit")
+        expect(page.locator("#quiz-view")).to_be_visible(timeout=15000)
+        expect(page.locator("#quiz-position")).to_contain_text("5")
+        shot(page, "6-switch-off-quiz")
+        assert runner.calls == 1  # bank first, then the (fake) generation job, as before T048
         browser.close()
