@@ -200,7 +200,7 @@ def test_answering_before_ready_and_bad_requests(synthetic_client):
     assert client.get("/api/practice/sessions/not-a-token").status_code == 422
 
 
-@pytest.mark.parametrize("overrides", [{"question_count": 10}, {"objective_codes": []},
+@pytest.mark.parametrize("overrides", [{"question_count": 10}, {"question_count": 7}, {"objective_codes": []},
                                        {"objective_codes": ["M01", "EL01"]}, {"client_request_id": "x"}])
 def test_invalid_configurations_are_rejected(synthetic_client, overrides):
     runner = FakeRunner()

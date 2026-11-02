@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-01 (T047 approved by the PO and merged into
-  `dev`; development complete, not released)
-- **Active Role:** Architect
+- **Last Updated:** 2026-11-01 (T048 configurable practice in a PR into
+  `dev`, awaiting PO review)
+- **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
   ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/` and
@@ -12,11 +12,12 @@
 
 ## Current Objective
 
-None open. T047 (Increment 1,
+T048, Configurable Practice (Increment 2,
+[ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)): bank-only
+practices of 5–30 questions, in a PR into `dev`, not merged. T047 (Increment 1,
 [ADR-034](../adr/ADR-034-question-bank-foundation.md)) is in `dev`,
 not released: no release to `main`, deployment, live generation or
-production seeding without separate authorization. Next milestone:
-Increment 2, Configurable Practice; scope needs PO approval first. Production runs
+production seeding without separate authorization. Production runs
 `v2026.10.31-1` (T046) on schema `0001`, healthy.
 
 ## Handoff Summary
@@ -79,16 +80,17 @@ Increment 2, Configurable Practice; scope needs PO approval first. Production ru
   - Schema `current 0001`; 5 dumps (732K, no automatic deletion).
   - Previous release `v2026.10.30-1` (`7702469e…3538`) is the allowed
     rollback target.
-- **Repository:** `main` at `4586a24`; `dev` at `9a09d38`. No open
-  feature branches.
-- **Tracker:** T046 `verified`; T047 `done` (in `dev`, not released). T034
+- **Repository:** `main` at `4586a24`; `dev` at `9a09d38`. Open:
+  `feature/T048-configurable-practice` (PR into `dev`).
+- **Tracker:** T046 `verified`; T047 `done` (in `dev`, not released);
+  T048 `done` (PR, awaiting review). T034
   and T035 pending (maintenance).
 
 ### Next Steps
 
-1. PO scope approval for Increment 2, Configurable Practice. No
-   implementation before it. T047 release, deployment and production
-   seeding remain separate authorizations.
+1. PO review and merge decision on the T048 PR. Release, deployment and
+   production seeding remain separate authorizations; bank-only practices
+   need seeded, reviewed stock to offer sizes above 5–10.
 2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.

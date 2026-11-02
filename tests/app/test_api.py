@@ -68,7 +68,7 @@ def test_configuration_is_deterministic(synthetic_client):
     ({"subject": "espanol", "objective_codes": ["EE01"]}, "invalid_selection"),
     ({"subject": "historia"}, "unknown_subject"),
     ({"difficulty": "extreme"}, "invalid_request"),
-    ({"question_count": 15}, "invalid_request"),
+    ({"question_count": 7}, "invalid_request"),
     ({"question_count": "10"}, "invalid_request"),
     ({"scope": "everything"}, "invalid_request"),
     ({"subject": "ciencias", "scope": "subject_simulation", "objective_codes": []}, "invalid_selection"),

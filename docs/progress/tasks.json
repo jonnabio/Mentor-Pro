@@ -1500,6 +1500,44 @@
       "result_file": "docs/progress/task_T047_result.md",
       "failures": [],
       "notes": "PO-approved 2026-11-01 (architecture assessment, revised plan). Mocked LLM only; no live generation, no production seeding, no deployment (separate authorizations). ACE gate pass: 892 passed, 6 skipped (baseline 879); 13 new tests. PO final approval 2026-11-01; PR #42 (head 6033edb, CI 41350431996) merged into dev as 9a09d38 (dev CI 41359022505). Not released."
+    },
+    {
+      "id": "T048",
+      "name": "Configurable practice: 5-30 questions from the bank only (Increment 2, ADR-035)",
+      "objective": "Practices of 5, 10, 15, 20, 25 or 30 questions assembled completely from eligible bank questions before the session exists; 409 with a Spanish message and the largest feasible size on shortage; no generation; exact cells kept (D1-D4).",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/bank_allocation.py",
+          "tests/app/test_bank_only_practice.py",
+          "tests/app/test_practice_browser.py",
+          "docs/adr/ADR-035-bank-only-configurable-practice.md",
+          "docs/progress/task_T048_result.md"
+        ],
+        "modify": [
+          "app/allocation.py",
+          "app/main.py",
+          "app/practice/bank.py",
+          "app/practice/routes.py",
+          "app/practice/store.py",
+          "app/static/index.html",
+          "app/static/app.js",
+          "tests/app/test_api_baseline.py",
+          "tests/app/test_practice_api.py",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "depends_on": [
+        "T047"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T048_result.md",
+      "failures": [],
+      "notes": "PO-approved 2026-11-01 (D1-D4 approved, D5 delegated). No deployment, live generation or production seeding."
     }
   ]
 }
