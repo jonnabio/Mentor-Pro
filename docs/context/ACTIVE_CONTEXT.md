@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-01 (T047 in PR #42, awaiting PO review;
-  T046 closed by PR #41)
+- **Last Updated:** 2026-11-01 (T048 configurable practice in a PR into
+  `dev`, awaiting PO review)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
@@ -12,10 +12,12 @@
 
 ## Current Objective
 
-T047, question bank foundation (Increment 1,
-[ADR-034](../adr/ADR-034-question-bank-foundation.md)): PR #42 into
-`dev`, not merged, awaiting PO review. Mocked LLM only; no live
-generation, production seeding or deployment. Production runs
+T048, Configurable Practice (Increment 2,
+[ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)): bank-only
+practices of 5–30 questions, in a PR into `dev`, not merged. T047 (Increment 1,
+[ADR-034](../adr/ADR-034-question-bank-foundation.md)) is in `dev`,
+not released: no release to `main`, deployment, live generation or
+production seeding without separate authorization. Production runs
 `v2026.10.31-1` (T046) on schema `0001`, healthy.
 
 ## Handoff Summary
@@ -67,7 +69,9 @@ generation, production seeding or deployment. Production runs
   returns to `pending`). CI run 41322277632 failed: on a fresh database
   `practice.item` did not exist when the seeding tests ran first; the test
   fixture now creates it (`PracticeStore`). Application code unchanged.
-  [T047 result](../progress/task_T047_result.md).
+  [T047 result](../progress/task_T047_result.md). PO final approval
+  2026-11-01; PR #42 (head `6033edb`, CI 41350431996) merged into `dev`
+  as `9a09d38` (`dev` CI 41359022505 green).
 
 ### Current State
 
@@ -76,15 +80,17 @@ generation, production seeding or deployment. Production runs
   - Schema `current 0001`; 5 dumps (732K, no automatic deletion).
   - Previous release `v2026.10.30-1` (`7702469e…3538`) is the allowed
     rollback target.
-- **Repository:** `main` at `4586a24`; `dev` at `2000f42`. Open:
-  `feature/T047-bank-foundation` (PR #42), synchronized with `dev`.
-- **Tracker:** T046 `verified`; T047 `done` (awaiting PO review). T034
+- **Repository:** `main` at `4586a24`; `dev` at `9a09d38`. Open:
+  `feature/T048-configurable-practice` (PR into `dev`).
+- **Tracker:** T046 `verified`; T047 `done` (in `dev`, not released);
+  T048 `done` (PR, awaiting review). T034
   and T035 pending (maintenance).
 
 ### Next Steps
 
-1. PO review and merge decision on PR #42 (T047). Running the seeder on
-   production, a release and a deployment are separate authorizations.
+1. PO review and merge decision on the T048 PR. Release, deployment and
+   production seeding remain separate authorizations; bank-only practices
+   need seeded, reviewed stock to offer sizes above 5–10.
 2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.

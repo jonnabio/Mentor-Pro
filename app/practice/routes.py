@@ -16,8 +16,9 @@ import psycopg
 from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, Field
 
-from app.allocation import allocate
+from app.allocation import QuestionCount, allocate
 from app.practice.bank import QuestionBank
+from app.practice.bank_allocation import BankComposer, Shortage
 from app.practice.jobs import JobQueue, SetRunner
 from app.practice.store import PracticeStore
 from curriculum.catalog import PracticeScope, SelectionError, select_objectives
@@ -44,10 +45,23 @@ class SessionRequest(BaseModel):
     scope: PracticeScope
     objective_codes: list[str] = Field(default_factory=list, max_length=100)
     difficulty: Literal["easy", "medium", "hard", "mixed"]
-    question_count: Literal[5]
+    # bank_only (student UI, T048): any permitted size, assembled from the bank before the session exists, never
+    # generated. bank_then_generate (default, earlier clients): 5 questions, bank first, the rest generated.
+    question_count: QuestionCount
+    source: Literal["bank_only", "bank_then_generate"] = "bank_then_generate"
     client_request_id: str = Field(pattern=r"^[A-Za-z0-9-]{8,64}$")
     # Anonymous per-tab token (sessionStorage); only its hash is stored, to prefer unseen bank questions.
     browser_token: str | None = Field(default=None, pattern=r"^[A-Za-z0-9-]{16,64}$")
+
+
+def shortage_message(requested: int, largest: int) -> str:
+    """Student-facing (age-appropriate) explanation when the bank cannot fill a practice (D5, T048)."""
+    if largest:
+        return (f"Todavía no tenemos suficientes preguntas revisadas para una práctica de {requested} preguntas "
+                f"con estas opciones. Puedes hacer una práctica de {largest} preguntas ahora, o probar otra "
+                "dificultad u otros objetivos.")
+    return ("Todavía estamos preparando preguntas revisadas para estas opciones. Prueba con otra dificultad "
+            "u otros objetivos.")
 
 
 class AnswerRequest(BaseModel):
@@ -162,11 +176,16 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
                                           request.objective_codes or None)
         except SelectionError as exc:
             raise api_error(422, "invalid_selection", selection_message(request.scope, str(exc))) from exc
+        if request.source == "bank_only":
+            return create_bank_only(request, selection, conn)
+        if request.question_count != 5:
+            raise api_error(422, "invalid_question_count",
+                            "Las prácticas con generación de preguntas tienen 5 preguntas.")
         plan = allocate(selection.objectives, request.question_count, request.difficulty)
         texts = {o["workbook_code"]: o["text_es"] for o in selection.objectives}
         for row in plan["allocation"]:
             row["text_es"] = texts[row["workbook_code"]]
-        config = request.model_dump(mode="json", exclude={"client_request_id", "browser_token"})
+        config = request.model_dump(mode="json", exclude={"client_request_id", "browser_token", "source"})
         browser_hash = (hashlib.sha256(request.browser_token.encode("ascii")).hexdigest()
                         if request.browser_token else None)
         store, queue, bank = service.get()
@@ -179,6 +198,31 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
             session = store.add_bank_items(session["session_id"], list(picks.values()), complete)
             if not complete:
                 queue.submit(session["session_id"])
+        return {**view(store, session), "created": created}
+
+    def create_bank_only(request: SessionRequest, selection: Any, conn: psycopg.Connection) -> dict:
+        """A complete practice from the bank, or 409 with nothing created; no LLM call, no job (ADR-035)."""
+        store, _, bank = service.get()
+        existing = store.by_request(request.client_request_id)
+        if existing is not None:
+            return {**view(store, existing), "created": False}
+        try:
+            with bank.connect() as db:
+                composer = BankComposer(bank, conn, baseline, request.subject, selection.objectives,
+                                        request.difficulty, db)
+                allocation, picks = composer.compose_or_shortage(request.question_count)
+        except Shortage as exc:
+            raise api_error(409, "insufficient_inventory", shortage_message(exc.requested, exc.largest),
+                            {"requested": exc.requested, "largest_available": exc.largest}) from exc
+        texts = {o["workbook_code"]: o["text_es"] for o in selection.objectives}
+        for row in allocation:
+            row["text_es"] = texts[row["workbook_code"]]
+        config = request.model_dump(mode="json", exclude={"client_request_id", "browser_token"})
+        browser_hash = (hashlib.sha256(request.browser_token.encode("ascii")).hexdigest()
+                        if request.browser_token else None)
+        session, created = store.create_or_get(request.client_request_id, baseline, config, allocation, browser_hash)
+        if created:
+            session = store.add_bank_items(session["session_id"], picks, True)
         return {**view(store, session), "created": created}
 
     @router.get("/sessions/{session_id}")

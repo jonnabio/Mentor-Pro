@@ -19,6 +19,7 @@ held: they are served only once linked to a batch whose review gate passed.
 
 from __future__ import annotations
 
+import contextlib
 import secrets
 from typing import Any
 
@@ -130,6 +131,8 @@ class QuestionBank:
     def _connect(self) -> psycopg.Connection:
         return psycopg.connect(self.url, row_factory=dict_row, autocommit=True)
 
+    connect = _connect  # public: a connection for `candidates(db=...)`
+
     def eligible(self, catalog: psycopg.Connection, baseline: str, subject: str, objective_code: str,
                  evidence_ordinal: int, evidence_id: str, difficulty: str,
                  include_held: bool = False) -> list[dict[str, Any]]:
@@ -138,33 +141,49 @@ class QuestionBank:
         Quarantined items are never returned. `include_held` (the seeder only) also returns seeder-generated
         items whose batch review has not passed; practices never see them.
         """
+        return self.candidates(catalog, baseline, subject, objective_code, {evidence_id: evidence_ordinal},
+                               (difficulty,), include_held)
+
+    def candidates(self, catalog: psycopg.Connection, baseline: str, subject: str, objective_code: str,
+                   evidences: dict[str, int], difficulties: tuple[str, ...],
+                   include_held: bool = False, db: psycopg.Connection | None = None) -> list[dict[str, Any]]:
+        """Eligible bank items of one objective for several evidencias (id -> ordinal) and difficulties.
+
+        One query per objective (T048); each row keeps its own `evidence_id` and `difficulty`, so a caller still
+        matches cells exactly. Same eligibility rules as `eligible`. `db` (dict rows, autocommit) reuses a
+        connection across objectives.
+        """
         held = "" if include_held else f"AND {NOT_HELD_SQL}"
-        with self._connect() as conn:
+        with contextlib.nullcontext(db) if db is not None else self._connect() as conn:
             rows = conn.execute(
                 f"""SELECT q.request_id, q.item, q.validation, q.checker_version, q.verdict, r.eligible,
-                          q.practice_set_id
+                          q.practice_set_id, q.evidence_id, q.difficulty
                    FROM generation.question_attempt q
                    LEFT JOIN generation.bank_revalidation r
                           ON r.request_id = q.request_id AND r.checker_version = %s
                    WHERE q.status = 'accepted' AND q.item IS NOT NULL AND q.baseline_version = %s
-                     AND q.objective_code = %s AND q.evidence_id = %s AND q.difficulty = %s
+                     AND q.objective_code = %s AND q.evidence_id = ANY(%s) AND q.difficulty = ANY(%s)
                      AND q.item->>'subject' = %s
                      AND {LATEST_REVIEW_SQL} IS DISTINCT FROM 'quarantined' {held}
                    ORDER BY q.created_at""",
-                (CHECKER_VERSION, baseline, objective_code, evidence_id, difficulty, subject)).fetchall()
+                (CHECKER_VERSION, baseline, objective_code, list(evidences), list(difficulties),
+                 subject)).fetchall()
             eligible = []
-            bundle = None
+            bundles: dict[str, Any] = {}  # evidence_id -> grounding bundle, or None when it cannot be built
             for row in rows:
                 if row["checker_version"] == CHECKER_VERSION and row["verdict"] == "accept":
                     eligible.append(row)
                     continue
                 if row["eligible"] is None:
-                    if bundle is None:
+                    if row["evidence_id"] not in bundles:
                         try:
-                            bundle = build_grounding(catalog, baseline, subject, objective_code, evidence_ordinal)
+                            bundles[row["evidence_id"]] = build_grounding(catalog, baseline, subject, objective_code,
+                                                                          evidences[row["evidence_id"]])
                         except GroundingError:
-                            return []
-                    ok, reasons = revalidate(row["item"], row["validation"], bundle)
+                            bundles[row["evidence_id"]] = None
+                    if bundles[row["evidence_id"]] is None:
+                        continue
+                    ok, reasons = revalidate(row["item"], row["validation"], bundles[row["evidence_id"]])
                     conn.execute(
                         """INSERT INTO generation.bank_revalidation (request_id, checker_version, eligible, reasons)
                            VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING""",

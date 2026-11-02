@@ -60,17 +60,19 @@
             <p class="field-label" id="count-label">Cantidad de preguntas</p>
             <div class="segmented" role="radiogroup" aria-labelledby="count-label">
               <label><input type="radio" name="question_count" value="5" checked> 5</label>
-              <label class="soon"><input type="radio" name="question_count" value="10" disabled> 10</label>
-              <label class="soon"><input type="radio" name="question_count" value="20" disabled> 20</label>
-              <label class="soon"><input type="radio" name="question_count" value="30" disabled> 30</label>
+              <label><input type="radio" name="question_count" value="10"> 10</label>
+              <label><input type="radio" name="question_count" value="15"> 15</label>
+              <label><input type="radio" name="question_count" value="20"> 20</label>
+              <label><input type="radio" name="question_count" value="25"> 25</label>
+              <label><input type="radio" name="question_count" value="30"> 30</label>
             </div>
-            <p class="muted small">Por ahora las prácticas tienen 5 preguntas.</p>
           </div>
         </div>
       </fieldset>
 
       <p id="dashboard-choice" class="choice-notice" role="status" hidden></p>
       <p id="form-error" class="alert" role="alert" hidden></p>
+      <p id="shortage-actions" hidden><button type="button" id="shortage-retry" class="secondary"></button></p>
       <button type="submit" id="submit" class="primary" disabled>Generar práctica</button>
       <button type="button" id="form-progress" class="secondary">Ver mi progreso</button>
     </form>

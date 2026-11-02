@@ -36,9 +36,10 @@ function showError(target, message) {
 }
 
 class ApiError extends Error {
-  constructor(message, status) {
+  constructor(message, status, body = {}) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -51,7 +52,8 @@ async function api(path, options = {}) {
   }
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new ApiError(body.message_es || "No fue posible completar la solicitud. Intente de nuevo.", response.status);
+    throw new ApiError(body.message_es || "No fue posible completar la solicitud. Intente de nuevo.", response.status,
+      body);
   }
   return body;
 }
@@ -196,6 +198,7 @@ form.addEventListener("submit", async (event) => {
   button.disabled = true; // blocks repeated clicks while the request is in flight
   button.textContent = "Enviando…";
   showError($("form-error"), "");
+  $("shortage-actions").hidden = true;
   state.requestId = state.requestId || newRequestId();
   const payload = {
     subject: form.elements.subject.value,
@@ -205,8 +208,9 @@ form.addEventListener("submit", async (event) => {
     question_count: Number(form.elements.question_count.value),
     client_request_id: state.requestId,
     browser_token: browserToken(),
+    source: "bank_only",
   };
-  // The server first fills the practice from the validated question bank.
+  // The server assembles the whole practice from the validated question bank, or explains a shortage (T048).
   renderPreparing();
   try {
     const session = await api("/api/practice/sessions", { method: "POST", body: JSON.stringify(payload) });
@@ -216,11 +220,29 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     show("practice-form");
     showError($("form-error"), error.message);
+    if (error.body && error.body.error === "insufficient_inventory") {
+      state.requestId = null; // nothing was created; a new choice is a new request
+      offerSmallerPractice(error.body.largest_available);
+    }
     updateState();
   } finally {
     button.textContent = "Generar práctica";
   }
 });
+
+// Shortage (409): one tap starts the largest practice the bank can fill now.
+function offerSmallerPractice(size) {
+  const option = size ? form.querySelector(`input[name="question_count"][value="${size}"]`) : null;
+  $("shortage-actions").hidden = !option;
+  if (!option) return;
+  const retry = $("shortage-retry");
+  retry.textContent = `Hacer una práctica de ${size} preguntas`;
+  retry.onclick = () => {
+    option.checked = true;
+    $("shortage-actions").hidden = true;
+    form.requestSubmit();
+  };
+}
 
 function renderPreparing() {
   show("progress-view");
@@ -650,7 +672,7 @@ function criterionItem(c) {
 $("dw-open-writing").addEventListener("click", () => openWriting());
 
 // Dashboard → practice form (T019): subject, "Un objetivo", only this objective, Intermedia, 5 questions.
-// Nothing is sent to the server here; "Generar práctica" starts the usual bank-then-generation flow.
+// Nothing is sent to the server here; "Generar práctica" starts the usual bank-only flow (T048).
 async function practiceObjective(subjectCode, objectiveCode) {
   backToMenu();
   await subjectsReady;

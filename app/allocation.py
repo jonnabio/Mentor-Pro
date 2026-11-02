@@ -16,11 +16,12 @@ Rules:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, get_args
 
 DIFFICULTIES = ("easy", "medium", "hard", "mixed")
 MIXED_CYCLE = ("easy", "medium", "hard")
-QUESTION_COUNTS = (5, 10, 20, 30)
+QuestionCount = Literal[5, 10, 15, 20, 25, 30]  # permitted practice sizes (T048)
+QUESTION_COUNTS: tuple[int, ...] = get_args(QuestionCount)
 
 
 def _spread_subset(count: int, size: int) -> list[int]:
