@@ -2,8 +2,10 @@
 
 - **Date:** 2026-11-02
 - **Role:** Developer
-- **Status:** Done (PR into `dev`, awaiting PO review). No deployment, no
-  live generation, no production seeding, budget unchanged.
+- **Status:** Done. PO final approval 2026-11-02; PR #44 (head `33de1f2`,
+  CI 41474791091) merged into `dev` as `69e2c39` (`dev` CI 41481451161).
+  Not released. No deployment, no live generation, no production seeding,
+  budget unchanged.
 - **Decision record:** [ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)
   (switch section)
 
@@ -28,3 +30,9 @@
   fixed: `.segmented label` display overrode `hidden`.
 - ACE gate: `VERIFY_RESULT=pass gate=all`; pytest 926 passed, 9 skipped
   (opt-in latency and browser tests).
+
+## Release
+
+Released in `v2026.11.02-1` (`main` `166acdc`), deployed 2026-11-02 with
+bank-only off: [release record](2026-11-02-production-release.md). PO
+browser acceptance pending.

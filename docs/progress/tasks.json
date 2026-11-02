@@ -1572,7 +1572,7 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T049_result.md",
       "failures": [],
-      "notes": "PO-approved 2026-11-02 after the read-only production inventory (34 accepted questions, about one per cell; no subject simulation can be filled bank-only). No deployment, live generation or production seeding."
+      "notes": "PO-approved 2026-11-02 after the read-only production inventory (34 accepted questions, about one per cell; no subject simulation can be filled bank-only). No deployment, live generation or production seeding. PO final approval 2026-11-02; PR #44 (head 33de1f2, CI 41474791091) merged into dev as 69e2c39 (dev CI 41481451161). Not released."
     }
   ]
 }

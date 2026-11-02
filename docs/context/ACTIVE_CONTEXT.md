@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-02 (T049 bank-only switch in a PR into `dev`;
-  production inventory assessed read-only)
-- **Active Role:** Developer
+- **Last Updated:** 2026-11-02 (release `v2026.11.02-1`, T047 + T048 +
+  T049, deployed with bank-only off; PO browser acceptance pending)
+- **Active Role:** Architect
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
   ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/` and
@@ -12,14 +12,14 @@
 
 ## Current Objective
 
-T049, default-off switch `MENTOR_PRO_BANK_ONLY_ENABLED` for bank-only
-practice: PR into `dev`, not merged. T048 (Increment 2,
-[ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)) and T047
-(Increment 1,
-[ADR-034](../adr/ADR-034-question-bank-foundation.md)) is in `dev`,
-not released: no release to `main`, deployment, live generation or
-production seeding without separate authorization. Production runs
-`v2026.10.31-1` (T046) on schema `0001`, healthy.
+None open. The question bank and configurable practice cycle is
+released: T047 (Increment 1,
+[ADR-034](../adr/ADR-034-question-bank-foundation.md)), T048 (Increment 2,
+[ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)) and T049
+(default-off switch `MENTOR_PRO_BANK_ONLY_ENABLED`) run in production as
+`v2026.11.02-1`, switch off. Only the PO browser acceptance (switch off)
+remains. Seeding, live generation and enabling bank-only each need a
+separate authorization.
 
 ## Handoff Summary
 
@@ -73,33 +73,51 @@ production seeding without separate authorization. Production runs
   [T047 result](../progress/task_T047_result.md). PO final approval
   2026-11-01; PR #42 (head `6033edb`, CI 41350431996) merged into `dev`
   as `9a09d38` (`dev` CI 41359022505 green).
+- **Release `v2026.11.02-1` (T047 + T048 + T049) deployed 2026-11-02
+  20:54 UTC**, window `T047-T049-2026-11-02`, authorization
+  `PO-T047-T049-2026-11-02`.
+  - T048 PR #43 merged as `0a776f9` (`dev` CI 41383980544); T049 PR #44
+    merged as `69e2c39` (`dev` CI 41481451161).
+  - Release PR #45 (head `ae3e09b`, CI 41517124354) merged into `main` as
+    `166acdc` (CI 41518476299, Tag and Release green). Digest
+    `sha256:738af74e…547a`; manifest sha256 `459ce7b3…e35b` on both sides.
+  - Switch: the administrator's key count returned `0`; the containers had
+    no such key.
+  - `status`/smoke 9/9; backup `mentor_pro_2026-11-02_205333.dump`
+    (sha256 `ad991fc0…00ff`, `VERIFY OK`); `PREFLIGHT OK` (schema `0001`);
+    `DEPLOY OK`; smoke 9/9; `STATUS HEALTHY`.
+  - `/api/subjects` reports `bank_only: false`, sizes `[5]`; a 10-question
+    request and a `bank_only` request are refused (422) before any write;
+    writing and tutor pages 200.
+  - [Release record](../progress/2026-11-02-production-release.md).
 
 ### Current State
 
 - **Production** (macedonianserver):
-  - `v2026.10.31-1` (`e7dd6edb…3215`) for app and tutor, `postgres:17.6`.
-  - Schema `current 0001`; 5 dumps (732K, no automatic deletion).
-  - Previous release `v2026.10.30-1` (`7702469e…3538`) is the allowed
-    rollback target.
+  - `v2026.11.02-1` (`738af74e…547a`) for app and tutor, `postgres:17.6`;
+    `MENTOR_PRO_BANK_ONLY_ENABLED` absent (off).
+  - Schema `current 0001`; 6 dumps (no automatic deletion).
+  - Rollback target: `v2026.10.31-1` (`e7dd6edb…3215`), same schema, with
+    `mentor_pro_2026-11-02_205333.dump`.
 - **Production inventory (read-only, 2026-11-02):** 34 accepted questions
   (Matemáticas 12, Estudios Sociales 9, Español 8, Ciencias 5), all checker
   1.6.0, about one per cell; 31 already seen. No subject simulation can be
   filled bank-only; five-question practices only for some objective sets.
-- **Repository:** `main` at `4586a24`; `dev` at `0a776f9` (T047 +
-  T048). Open: `feature/T049-bank-only-switch` (PR into `dev`). No
-  `deploy/` or schema change since `v2026.10.31-1`.
-- **Tracker:** T046 `verified`; T047 `done` (in `dev`, not released);
-  T048 `done` (in `dev`, not released): PR #43 merged as `0a776f9`
-  (`dev` CI 41383980544). T034
-  and T035 pending (maintenance).
+- **Repository:** `main` at `166acdc` (`v2026.11.02-1`); `dev` synced
+  with `main` by the closure PR. No open feature branches. No `deploy/`
+  or schema change since `v2026.10.31-1`.
+- **Tracker:** T046 `verified`; T047, T048, T049 `done` and released
+  (`verified` after PO browser acceptance). T034 and T035 pending
+  (maintenance).
 
 ### Next Steps
 
-1. PO review of the T049 PR, then the release decision on T047 + T048 +
-   T049 with the switch off:
+1. PO browser acceptance of `v2026.11.02-1`, switch off (checklist step
+   7, first and last checks):
    [release checklist](../planning/2026-11-01-release-checklist-T047-T048.md).
-   Release, deployment, inventory check and seeding pilot are separate
-   authorizations. No further feature work is authorized.
+   Then T047–T049 become `verified`. Inventory recheck, seeding pilot and
+   enabling bank-only are separate authorizations. No further feature
+   work is authorized.
 2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.
