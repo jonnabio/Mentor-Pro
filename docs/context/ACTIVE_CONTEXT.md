@@ -2,8 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-02 (release `v2026.11.02-1`, T047 + T048 +
-  T049, deployed with bank-only off; PO browser acceptance pending)
+- **Last Updated:** 2026-11-02, session end (release `v2026.11.02-1`,
+  T047 + T048 + T049, deployed with bank-only off; T050 browser
+  acceptance pending)
 - **Active Role:** Architect
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
@@ -25,44 +26,11 @@ separate authorization.
 
 ### Completed
 
-- **Release `v2026.10.30-1` (T036–T039, T045) CLOSED.**
-  - Step D rehearsal OK. Step E: production migrated to schema `0001`
-    and deployed (downtime 0.5 min). Step F accepted by the PO.
-  - Step G (I8), PR #37, merged as `a67523b` (`dev` CI 41246270688
-    green). Its changes:
-    - runbook section 0 rebuilt around `deploy/mentorpro`;
-    - pre-T036 rollback prohibited;
-    - protected pre-migration dump recorded;
-    - obsolete server files listed, not removed;
-    - ADR-033 Accepted.
-  - Evidence: [release record](../progress/2026-10-31-production-release.md).
-- **T046 (tutor "Volver a Mentor Pro" link) verified; release
-  `v2026.10.31-1` CLOSED.** PO browser acceptance passed 2026-11-01.
-  Handoff PR #40 merged into `dev` as `b2bc70c` (CI 41254232707).
-  - Change: a link to `http://192.168.50.229:8080/` (fixed LAN URL, PO
-    decision) plus one regression test. Authentication and isolation
-    unchanged.
-  - PR #38 merged into `dev` as `ec2b838` (CI 41249721154). Release PR
-    #39 merged into `main` as `4586a24`, pinned to head `ec2b838` (CI
-    41250517110 and 41251160982 green).
-  - Release `v2026.10.31-1`: protected tag, GitHub Release and manifest
-    (sha256 `f29acb33…85af`), digest `sha256:e7dd6edb…3215`.
-  - Deployed 2026-10-31 23:26 UTC (window `t046-2026-10-31`,
-    authorization `PO-urgent-T046-release-2026-10-31`). The sequence:
-    `PREFLIGHT OK`; backup `mentor_pro_2026-10-31_232534.dump`
-    (sha256 `3ce142a3…427e`, `VERIFY OK`); `DEPLOY OK`; smoke 9/9;
-    `STATUS HEALTHY`.
-  - The link is present on the production tutor page, and its target
-    returns 200. [T046 result](../progress/task_T046_result.md).
-  - 2026-11-01, after the laptop restart (read only): `STATUS HEALTHY`,
-    smoke 9/9.
-- **Unattended deployment enabled** (PO-authorized, 2026-10-31):
-  - The administrator installed a root-owned copy of the tool in
-    `/usr/local/lib/mentor-pro/`.
-  - The sudo rule `/etc/sudoers.d/mentor-pro` lets `jonnabio` run only
-    that tool without a password (`visudo -c` OK).
-  - The agent now deploys with `sudo -n`. Runbook section 0 updated.
-- **Closure PR #41** merged into `dev` as `2000f42` (CI green).
+- **Earlier releases, closed:** `v2026.10.30-1` (T036–T039, T045;
+  [record](../progress/2026-10-31-production-release.md)) and
+  `v2026.10.31-1` (T046, PO acceptance 2026-11-01;
+  [T046 result](../progress/task_T046_result.md)). Unattended deployment
+  with `sudo -n` enabled 2026-10-31. Closure PR #41 merged as `2000f42`.
 - **T047 (question bank foundation) developed, PR #42.** Fixed 100-cell
   plan, adoption, resumable gap-only seeding under an advisory lock,
   coverage and readiness report, question quarantine, 10-question review
@@ -90,6 +58,12 @@ separate authorization.
     request and a `bank_only` request are refused (422) before any write;
     writing and tutor pages 200.
   - [Release record](../progress/2026-11-02-production-release.md).
+  - Closure PR #46 merged into `dev` as `167c985` (CI 41523840735 and
+    `dev` CI 41525157754 green); `dev` now contains `main`.
+- **T050 (browser acceptance) started 2026-11-02:** production rechecked
+  (`STATUS HEALTHY`, smoke 9/9, `bank_only: false`, sizes `[5]`); the PO
+  checklist was issued. **No acceptance results reported yet**; nothing
+  recorded as accepted.
 
 ### Current State
 
@@ -112,12 +86,22 @@ separate authorization.
 
 ### Next Steps
 
-1. PO browser acceptance of `v2026.11.02-1`, switch off (checklist step
-   7, first and last checks):
-   [release checklist](../planning/2026-11-01-release-checklist-T047-T048.md).
-   Then T047–T049 become `verified`. Inventory recheck, seeding pilot and
-   enabling bank-only are separate authorizations. No further feature
-   work is authorized.
+1. T050: collect the PO's browser acceptance results for `v2026.11.02-1`
+   (switch off) on the house Wi-Fi:
+   - only size 5 and the note "Por ahora las prácticas tienen 5
+     preguntas.";
+   - a practice is generated, answered to the summary, "Mi progreso"
+     updates (needs the step-2 decision below);
+   - "Salir de la práctica" and "Volver al menú principal";
+   - writing exercise and earlier feedback visible (look only);
+   - tutor page through the 8081 tunnel, "Volver a Mentor Pro".
+
+   Record the actual results only; never infer acceptance from tests.
+   All pass: T047–T049 become `verified` (records ride in the next
+   functional PR). A failure: PO decides rollback to `v2026.10.31-1` or
+   a fix. [Checklist](../planning/2026-11-01-release-checklist-T047-T048.md).
+   Inventory recheck, seeding pilot and enabling bank-only are separate
+   authorizations. No further feature work is authorized.
 2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.
@@ -131,6 +115,11 @@ separate authorization.
    listed in runbook section 0.
 
 ### Blockers/Issues
+
+- **Pending PO decision (T050 step 2):** the practice check generates
+  questions and records answers. Options: (a) the student does a real
+  practice while the PO watches (recommended, ADR-017); (b) the PO
+  authorizes doing it and classifies it afterwards; (c) skip it.
 
 - **Pending PO decision:** the sudo rule covers every `mentorpro`
   command, including `migrate`, `rollback`, `maintenance`, `rehearse`
@@ -178,6 +167,11 @@ separate authorization.
 - **Release flow:** feature PR into `dev`, then a `dev` → `main` PR
   (merge with `--match-head-commit`). The `main` run tags, publishes to
   GHCR and creates the GitHub Release; `dev` runs skip Tag and Release.
+  `v2026.11.02-1` used a release PR from the handoff branch (`dev` plus
+  the docs record); `dev` was then synced by a closure PR from `main`.
+- **Switch check:** `/etc/mentor-pro` is root-only and production reads
+  are blocked for the agent; the administrator runs `sudo grep -c
+  '^MENTOR_PRO_BANK_ONLY_ENABLED=' /etc/mentor-pro/app.env` (expect `0`).
 - **Server:** `ssh jonnabio@100.64.84.15` (docker group).
   - Student app: `127.0.0.1:8080` and `192.168.50.229:8080`.
   - Tutor: `127.0.0.1:8081` only, through
