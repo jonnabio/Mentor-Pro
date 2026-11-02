@@ -136,7 +136,8 @@ def summary(session: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, An
 
 
 def build_practice_router(catalog_dependency: Callable, baseline: str, service: PracticeService,
-                          api_error: type[Exception], selection_message: Callable[[Any, str], str]) -> APIRouter:
+                          api_error: type[Exception], selection_message: Callable[[Any, str], str],
+                          bank_only_enabled: bool = False) -> APIRouter:
     router = APIRouter(prefix="/api/practice", tags=["practice"])
 
     def load(session_id: str) -> tuple[PracticeStore, dict[str, Any]]:
@@ -177,6 +178,8 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
         except SelectionError as exc:
             raise api_error(422, "invalid_selection", selection_message(request.scope, str(exc))) from exc
         if request.source == "bank_only":
+            if not bank_only_enabled:  # T049: switch off, enforced here and not only in the UI
+                raise api_error(422, "bank_only_disabled", "Por ahora las prácticas tienen 5 preguntas.")
             return create_bank_only(request, selection, conn)
         if request.question_count != 5:
             raise api_error(422, "invalid_question_count",

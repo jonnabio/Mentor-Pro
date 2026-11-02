@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app.allocation import QuestionCount, allocate
+from app.allocation import QUESTION_COUNTS, QuestionCount, allocate
 from app.dev_routes import LlmFactory, build_dev_router
 from app.practice.jobs import SetRunner, live_set_runner
 from app.practice.mastery import NOTICE_ES, STATUS_LABELS_ES, STATUSES, Thresholds, subject_dashboard
@@ -68,7 +68,8 @@ class PracticeConfig(BaseModel):
 def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
                baseline: str = BASELINE_VERSION, dev_endpoints: bool | None = None,
                llm_factory: LlmFactory | None = None, practice_runner: SetRunner | None = None,
-               tutor_token: str | None = None, tutor_hosts: frozenset[str] = LOOPBACK) -> FastAPI:
+               tutor_token: str | None = None, tutor_hosts: frozenset[str] = LOOPBACK,
+               bank_only: bool | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.writing.check_schema()  # T036: refuse to start on an unmigrated writing schema
@@ -77,6 +78,9 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
     app = FastAPI(title="Mentor Pro", version="0.4.0", docs_url="/api/docs", openapi_url="/api/openapi.json",
                   lifespan=lifespan)
     app.state.catalog_target = (database_url, schema)
+    # T049: bank-only configurable practice (ADR-035) only when enabled; absent or anything else means off.
+    if bank_only is None:
+        bank_only = os.environ.get("MENTOR_PRO_BANK_ONLY_ENABLED", "").lower() in ("1", "true", "yes")
 
     def catalog() -> Iterator[psycopg.Connection]:
         conn = open_catalog(database_url or db.database_url(), schema)
@@ -112,7 +116,8 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
         subjects = [{"code": code, "name_es": name,
                      "objective_count": len(list_objectives(conn, baseline, code))}
                     for code, name in SUBJECTS]
-        return {"baseline_version": baseline, "notice_es": GROUNDING_NOTICE_ES, "subjects": subjects}
+        return {"baseline_version": baseline, "notice_es": GROUNDING_NOTICE_ES, "subjects": subjects,
+                "practice": {"bank_only": bank_only, "question_counts": list(QUESTION_COUNTS) if bank_only else [5]}}
 
     @app.get("/api/objectives")
     def get_objectives(subject: str = Query(...), conn: psycopg.Connection = Depends(catalog)) -> dict:
@@ -173,7 +178,8 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
                                lambda: open_catalog(database_url or db.database_url(), schema))
 
     app.state.practice = PracticeService(lambda: database_url or db.database_url(), runner_factory)
-    app.include_router(build_practice_router(catalog, baseline, app.state.practice, ApiError, _selection_message))
+    app.include_router(build_practice_router(catalog, baseline, app.state.practice, ApiError, _selection_message,
+                                             bank_only))
     # T022: Producción escrita (Español) reads stored exercises only; it never generates.
     app.state.writing = WritingService(lambda: database_url or db.database_url())
     app.include_router(build_writing_router(app.state.writing, ApiError))

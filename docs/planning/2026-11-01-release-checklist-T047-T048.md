@@ -10,6 +10,16 @@
   deploy (runbook section 0). The T047 tables are created additively on
   first use.
 
+## T049 switch (2026-11-02)
+
+Release with `MENTOR_PRO_BANK_ONLY_ENABLED` absent (off): the student keeps
+the 5-question flow with generation, and T047 holds seeded questions until
+review. Step 1 found 34 accepted questions in production, about one per
+cell, so bank-only stays off until Matemáticas passes review. Enabling it
+later: add `MENTOR_PRO_BANK_ONLY_ENABLED=true` to `/etc/mentor-pro/app.env`
+(administrator), redeploy the same release, smoke, then the bank-only
+browser checks below. The release also includes T049.
+
 ## Decision before release
 
 The student UI now serves practices only from the bank. A topic, level or
@@ -50,7 +60,10 @@ section 0). No `sudo install` is needed: `deploy/` is unchanged.
 Practices: done by the student, or classified afterwards (ADR-017); no
 synthetic writing submissions.
 
-- [ ] The form shows 5, 10, 15, 20, 25, 30; 5 is selected.
+- [ ] Switch off (release): only 5 and "Por ahora las prácticas tienen 5
+      preguntas."; a practice is prepared as before.
+- [ ] Switch on (after review), the remaining checks: the form shows 5,
+      10, 15, 20, 25, 30; 5 is selected.
 - [ ] A choice the bank can fill (from step 1) starts at once, without the
       "Generando" screen; answered to the summary; "Mi progreso" updates.
 - [ ] "Salir de la práctica" and "Volver al menú principal" work.

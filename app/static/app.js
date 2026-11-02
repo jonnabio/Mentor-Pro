@@ -13,6 +13,7 @@ const $ = (id) => document.getElementById(id);
 const form = $("practice-form");
 const state = {
   objectives: [],
+  bankOnly: false, // T049: set from /api/subjects
   subjectNames: {},
   requestId: null,      // reused if the same submission is retried (server deduplicates)
   session: null,
@@ -111,6 +112,7 @@ async function loadSubjects() {
   try {
     const data = await api("/api/subjects");
     $("notice").textContent = data.notice_es;
+    setBankOnly(Boolean(data.practice && data.practice.bank_only));
     const container = $("subjects");
     container.replaceChildren();
     for (const subject of data.subjects) {
@@ -208,8 +210,8 @@ form.addEventListener("submit", async (event) => {
     question_count: Number(form.elements.question_count.value),
     client_request_id: state.requestId,
     browser_token: browserToken(),
-    source: "bank_only",
   };
+  if (state.bankOnly) payload.source = "bank_only";
   // The server assembles the whole practice from the validated question bank, or explains a shortage (T048).
   renderPreparing();
   try {
@@ -229,6 +231,16 @@ form.addEventListener("submit", async (event) => {
     button.textContent = "Generar práctica";
   }
 });
+
+// T049: the server decides whether bank-only practice (sizes 5-30) is on; off keeps the 5-question flow.
+function setBankOnly(enabled) {
+  state.bankOnly = enabled;
+  for (const label of form.querySelectorAll("label.bank-only")) {
+    label.hidden = !enabled;
+    label.querySelector("input").disabled = !enabled;
+  }
+  $("count-note").hidden = enabled;
+}
 
 // Shortage (409): one tap starts the largest practice the bank can fill now.
 function offerSmallerPractice(size) {
@@ -672,7 +684,7 @@ function criterionItem(c) {
 $("dw-open-writing").addEventListener("click", () => openWriting());
 
 // Dashboard → practice form (T019): subject, "Un objetivo", only this objective, Intermedia, 5 questions.
-// Nothing is sent to the server here; "Generar práctica" starts the usual bank-only flow (T048).
+// Nothing is sent to the server here; "Generar práctica" starts the configured flow (T049).
 async function practiceObjective(subjectCode, objectiveCode) {
   backToMenu();
   await subjectsReady;

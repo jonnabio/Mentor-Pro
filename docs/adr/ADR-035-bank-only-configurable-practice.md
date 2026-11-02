@@ -57,6 +57,18 @@ fail on exact cells while the bank holds suitable questions.
    shared connection per request, grounding built once per evidencia for
    revalidation.
 
+### Switch (T049, 2026-11-02)
+
+- `MENTOR_PRO_BANK_ONLY_ENABLED` (`true`, `1` or `yes`; anything else,
+  or absent, is off). Production sets it in `/etc/mentor-pro/app.env`.
+- Off (default): `/api/subjects` reports `practice.bank_only: false` and
+  sizes `[5]`; the UI shows only 5 and sends no `source`, so practices use
+  the earlier bank-first flow with generation. `source: bank_only` is
+  refused server-side (422 `bank_only_disabled`, nothing created).
+- On: the behavior above. Requests without `source` still get the
+  5-question flow in both states; developer endpoints are unaffected.
+- The switch does not touch seeding, review, quarantine or eligibility.
+
 ## Consequences
 
 - Practices start in under a second (measured locally on the synthetic

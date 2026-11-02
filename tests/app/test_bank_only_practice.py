@@ -22,7 +22,7 @@ from conftest import SYNTHETIC
 from curriculum.catalog import PracticeScope, select_objectives
 from test_bank_seeding import item, store_accepted
 from test_generation import catalog_conn  # noqa: F401  (fixture)
-from test_practice_api import FakeRunner, practice_client, request_body
+from test_practice_api import FakeRunner, practice_client, request_body, wait_ready
 
 PLACES = ["Liberia", "Cartago", "Limón", "Heredia", "Puntarenas", "Alajuela", "Nicoya", "Turrialba", "Grecia",
           "Quepos", "Golfito", "Upala", "Atenas", "Orotina", "Santa Cruz"]
@@ -264,7 +264,7 @@ def bank_only(**overrides):
 def test_a_bank_only_practice_is_ready_at_once_without_generation(synthetic_client, url, catalog_conn, count):
     fill_bank(url, catalog_conn, per_cell=4)  # M02 has one evidencia: 12 questions for its 10 slots
     runner = FakeRunner()
-    client = practice_client(synthetic_client, runner)
+    client = practice_client(synthetic_client, runner, bank_only=True)
     body = bank_only(question_count=count)
     response = client.post("/api/practice/sessions", json=body)
     assert response.status_code == 202, response.json()
@@ -282,7 +282,7 @@ def test_a_bank_only_practice_is_ready_at_once_without_generation(synthetic_clie
 def test_a_shortage_creates_nothing_and_explains_in_spanish(synthetic_client, url, catalog_conn):
     fill_bank(url, catalog_conn, per_cell=1)  # 4 evidencias × 3 levels = 12 questions
     runner = FakeRunner()
-    client = practice_client(synthetic_client, runner)
+    client = practice_client(synthetic_client, runner, bank_only=True)
     body = bank_only(question_count=30)
     response = client.post("/api/practice/sessions", json=body)
     assert response.status_code == 409
@@ -297,7 +297,7 @@ def test_a_shortage_creates_nothing_and_explains_in_spanish(synthetic_client, ur
 
 def test_an_empty_bank_gives_no_smaller_option_and_never_generates(synthetic_client, url):
     runner = FakeRunner()
-    client = practice_client(synthetic_client, runner)
+    client = practice_client(synthetic_client, runner, bank_only=True)
     body = {**bank_only(question_count=5), "difficulty": "hard"}
     out = client.post("/api/practice/sessions", json=body)
     assert out.status_code == 409 and out.json()["largest_available"] == 0
@@ -312,14 +312,14 @@ def test_quarantined_questions_are_never_served(synthetic_client, url, catalog_c
                             "'bank-only-test' AND objective_code = 'M02'").fetchall()
     for (request_id,) in rows:
         seeding.quarantine(url, request_id, "wrong_key", "test")
-    client = practice_client(synthetic_client, FakeRunner())
+    client = practice_client(synthetic_client, FakeRunner(), bank_only=True)
     body = request_body(source="bank_only", scope="single_objective", objective_codes=["M02"], difficulty="easy")
     assert client.post("/api/practice/sessions", json=body).status_code == 409
 
 
 def test_generation_requests_keep_five_questions_and_their_flow(synthetic_client, url):
     runner = FakeRunner()
-    client = practice_client(synthetic_client, runner)
+    client = practice_client(synthetic_client, runner, bank_only=True)
     for count in (7, 10):  # not permitted / bank-only sizes only
         assert client.post("/api/practice/sessions", json=request_body(question_count=count)).status_code == 422
     assert client.post("/api/practice/sessions", json=request_body(source="bank_only",
@@ -330,7 +330,7 @@ def test_generation_requests_keep_five_questions_and_their_flow(synthetic_client
 @pytest.mark.skipif(not os.environ.get("MENTOR_PRO_LATENCY"), reason="set MENTOR_PRO_LATENCY=1 to time startup")
 def test_bank_only_startup_latency(synthetic_client, url, catalog_conn):
     fill_bank(url, catalog_conn, per_cell=12)
-    client = practice_client(synthetic_client, FakeRunner())
+    client = practice_client(synthetic_client, FakeRunner(), bank_only=True)
     for count, limit in ((5, 0.5), (30, 1.0)):
         timings = []
         for _ in range(20):
@@ -346,3 +346,45 @@ def test_bank_only_startup_latency(synthetic_client, url, catalog_conn):
         assert client.post("/api/practice/sessions", json=request_body()).json()["status"] == "complete"
         timings.append(time.perf_counter() - start)
     print(f"bank-then-generate 5 (reference): p95 {sorted(timings)[18] * 1000:.0f} ms")
+
+
+# ---------------------------------------------------------------- T049 switch (MENTOR_PRO_BANK_ONLY_ENABLED)
+
+@pytest.mark.parametrize(("value", "enabled"), [(None, False), ("", False), ("false", False), ("0", False),
+                                                ("no", False), ("true", True), ("1", True), ("YES", True)])
+def test_the_switch_is_off_unless_explicitly_enabled(synthetic_client, monkeypatch, value, enabled):
+    if value is None:
+        monkeypatch.delenv("MENTOR_PRO_BANK_ONLY_ENABLED", raising=False)
+    else:
+        monkeypatch.setenv("MENTOR_PRO_BANK_ONLY_ENABLED", value)
+    practice = practice_client(synthetic_client, FakeRunner()).get("/api/subjects").json()["practice"]
+    assert practice == {"bank_only": enabled, "question_counts": list(QUESTION_COUNTS) if enabled else [5]}
+
+
+def test_switch_off_refuses_bank_only_requests_and_keeps_the_generated_flow(synthetic_client, url, catalog_conn):
+    fill_bank(url, catalog_conn, per_cell=4)
+    runner = FakeRunner()
+    client = practice_client(synthetic_client, runner, bank_only=False)
+    for count in (5, 10, 30):  # direct API requests: refused server-side, nothing created
+        body = bank_only(question_count=count)
+        out = client.post("/api/practice/sessions", json=body)
+        assert out.status_code == 422 and out.json()["error"] == "bank_only_disabled"
+        assert sessions_with(url, body["client_request_id"]) == 0
+    assert client.post("/api/practice/sessions", json=request_body(question_count=10)).status_code == 422
+    with psycopg.connect(url, autocommit=True) as conn:  # an empty bank for this objective: generation fills it
+        conn.execute("DELETE FROM generation.question_attempt WHERE prompt_version = 'bank-only-test' "
+                     "AND objective_code = 'M03'")
+    body = request_body(scope="single_objective", objective_codes=["M03"])
+    session = client.post("/api/practice/sessions", json=body).json()
+    assert session["status"] in ("queued", "running", "complete") and session["slots_total"] == 5
+    wait_ready(client, session["session_id"])
+    assert runner.calls == 1  # the earlier bank-first flow with generation fallback
+
+
+def test_switch_on_still_accepts_earlier_five_question_clients(synthetic_client, url):
+    runner = FakeRunner()
+    client = practice_client(synthetic_client, runner, bank_only=True)
+    session = client.post("/api/practice/sessions", json=request_body()).json()
+    assert session["slots_total"] == 5
+    wait_ready(client, session["session_id"])
+    assert runner.calls == 1

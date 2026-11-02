@@ -60,9 +60,9 @@ class FakeRunner:
                                  slots, [], 1)
 
 
-def practice_client(synthetic_client, runner):
+def practice_client(synthetic_client, runner, bank_only=None):
     url, schema = synthetic_client.app.state.catalog_target
-    return TestClient(create_app(url, schema, SYNTHETIC, practice_runner=runner))
+    return TestClient(create_app(url, schema, SYNTHETIC, practice_runner=runner, bank_only=bank_only))
 
 
 def request_body(**overrides):
