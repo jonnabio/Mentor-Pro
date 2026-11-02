@@ -9,7 +9,7 @@
   administrator ran the switch check interactively.
 - **Result:** `v2026.11.02-1` running in production, schema `current
   0001`, `STATUS HEALTHY`, bank-only practice **off**. PO browser
-  acceptance is **not done**.
+  acceptance (T050) **passed** 2026-11-02; release cycle T047–T050 closed.
 
 ## Release identity
 
@@ -51,7 +51,26 @@
 - Not done: a real 5-question practice (it would generate questions, not
   authorized); no seeding, no writing submission.
 
-## Open
+## PO browser acceptance (T050, switch off)
 
-- PO browser acceptance (checklist step 7, switch off).
+Reported by the PO on 2026-11-02, after a production recheck
+(`STATUS HEALTHY`, smoke 9/9, `bank_only: false`, sizes `[5]`). Results as
+reported; none inferred from tests.
+
+| Check | Result |
+| --- | --- |
+| Practice form: only size 5 and the note "Por ahora las prácticas tienen 5 preguntas." | PASS |
+| Five-question practice generated, answered to the summary, "Mi progreso" updated | PASS |
+| Navigation: "Salir de la práctica", "Volver al menú principal" | PASS |
+| Writing workflow: exercise and earlier feedback visible | PASS |
+| Tutor page through the 8081 tunnel, "Volver a Mentor Pro" | PASS |
+| Failures | None |
+
+The practice check was option (a) of the pending decision: the student
+completed a real five-question practice while the PO watched (ADR-017). It
+is genuine use and is kept as such, not a synthetic test. T047, T048 and
+T049 are now `verified`.
+
+## Rollback (kept)
+
 - Rollback target: `v2026.10.31-1` (`e7dd6edb…3215`) with the dump above.
