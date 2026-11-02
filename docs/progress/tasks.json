@@ -1450,7 +1450,7 @@
       "id": "T046",
       "name": "Tutor page: visible navigation back to Mentor Pro",
       "objective": "The tutor page (/tutor) has no way back to the student application. Add a minimal 'Volver a Mentor Pro' link in the tutor header without changing authentication, token handling, allowed hosts or the tutor service's routes; the student app still never links to the tutor (ADR-024).",
-      "status": "done",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [],
@@ -1468,7 +1468,111 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T046_result.md",
       "failures": [],
-      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented. Started 2026-10-31 by the PO after release v2026.10.30-1. Link to the student app on the house Wi-Fi; 1 regression test. PR into dev for PO review; not merged, not deployed (separate release authorization)."
+      "notes": "Found in T032/T033 real-user acceptance (2026-10-30, PO report with screenshot): completed submission shown, no return navigation. Usability defect, not a safety issue. DEFERRED by the PO (2026-10-30); not in this release; not implemented. Started 2026-10-31 by the PO after release v2026.10.30-1. Link to the student app on the house Wi-Fi; 1 regression test. PR #38 merged into dev as ec2b838 (CI 41249721154). Released in v2026.10.31-1 (main 4586a24, CI 41251160982, digest e7dd6edb…3215), deployed 2026-10-31 23:26 UTC: DEPLOY OK, smoke 9/9, STATUS HEALTHY, link present on the production tutor page. PO browser acceptance passed 2026-11-01."
+    },
+    {
+      "id": "T047",
+      "name": "Question bank foundation: seeded batches, coverage, review gate (Increment 1, ADR-034)",
+      "objective": "Prepare a validated inventory of 100 questions per subject outside student requests: fixed exact-cell plan, adoption of eligible questions, resumable gap-only seeding under an advisory lock, coverage and readiness reporting, question-level quarantine and a 10-question educational review gate. Generation pipeline, writing, practice routes, student UI and LLM budget unchanged.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/seeding.py",
+          "app/practice/seed_bank.py",
+          "tests/app/test_bank_seeding.py",
+          "docs/adr/ADR-034-question-bank-foundation.md",
+          "docs/progress/task_T047_result.md"
+        ],
+        "modify": [
+          "app/practice/bank.py",
+          "docs/runbooks/production-deployment.md",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "depends_on": [
+        "T013",
+        "T014"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T047_result.md",
+      "failures": [],
+      "notes": "PO-approved 2026-11-01 (architecture assessment, revised plan). Mocked LLM only; no live generation, no production seeding, no deployment (separate authorizations). ACE gate pass: 892 passed, 6 skipped (baseline 879); 13 new tests. PO final approval 2026-11-01; PR #42 (head 6033edb, CI 41350431996) merged into dev as 9a09d38 (dev CI 41359022505). Not released."
+    },
+    {
+      "id": "T048",
+      "name": "Configurable practice: 5-30 questions from the bank only (Increment 2, ADR-035)",
+      "objective": "Practices of 5, 10, 15, 20, 25 or 30 questions assembled completely from eligible bank questions before the session exists; 409 with a Spanish message and the largest feasible size on shortage; no generation; exact cells kept (D1-D4).",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/bank_allocation.py",
+          "tests/app/test_bank_only_practice.py",
+          "tests/app/test_practice_browser.py",
+          "docs/adr/ADR-035-bank-only-configurable-practice.md",
+          "docs/progress/task_T048_result.md"
+        ],
+        "modify": [
+          "app/allocation.py",
+          "app/main.py",
+          "app/practice/bank.py",
+          "app/practice/routes.py",
+          "app/practice/store.py",
+          "app/static/index.html",
+          "app/static/app.js",
+          "tests/app/test_api_baseline.py",
+          "tests/app/test_practice_api.py",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "depends_on": [
+        "T047"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T048_result.md",
+      "failures": [],
+      "notes": "PO-approved 2026-11-01 (D1-D4 approved, D5 delegated). No deployment, live generation or production seeding. Correction: bounded backtracking selection (3 regression tests). PO final approval 2026-11-01; PR #43 (head 6776f33, CI 41376308110) merged into dev as 0a776f9 (dev CI 41383980544). Not released."
+    },
+    {
+      "id": "T049",
+      "name": "Default-off bank-only feature switch (MENTOR_PRO_BANK_ONLY_ENABLED)",
+      "objective": "Release T047 + T048 safely: switch off keeps the 5-question bank-first flow with generation, enforced server-side; on enables T048 configurable bank-only practice. Seeding, review, quarantine and eligibility unaffected.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T049_result.md"
+        ],
+        "modify": [
+          "app/main.py",
+          "app/practice/routes.py",
+          "app/static/index.html",
+          "app/static/app.js",
+          "app/static/styles.css",
+          "tests/app/test_bank_only_practice.py",
+          "tests/app/test_practice_api.py",
+          "tests/app/test_practice_browser.py",
+          "docs/adr/ADR-035-bank-only-configurable-practice.md",
+          "docs/planning/2026-11-01-release-checklist-T047-T048.md",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "depends_on": [
+        "T048"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T049_result.md",
+      "failures": [],
+      "notes": "PO-approved 2026-11-02 after the read-only production inventory (34 accepted questions, about one per cell; no subject simulation can be filled bank-only). No deployment, live generation or production seeding. PO final approval 2026-11-02; PR #44 (head 33de1f2, CI 41474791091) merged into dev as 69e2c39 (dev CI 41481451161). Not released."
     }
   ]
 }

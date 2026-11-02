@@ -31,15 +31,38 @@ Never use `compose.deploy.yml` again: it pins the pre-T036 digest
 
 ## 0. Release workflow (ADR-033)
 
-Current state (2026-10-31): release `v2026.10.30-1`, digest
-`sha256:7702469e442596d56b1425bfc5a0d189bcc1f21a2fd3972d47f079b932423538`,
-writing schema `current 0001`
-([release record](../progress/2026-10-31-production-release.md)).
+Current state (2026-10-31 23:26 UTC): release `v2026.10.31-1` (T046),
+digest
+`sha256:e7dd6edb74ecbd993a2d7c8d81ef8b40e67ee98cb0c5759ce1d7617398073215`,
+writing schema `current 0001`; previous `v2026.10.30-1` (`7702469e…3538`,
+[release record](../progress/2026-10-31-production-release.md)).
 
-The administrator runs every `sudo` command in an interactive SSH session
-and pastes the output; nobody else handles the password. Window and
-authorization references are recorded as given and do not prove an
-approval.
+**Privileged execution (PO and administrator, 2026-10-31).** A
+root-owned copy of the tool is in `/usr/local/lib/mentor-pro/`
+(`mentorpro`, `mentorpro_*.py`, `compose*.yml`), and
+`/etc/sudoers.d/mentor-pro` allows only
+`jonnabio ALL=(root) NOPASSWD: /usr/local/lib/mentor-pro/mentorpro`.
+The agent runs releases over SSH with `sudo -n`; nobody handles a
+password. Never point that rule at the `jonnabio`-writable
+`/opt/mentor-pro/deploy`. When a release changes `deploy/`, the
+administrator re-runs the three `sudo install` commands
+(`install -o root -g root`, `755` for `mentorpro`, `644` for the rest)
+before deploying. Window and authorization references (no spaces) are
+recorded as given and do not prove an approval.
+
+```bash
+T="sudo -n /usr/local/lib/mentor-pro/mentorpro"
+M=/opt/mentor-pro/manifests/<release>.json   # from the GitHub Release, checksum compared
+W=<window ref>; A=<PO authorization ref>
+```
+
+With `T` defined like this, read `sudo $T` in the table as `$T`.
+`verify-backup` and `--backup` take the dump's full path under
+`/var/backups/mentor-pro/`. To install the manifest:
+`gh release download <release> -p release-manifest.json`, `scp` it to
+`/opt/mentor-pro/manifests/<release>.json` and compare `sha256sum`.
+
+Previous form (interactive administrator session):
 
 ```bash
 T=/opt/mentor-pro/deploy/mentorpro
@@ -465,3 +488,31 @@ Never start a pre-T036 image on the migrated database: it recreates
 (ADR-032). If it happened, the new image refuses to start with "run
 `python -m app.writing.migrate repair`"; that command drops only the
 recreated index (separate PO decision).
+
+## L. Question bank seeding and review (T047, ADR-034)
+
+**Not authorized on production.** Running any command below against the
+production database needs a separate PO authorization (and an image that
+contains `app/practice/seed_bank.py`). The commands are the same locally
+and in the container; locally use `.venv/Scripts/python.exe`.
+
+```bash
+seed() { python -m app.practice.seed_bank "$@"; }
+seed run --subject matematicas --max-calls 20   # adopt, then generate gaps; resumable
+seed report --subject matematicas               # inventory, coverage, readiness (add --cells)
+seed review-sample --subject matematicas --out review.json
+# the tutor fills "verdict" (approved | quarantined) and "reason" per question
+seed review-record --subject matematicas --decisions review.json
+seed quarantine --request-id req-... --reason wrong_key
+```
+
+**Exit codes:** 0 done; 1 refused (nothing changed by that step);
+3 `SEED BUSY` (another run holds the subject, try later); 4 `LOCK LOST`
+(the run stopped; rerun). Rerunning is always safe: it fills only gaps.
+
+**Gates:** stop on exit 1 or 4. `run` never raises the daily budget; a
+stop at `run_call_limit` or `daily_budget` leaves the batch `open`.
+Generated questions reach practices only after `review-record` reports
+`review_status: passed`. On `failed`, stop and investigate. The review file
+holds question text; delete it after recording. Standard output holds
+counts and identifiers only.
