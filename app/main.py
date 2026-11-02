@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app.allocation import allocate
+from app.allocation import QuestionCount, allocate
 from app.dev_routes import LlmFactory, build_dev_router
 from app.practice.jobs import SetRunner, live_set_runner
 from app.practice.mastery import NOTICE_ES, STATUS_LABELS_ES, STATUSES, Thresholds, subject_dashboard
@@ -52,9 +52,9 @@ GROUNDING_NOTICE_ES = (
 class ApiError(Exception):
     """An error with a stable code and a student-facing Spanish message."""
 
-    def __init__(self, status: int, code: str, message_es: str):
+    def __init__(self, status: int, code: str, message_es: str, details: dict | None = None):
         super().__init__(code)
-        self.status, self.code, self.message_es = status, code, message_es
+        self.status, self.code, self.message_es, self.details = status, code, message_es, details or {}
 
 
 class PracticeConfig(BaseModel):
@@ -62,7 +62,7 @@ class PracticeConfig(BaseModel):
     scope: PracticeScope
     objective_codes: list[str] = Field(default_factory=list, max_length=100)
     difficulty: Literal["easy", "medium", "hard", "mixed"]
-    question_count: Literal[5, 10, 20, 30]
+    question_count: QuestionCount
 
 
 def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
@@ -87,7 +87,7 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
 
     @app.exception_handler(ApiError)
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
-        return JSONResponse(status_code=exc.status, content={"error": exc.code, "message_es": exc.message_es})
+        return JSONResponse(status_code=exc.status, content={**exc.details, "error": exc.code, "message_es": exc.message_es})
 
     @app.exception_handler(SchemaMigrationRequired)
     async def schema_migration_required(_: Request, __: Exception) -> JSONResponse:

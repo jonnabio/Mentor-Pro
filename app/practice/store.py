@@ -128,6 +128,11 @@ class PracticeStore:
                    ORDER BY created_at LIMIT 1""", (client_request_id, fp)).fetchone()
             return existing, False
 
+    def by_request(self, client_request_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn:
+            return conn.execute("SELECT * FROM practice.session WHERE client_request_id = %s",
+                                (client_request_id,)).fetchone()
+
     def get(self, session_id: str) -> dict[str, Any] | None:
         with self._connect() as conn:
             return conn.execute("SELECT * FROM practice.session WHERE session_id = %s", (session_id,)).fetchone()

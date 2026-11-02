@@ -55,7 +55,7 @@ def test_multiple_and_all_objectives(client):
     assert {a["workbook_code"]: a["questions"] for a in multi["allocation"]} == {"M01": 4, "M07": 3, "M22": 3}
 
     for subject, total in EXPECTED.items():
-        for n in (5, 10, 20, 30):
+        for n in (5, 10, 15, 20, 25, 30):
             data = client.post("/api/practice/configure", json={
                 "subject": subject, "scope": "subject_simulation", "objective_codes": [],
                 "difficulty": "mixed", "question_count": n}).json()
