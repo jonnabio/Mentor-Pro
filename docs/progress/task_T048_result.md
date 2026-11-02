@@ -37,3 +37,9 @@
   default 5, a 30-question request shows the shortage message and "Hacer una
   práctica de 10 preguntas", which starts a 10-question practice answered to
   the summary; no generation.
+
+## Release
+
+Released in `v2026.11.02-1` (`main` `166acdc`), deployed 2026-11-02 with
+bank-only off: [release record](2026-11-02-production-release.md). PO
+browser acceptance pending.

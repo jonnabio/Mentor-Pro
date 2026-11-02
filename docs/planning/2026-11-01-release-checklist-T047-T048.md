@@ -1,8 +1,9 @@
 # Release and Acceptance Checklist: T047 + T048
 
 - **Date:** 2026-11-01
-- **Status:** Prepared. Not authorized: release, deployment, the production
-  inventory query and seeding each need a PO authorization.
+- **Status:** Steps 2–6 done 2026-11-02: `v2026.11.02-1` deployed, switch
+  off ([release record](../progress/2026-11-02-production-release.md)).
+  Step 7 (browser acceptance) pending; steps 8–9 need authorization.
 - **Source:** `dev` at `0a776f9` (`dev` CI 41383980544). Production runs
   `v2026.10.31-1` (`e7dd6edb…3215`), schema `0001`.
 - **Scope:** T047 bank foundation (ADR-034), T048 bank-only configurable
