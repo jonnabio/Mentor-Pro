@@ -48,7 +48,12 @@ fail on exact cells while the bank holds suitable questions.
    `largest_available` (largest smaller permitted size that fits now, 0 if
    none) and a Spanish message (D5). No LLM call, no job (D4: larger sizes
    are bank-only).
-6. Bank lookups: one query per objective (`QuestionBank.candidates`), one
+6. Selection is a depth-first search over slots that tries candidates in
+   the preference order above. The first complete practice is the greedy
+   choice whenever that works, and a dead end backtracks instead of
+   reporting a shortage. Failed partial selections are remembered by their
+   set of chosen questions; at most 20,000 states per size.
+7. Bank lookups: one query per objective (`QuestionBank.candidates`), one
    shared connection per request, grounding built once per evidencia for
    revalidation.
 

@@ -155,6 +155,50 @@ def test_a_shortage_reports_the_largest_permitted_size_that_fits():
     assert comp.compose(25) is None and comp.compose(20) is not None
 
 
+def row(code, level, n, item_=None):
+    return {"objective_code": code, "evidence_id": f"{code}-E1", "difficulty": level, "item": item_ or variant(n),
+            "request_id": f"r{n}"}
+
+
+def level_trap():
+    """M01 gets 3 slots, M02 gets 2. Greedy balances M01 as easy, medium, hard; M02 then needs 2 hard and the
+    hard share (at most 2 of 5) is gone. Complete: M01 easy, easy, medium; M02 hard, hard."""
+    objs = objectives(2, evidences=1)
+    rows = [row("M01", "easy", 0), row("M01", "easy", 1), row("M01", "medium", 2), row("M01", "hard", 3),
+            row("M02", "hard", 4), row("M02", "hard", 5)]
+    return objs, rows
+
+
+def test_a_dead_end_on_difficulty_balance_backtracks_to_a_complete_practice():
+    objs, rows = level_trap()
+    allocation, picks = composer(rows, objs)[0].compose_or_shortage(5)
+    by_objective = {r["workbook_code"]: sorted(s["difficulty"] for s in r["slots"]) for r in allocation}
+    assert by_objective == {"M01": ["easy", "easy", "medium"], "M02": ["hard", "hard"]}
+    assert [r["questions"] for r in allocation] == [3, 2] and len(picks) == 5
+
+
+def test_a_dead_end_on_near_duplicates_backtracks_and_still_prefers_unseen():
+    objs = objectives(2, evidences=1)
+    target = variant(4)
+    trap = {**copy.deepcopy(target), "item_id": "trap"}  # a near duplicate of M02's first question
+    rows = [row("M01", "easy", 0, trap), row("M01", "easy", 1), row("M01", "easy", 2), row("M01", "easy", 3),
+            row("M02", "easy", 4, target), row("M02", "easy", 5)]
+    seen = {"bo-1", "bo-2", "bo-3"}  # greedy takes the unseen trap first, leaving M02 one question short
+    _, picks = composer(rows, objs, difficulty="easy", seen=seen)[0].compose_or_shortage(5)
+    chosen = [p["item"]["item_id"] for p in picks]
+    assert "trap" not in chosen and sorted(chosen) == ["bo-1", "bo-2", "bo-3", "bo-4", "bo-5"]
+    _, fresh = composer(rows[:4] + [row("M02", "easy", 6), row("M02", "easy", 7)], objs, "easy",
+                        seen)[0].compose_or_shortage(5)
+    assert "trap" in [p["item"]["item_id"] for p in fresh]  # without the conflict the unseen question is used
+
+
+def test_largest_available_is_not_lowered_by_an_avoidable_dead_end():
+    objs, rows = level_trap()
+    with pytest.raises(Shortage) as exc:
+        composer(rows, objs)[0].compose_or_shortage(10)
+    assert exc.value.largest == 5
+
+
 # ---------------------------------------------------------------- API (mentor_pro_test, synthetic catalog)
 
 @pytest.fixture()

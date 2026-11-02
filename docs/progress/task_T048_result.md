@@ -23,10 +23,11 @@
 
 - `tests/app/test_bank_only_practice.py`: every size, exact cells, objective
   counts, D1 evidencia spread, no level substitution, mixed balance, unseen
-  first, no duplicates, largest feasible size, ready at once without
+  first, no duplicates, backtracking out of difficulty and near-duplicate
+  dead ends (both fail on plain greedy), largest feasible size, ready at once without
   generation, shortage creates nothing, empty bank, quarantine, earlier
   5-question flow kept.
-- ACE gate: `VERIFY_RESULT=pass gate=all`; pytest 913 passed, 8 skipped
+- ACE gate: `VERIFY_RESULT=pass gate=all`; pytest 916 passed, 8 skipped
   (opt-in latency and browser tests); baseline 892 passed, 6 skipped.
 - Latency (opt-in, `MENTOR_PRO_LATENCY=1`), p95 of 20 starts: 5 questions
   439 ms, 30 questions 863 ms; earlier bank-first flow 592 ms.

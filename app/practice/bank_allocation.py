@@ -29,6 +29,9 @@ from app.generation.validation import duplicate_reason
 from app.practice.bank import QuestionBank
 
 
+SEARCH_LIMIT = 20_000  # search states per practice size; far above what 30 slots need in practice
+
+
 class Shortage(Exception):
     """Not enough eligible bank questions; `largest` is the largest permitted size that fits now (0 if none)."""
 
@@ -65,47 +68,69 @@ class BankComposer:
         return self._cache[code]
 
     def compose(self, count: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]] | None:
-        """(allocation, picks) for a complete practice of `count`, or None when the bank cannot fill it."""
+        """(allocation, picks) for a complete practice of `count`, or None when the bank cannot fill it.
+
+        Depth-first over slots, each trying candidates in preference order, so the first complete practice is
+        the greedy one whenever greedy succeeds; a dead end backtracks instead of reporting a shortage. A failed
+        partial practice is remembered by its set of chosen questions (which fixes its level and evidencia
+        counts), so no state is explored twice; SEARCH_LIMIT bounds the work per size.
+        """
         plan = allocate(self.objectives, count, self.difficulty)["allocation"]
         by_code = {o["workbook_code"]: o for o in self.objectives}
         low, high = level_bounds(count) if self.difficulty == "mixed" else (count, count)
+        slots = [(row, by_code[row["workbook_code"]]) for row in plan for _ in range(row["questions"])]
         levels: Counter[str] = Counter()
-        chosen: list[dict[str, Any]] = []
-        allocation, picks = [], []
-        sequence = 0
-        for row in plan:
-            objective = by_code[row["workbook_code"]]
+        chosen: list[dict[str, Any]] = []  # candidate rows, in slot order
+        failed: set[frozenset[str]] = set()
+        budget = [SEARCH_LIMIT]
+
+        def options(index: int) -> list[dict[str, Any]]:
+            row, objective = slots[index]
             ordinals = {e["id"]: e["ordinal"] for e in objective["evidences"]}
-            pool = self._candidates(objective)
-            uses: Counter[str] = Counter()
-            slots = []
-            for _ in range(row["questions"]):
-                usable = [c for c in pool if levels[c["difficulty"]] < high
-                          and all(c["item"]["item_id"] != p["item_id"] for p in chosen)
-                          and duplicate_reason(c["item"], chosen) is None]
-                if not usable:
-                    return None
-                # Spread evidencias first, then the level furthest below its share, then unseen; ties by ordinal.
-                def rank(c: dict[str, Any]) -> tuple:
-                    return (uses[c["evidence_id"]], levels[c["difficulty"]], c["item"]["item_id"] in self.seen,
-                            ordinals[c["evidence_id"]], MIXED_CYCLE.index(c["difficulty"]))
-                best = min(rank(c)[:2] for c in usable)
-                cell = [c for c in usable if rank(c)[:2] == best]
-                fresh = [c for c in cell if c["item"]["item_id"] not in self.seen]
-                first = min(rank(c)[3:] for c in (fresh or cell))
-                pick = secrets.choice([c for c in (fresh or cell) if rank(c)[3:] == first])
-                sequence += 1
-                uses[pick["evidence_id"]] += 1
-                levels[pick["difficulty"]] += 1
-                chosen.append(pick["item"])
-                slots.append({"slot": sequence, "evidence_id": pick["evidence_id"],
-                              "evidence_ordinal": ordinals[pick["evidence_id"]], "difficulty": pick["difficulty"]})
-                picks.append({"slot": sequence, "objective_code": row["workbook_code"],
-                              "evidence_id": pick["evidence_id"], "item": pick["item"], "source": "bank",
-                              "source_request_id": pick["request_id"]})
-            allocation.append({**row, "evidences_covered": len({s["evidence_id"] for s in slots}), "slots": slots})
-        if any(levels[level] < low for level in self.levels):
+            mine = [c for c, (r, _) in zip(chosen, slots) if r is row]
+            uses = Counter(c["evidence_id"] for c in mine)
+            items = [c["item"] for c in chosen]
+            usable = [c for c in self._candidates(objective) if levels[c["difficulty"]] < high
+                      and all(c["item"]["item_id"] != i["item_id"] for i in items)
+                      and duplicate_reason(c["item"], items) is None]
+            # Spread evidencias first, then the level furthest below its share, then unseen; ties by ordinal,
+            # then at random among equals.
+            noise = {id(c): secrets.randbits(32) for c in usable}
+            return sorted(usable, key=lambda c: (uses[c["evidence_id"]], levels[c["difficulty"]],
+                                                 c["item"]["item_id"] in self.seen, ordinals[c["evidence_id"]],
+                                                 MIXED_CYCLE.index(c["difficulty"]), noise[id(c)]))
+
+        def search(index: int) -> bool:
+            if index == len(slots):
+                return all(levels[level] >= low for level in self.levels)
+            short = sum(max(0, low - levels[level]) for level in self.levels)
+            key = frozenset(c["request_id"] for c in chosen)
+            if short > len(slots) - index or key in failed or budget[0] <= 0:
+                return False
+            budget[0] -= 1
+            for c in options(index):
+                chosen.append(c)
+                levels[c["difficulty"]] += 1
+                if search(index + 1):
+                    return True
+                chosen.pop()
+                levels[c["difficulty"]] -= 1
+            failed.add(key)
+            return False
+
+        if not search(0):
             return None
+        allocation, picks = [], []
+        for row in plan:
+            ordinals = {e["id"]: e["ordinal"] for e in by_code[row["workbook_code"]]["evidences"]}
+            rows = []
+            for c in chosen[len(picks):len(picks) + row["questions"]]:
+                slot = len(picks) + 1
+                rows.append({"slot": slot, "evidence_id": c["evidence_id"],
+                             "evidence_ordinal": ordinals[c["evidence_id"]], "difficulty": c["difficulty"]})
+                picks.append({"slot": slot, "objective_code": row["workbook_code"], "evidence_id": c["evidence_id"],
+                              "item": c["item"], "source": "bank", "source_request_id": c["request_id"]})
+            allocation.append({**row, "evidences_covered": len({s["evidence_id"] for s in rows}), "slots": rows})
         return allocation, picks
 
     def compose_or_shortage(self, count: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
