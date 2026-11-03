@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-10-28",
+  "updated": "2026-11-03",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -1600,6 +1600,37 @@
       "result_file": "docs/progress/2026-11-02-production-release.md",
       "failures": [],
       "notes": "PO reported PASS 2026-11-02 for all five checks: practice form (size 5 only, note shown), real five-question practice completed by the student under PO observation (option a, ADR-017; real use, not a synthetic test), navigation, writing workflow, tutor navigation. No failures. Release cycle T047-T050 closed by PO."
+    },
+    {
+      "id": "T051",
+      "name": "Targeted seeding and individual educational review (question bank population)",
+      "objective": "run --objective CODE for one objective's planned gaps; individual tutor review of generated questions while the batch is open; an individually approved, actively linked, never-sampled question in a non-failed batch is servable; the batch gate is unchanged (ADR-034 amendment).",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T051_result.md"
+        ],
+        "modify": [
+          "app/practice/seeding.py",
+          "app/practice/seed_bank.py",
+          "app/practice/bank.py",
+          "tests/app/test_bank_seeding.py",
+          "docs/adr/ADR-034-question-bank-foundation.md",
+          "docs/progress/tasks.json",
+          "docs/context/ACTIVE_CONTEXT.md"
+        ]
+      },
+      "dependencies": [
+        "T047",
+        "T050"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T051_result.md",
+      "failures": [],
+      "notes": "PO approval 2026-11-03. Not merged, released or deployed; no production seeding or live generation; budget unchanged."
     }
   ]
 }

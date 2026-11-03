@@ -1,10 +1,10 @@
-# Active Context: Session Handoff 2026-11-02
+# Active Context: Session Handoff 2026-11-03
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-02, session end (release cycle T047–T050
-  closed: `v2026.11.02-1` accepted by the PO, bank-only off)
-- **Active Role:** Architect
+- **Last Updated:** 2026-11-03 (T051 developed, PR into `dev` open; not
+  merged, released or deployed)
+- **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
   ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/` and
@@ -12,16 +12,20 @@
 
 ## Current Objective
 
-None open. The release cycle T047–T050 is closed: T047 (Increment 1,
-[ADR-034](../adr/ADR-034-question-bank-foundation.md)), T048 (Increment 2,
-[ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)) and T049
-(default-off switch `MENTOR_PRO_BANK_ONLY_ENABLED`) run in production as
-`v2026.11.02-1`, switch off, and passed PO browser acceptance (T050).
+T051, Matemáticas question bank population and activation (fast track).
 
-**Next milestone (not started, needs PO authorization):** Matemáticas
-question bank population and activation. Seeding, live generation,
-enabling bank-only, provider limit changes, deployment and any new
-development each need a separate PO authorization.
+- **Stage A done (read-only):** whole-subject size 5 always uses M01, M05,
+  M09, M14, M18; M09 is empty and none of the five has a `hard` question.
+  Size 10 also needs M07, M12, M20. No batch exists in production.
+  [T051 result](../progress/task_T051_result.md).
+- **Change developed (PO approval 2026-11-03):** `run --objective`,
+  `item-review-sample` / `item-review-record`, and individual approval
+  as a serving path (ADR-034 amendment T051). The PR also carries the T050
+  records (`074e133`).
+- **Still separate authorizations:** merge, release, deployment, the
+  production pilot (`run --subject matematicas --objective M09
+  --max-calls 10`), live generation, provider limits and enabling
+  `MENTOR_PRO_BANK_ONLY_ENABLED`.
 
 ## Handoff Summary
 
@@ -69,10 +73,7 @@ development each need a separate PO authorization.
   T047, T048 and T049 are `verified`;
   [release record](../progress/2026-11-02-production-release.md). The PO
   closed the cycle.
-- **Handoff records not yet merged:** branch
-  `handoff/T050-acceptance-close` (local, not pushed) holds the T050
-  records. Per policy, they ride in the next authorized functional PR, not a
-  docs-only PR.
+- **T050 handoff records** (`074e133`) ride in the T051 PR.
 
 ### Current State
 
@@ -95,23 +96,17 @@ development each need a separate PO authorization.
 
 ### Next Steps
 
-1. **Next milestone, awaiting PO authorization:** Matemáticas question bank
-   population and activation. Expected shape (to plan as Architect, not
-   started): inventory recheck, seeding pilot with T047 and tutor review,
-   coverage and readiness report, then a separate decision to enable
-   `MENTOR_PRO_BANK_ONLY_ENABLED`. Each step needs its own authorization;
-   no seeding, switch change, provider limit change or deployment before
-   then.
-2. Merge the `handoff/T050-acceptance-close` records with the next
-   authorized functional PR.
-3. Maintenance candidates, each a separate verified change:
+1. **T051:** PO review and merge of the T051 PR, then release and
+   deployment, the targeted M09 pilot, individual tutor review, and the
+   activation decision. Each step needs its own authorization.
+2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.
    - Assess CI on PRs into `dev`.
-4. Stage 6.3 close: check whether the T050 practice on the student's own
+3. Stage 6.3 close: check whether the T050 practice on the student's own
    device, plus progress surviving a restart, satisfies ADR-030 criterion 8
    (restart part not yet shown).
-5. With separate authorization only: remove the obsolete server files
+4. With separate authorization only: remove the obsolete server files
    listed in runbook section 0.
 
 ### Blockers/Issues

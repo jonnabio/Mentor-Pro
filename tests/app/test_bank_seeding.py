@@ -114,7 +114,7 @@ def test_generation_fills_every_exact_cell_and_holds_new_questions(url, catalog_
     out = seed_run(url, catalog_conn)
     assert out["run"]["generated"] == TARGET and out["run"]["status"] == "filled" and out["status"] == "filled"
     assert out["inventory"] == {"validated": 6, "target": 6, "adopted": 0, "generated": 6, "held_from_practice": 6,
-                                "seen_by_student": 0, "deactivated": 0}
+                                "individually_approved": 0, "seen_by_student": 0, "deactivated": 0}
     assert all(r["filled"] == r["planned"] for r in out["coverage"]["by_evidencia"])
     with psycopg.connect(url) as conn:
         rows = conn.execute(
@@ -287,3 +287,111 @@ def test_a_quarantine_after_release_holds_the_batch_until_the_replacement_is_rev
     assert [(r["round"], r["cell"]) for r in replacement] == [(2, 4)]
     assert seeding.review_record(url, batch_id, decide(replacement))["review_status"] == "passed"
     assert eligible(url, catalog_conn, 4)[0]["request_id"] == replacement[0]["request_id"]
+
+
+# ---------------------------------------------------------------- T051: targeted seeding, individual review
+
+def targeted(url, conn, objective, fake=None, max_calls=200):
+    return seeding.run(url, conn, SYNTHETIC, "matematicas", factory(url, fake or FakeLlm([item(i) for i in range(10)])),
+                       target=TARGET, max_calls=max_calls, objective=objective)
+
+
+def test_targeted_run_generates_only_the_objectives_planned_gaps_and_resumes(url, catalog_conn):
+    with pytest.raises(seeding.SeedError):
+        targeted(url, catalog_conn, "M99")
+    assert seeding.current_batch(url, SYNTHETIC, "matematicas") is None  # refused before opening a batch
+    out = targeted(url, catalog_conn, "M02")
+    filled = {c["cell"] for c in out["coverage"]["cells"] if c["status"] == "filled"}
+    assert filled == {3, 4} and out["run"]["generated"] == 2 and out["run"]["objective"] == "M02"
+    assert out["status"] == "open" and out["inventory"]["held_from_practice"] == 2
+    again = targeted(url, catalog_conn, "M02")
+    assert again["run"]["generated"] == 0 and again["run"]["calls"] == 0 and again["batch_id"] == out["batch_id"]
+    rest = seed_run(url, catalog_conn, FakeLlm([item(i) for i in range(2, 10)]))  # untargeted: remaining gaps
+    assert rest["run"]["generated"] == TARGET - 2 and rest["status"] == "filled"
+
+
+def test_an_individually_approved_question_is_served_from_an_open_batch(url, catalog_conn):
+    batch_id = targeted(url, catalog_conn, "M02")["batch_id"]
+    export = seeding.item_review_export(url, catalog_conn, batch_id)
+    assert [q["cell"] for q in export["questions"]] == [3, 4] and export["questions"][0]["answer_key"] == "B"
+    assert seeding.item_review_export(url, catalog_conn, batch_id, "M01")["questions"] == []
+    by_cell = {q["cell"]: q["request_id"] for q in export["questions"]}
+    bad = [{"request_id": by_cell[3], "verdict": "approved"}, {"request_id": by_cell[4], "verdict": "maybe"}]
+    with pytest.raises(seeding.SeedError):
+        seeding.item_review_record(url, batch_id, bad)               # all or nothing
+    assert eligible(url, catalog_conn, 3) == []
+
+    out = seeding.item_review_record(url, batch_id, [
+        {"request_id": by_cell[3], "verdict": "approved"},
+        {"request_id": by_cell[4], "verdict": "quarantined", "reason": "ambiguous"}])
+    assert out == {"batch_id": batch_id, "recorded": 2, "approved": 1, "quarantined": 1, "review_status": "pending"}
+    assert [r["request_id"] for r in eligible(url, catalog_conn, 3)] == [by_cell[3]]   # servable, batch open
+    assert eligible(url, catalog_conn, 4, include_held=True) == []                     # quarantined: never
+    batch = seeding.get_batch(url, batch_id)
+    assert batch["status"] == "open" and batch["review_status"] == "pending"
+    report = seeding.report(url, catalog_conn, batch_id)
+    assert report["inventory"]["individually_approved"] == 1 and report["inventory"]["held_from_practice"] == 0
+    assert {c["cell"] for c in report["coverage"]["cells"] if c["status"] == "gap"} == {1, 2, 4, 5, 6}
+    with pytest.raises(seeding.SeedError):                            # already reviewed
+        seeding.item_review_record(url, batch_id, [{"request_id": by_cell[3], "verdict": "approved"}])
+
+
+def test_quarantine_after_individual_approval_excludes_at_once_and_keeps_evidence(url, catalog_conn):
+    batch_id = targeted(url, catalog_conn, "M03")["batch_id"]
+    request_id = seeding.item_review_export(url, catalog_conn, batch_id)["questions"][0]["request_id"]
+    seeding.item_review_record(url, batch_id, [{"request_id": request_id, "verdict": "approved"}])
+    assert len(eligible(url, catalog_conn, 5)) == 1
+    seeding.quarantine(url, request_id, "wrong_key")
+    assert eligible(url, catalog_conn, 5, include_held=True) == []
+    with psycopg.connect(url) as conn:
+        assert conn.execute("SELECT verdict FROM generation.bank_item_review WHERE request_id = %s ORDER BY review_id",
+                            (request_id,)).fetchall() == [("approved",), ("quarantined",)]
+        assert conn.execute("SELECT active FROM generation.bank_batch_item WHERE request_id = %s",
+                            (request_id,)).fetchone()[0] is False
+    refill = targeted(url, catalog_conn, "M03", FakeLlm([item(9)]))
+    assert refill["run"]["generated"] == 1 and refill["inventory"]["deactivated"] == 1
+    replacement = next(c for c in refill["coverage"]["cells"] if c["cell"] == 5)["request_id"]
+    assert eligible(url, catalog_conn, 5) == []                       # the replacement is held until reviewed
+    awaiting = {q["cell"]: q["request_id"] for q in seeding.item_review_export(url, catalog_conn, batch_id)["questions"]}
+    assert awaiting == {5: replacement, 6: awaiting[6]}               # the replacement and the never-reviewed cell 6
+
+
+def test_individual_approval_never_releases_a_sampled_or_failed_batch_question(url, catalog_conn):
+    batch_id = seed_run(url, catalog_conn)["batch_id"]
+    rows = seeding.review_sample(url, batch_id)
+    assert seeding.review_record(url, batch_id, decide(rows, quarantine={1, 3, 5}))["review_status"] == "failed"
+    assert seeding.report(url, catalog_conn, batch_id)["inventory"]["individually_approved"] == 0
+    for cell in (2, 4, 6):                       # approved in the sample of a failed batch: still held
+        assert eligible(url, catalog_conn, cell) == []
+
+
+def test_a_post_release_quarantine_holds_sample_approved_questions_again(url, catalog_conn):
+    batch_id = seed_run(url, catalog_conn, FakeLlm([item(i) for i in range(6)]))["batch_id"]
+    rows = seeding.review_sample(url, batch_id)
+    seeding.review_record(url, batch_id, decide(rows))
+    seeding.quarantine(url, next(r for r in rows if r["cell"] == 4)["request_id"], "level")
+    assert all(eligible(url, catalog_conn, cell) == [] for cell in (1, 2, 3, 5, 6))
+
+
+def test_individual_approvals_never_pass_the_batch_gate(url, catalog_conn):
+    batch_id = seed_run(url, catalog_conn, FakeLlm([item(i) for i in range(6)]))["batch_id"]
+    export = seeding.item_review_export(url, catalog_conn, batch_id)["questions"]
+    seeding.item_review_record(url, batch_id, [{"request_id": q["request_id"], "verdict": "approved"} for q in export])
+    assert seeding.get_batch(url, batch_id)["review_status"] == "pending"
+    rows = seeding.review_sample(url, batch_id)                       # the batch sample is reviewed again
+    assert len(rows) == TARGET and all(r["verdict"] is None for r in rows)
+    assert seeding.review_state(url, batch_id)["unreviewed"] == TARGET
+    assert len(seeding.review_export(url, catalog_conn, batch_id)["questions"]) == TARGET
+    assert seeding.review_record(url, batch_id, decide(rows))["review_status"] == "passed"
+
+
+def test_unreviewed_generated_questions_stay_held_for_bank_only_candidates(url, catalog_conn):
+    batch_id = targeted(url, catalog_conn, "M01")["batch_id"]
+    plan = seeding.build_plan(catalog_conn, SYNTHETIC, "matematicas", TARGET)
+    evidences = {c["evidence_id"]: int(c["evidence_id"][-1]) for c in plan if c["objective_code"] == "M01"}
+    bank = QuestionBank(url)
+    assert bank.candidates(catalog_conn, SYNTHETIC, "matematicas", "M01", evidences, ("easy", "medium")) == []
+    first = seeding.item_review_export(url, catalog_conn, batch_id)["questions"][0]["request_id"]
+    seeding.item_review_record(url, batch_id, [{"request_id": first, "verdict": "approved"}])
+    assert [r["request_id"] for r in bank.candidates(catalog_conn, SYNTHETIC, "matematicas", "M01", evidences,
+                                                     ("easy", "medium"))] == [first]

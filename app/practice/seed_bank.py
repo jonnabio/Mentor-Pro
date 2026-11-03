@@ -1,9 +1,11 @@
 """Question bank seeding and educational review (T047, ADR-034).
 
-    python -m app.practice.seed_bank run --subject matematicas [--target 100] [--max-calls 20]
+    python -m app.practice.seed_bank run --subject matematicas [--target 100] [--max-calls 20] [--objective M09]
     python -m app.practice.seed_bank report --subject matematicas [--cells]
     python -m app.practice.seed_bank review-sample --subject matematicas --out FILE
     python -m app.practice.seed_bank review-record --subject matematicas --decisions FILE [--reviewer tutor]
+    python -m app.practice.seed_bank item-review-sample --subject matematicas --out FILE [--objective M09]
+    python -m app.practice.seed_bank item-review-record --subject matematicas --decisions FILE [--reviewer tutor]
     python -m app.practice.seed_bank quarantine --request-id REQ --reason wrong_key [--reviewer tutor]
 
 Reads DATABASE_URL and CURRICULUM_BASELINE like the application; `run` uses the OpenRouter settings and the
@@ -51,15 +53,21 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run")
     run.add_argument("--target", type=int, default=seeding.DEFAULT_TARGET)
     run.add_argument("--max-calls", type=int, default=20)
+    run.add_argument("--objective", help="generate only this objective's planned gap cells (T051)")
     rep = sub.add_parser("report")
     rep.add_argument("--cells", action="store_true", help="include the per-cell rows")
     sample = sub.add_parser("review-sample")
     sample.add_argument("--out", type=Path, required=True)
     record = sub.add_parser("review-record")
     record.add_argument("--decisions", type=Path, required=True)
-    for p in (run, rep, sample, record):
+    item_sample = sub.add_parser("item-review-sample", help="export unreviewed generated questions (T051)")
+    item_sample.add_argument("--out", type=Path, required=True)
+    item_sample.add_argument("--objective")
+    item_record = sub.add_parser("item-review-record", help="record individual verdicts (T051)")
+    item_record.add_argument("--decisions", type=Path, required=True)
+    for p in (run, rep, sample, record, item_sample, item_record):
         p.add_argument("--subject", choices=SUBJECTS, required=True)
-    for p in (record, quar := sub.add_parser("quarantine")):
+    for p in (record, item_record, quar := sub.add_parser("quarantine")):
         p.add_argument("--reviewer", default="tutor")
     quar.add_argument("--request-id", required=True)
     quar.add_argument("--reason", choices=seeding.REASONS, required=True)
@@ -70,7 +78,8 @@ def main(argv: list[str] | None = None) -> int:
     conn = catalog.open_catalog(url)
     try:
         if args.command == "run":
-            out = seeding.run(url, conn, baseline, args.subject, _llm_factory(url), args.target, args.max_calls)
+            out = seeding.run(url, conn, baseline, args.subject, _llm_factory(url), args.target, args.max_calls,
+                              objective=args.objective)
             out["coverage"].pop("cells")
         elif args.command == "report":
             out = seeding.report(url, conn, _batch_id(url, baseline, args.subject))
@@ -82,12 +91,18 @@ def main(argv: list[str] | None = None) -> int:
             args.out.write_text(json.dumps(seeding.review_export(url, conn, batch_id), ensure_ascii=False,
                                            indent=1), encoding="utf-8")
             out = {"batch_id": batch_id, "round": rows[0]["round"], "sampled": len(rows), "file": str(args.out)}
-        elif args.command == "review-record":
+        elif args.command == "item-review-sample":
+            batch_id = _batch_id(url, baseline, args.subject)
+            export = seeding.item_review_export(url, conn, batch_id, args.objective)
+            args.out.write_text(json.dumps(export, ensure_ascii=False, indent=1), encoding="utf-8")
+            out = {"batch_id": batch_id, "exported": len(export["questions"]), "file": str(args.out)}
+        elif args.command in ("review-record", "item-review-record"):
             decisions = json.loads(args.decisions.read_text(encoding="utf-8"))
             decisions = decisions.get("questions", decisions) if isinstance(decisions, dict) else decisions
-            out = seeding.review_record(url, _batch_id(url, baseline, args.subject),
-                                        [{k: d.get(k, "") for k in ("request_id", "verdict", "reason")}
-                                         for d in decisions], args.reviewer)
+            record_fn = seeding.review_record if args.command == "review-record" else seeding.item_review_record
+            out = record_fn(url, _batch_id(url, baseline, args.subject),
+                            [{k: d.get(k, "") for k in ("request_id", "verdict", "reason")} for d in decisions],
+                            args.reviewer)
         else:
             out = seeding.quarantine(url, args.request_id, args.reason, args.reviewer)
     except seeding.SeedBusy as exc:
