@@ -61,4 +61,4 @@ practice routes, student UI, LLM settings and budget.
 
 Released in `v2026.11.02-1` (`main` `166acdc`), deployed 2026-11-02 with
 bank-only off: [release record](2026-11-02-production-release.md). PO
-browser acceptance pending.
+browser acceptance (T050) passed 2026-11-02; status `verified`.

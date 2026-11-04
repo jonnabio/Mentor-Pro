@@ -33,7 +33,7 @@ from psycopg.types.json import Jsonb
 from app.allocation import allocate
 from app.generation.practice_set import SetLimits, generate_set
 from app.generation.validation import duplicate_reason
-from app.practice.bank import QuestionBank
+from app.practice.bank import INDIVIDUALLY_APPROVED_SQL, QuestionBank
 from curriculum.catalog import PracticeScope, select_objectives
 
 LOCK_NAMESPACE = 4047  # first key of the two-key advisory lock (T047); the second is per baseline and subject
@@ -206,16 +206,26 @@ def _set_fill_status(lock: SeedLock, batch: dict[str, Any]) -> str:
 
 
 def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_factory: Callable[[], tuple],
-        target: int = DEFAULT_TARGET, max_calls: int = 20, limits: SetLimits | None = None) -> dict[str, Any]:
-    """One resumable seeding run (adopt, then generate gaps). Raises SeedBusy or LockLost; returns a report."""
+        target: int = DEFAULT_TARGET, max_calls: int = 20, limits: SetLimits | None = None,
+        objective: str | None = None) -> dict[str, Any]:
+    """One resumable seeding run (adopt, then generate gaps). Raises SeedBusy or LockLost; returns a report.
+
+    `objective` (T051) generates only that objective's planned gap cells; adoption still covers the whole plan.
+    """
     if max_calls < 0:
         raise SeedError("max_calls must be zero or positive")
     bank = QuestionBank(url)
     with SeedLock(url, baseline, subject) as lock:
+        if objective is not None:  # refused before a batch is opened
+            current = current_batch(url, baseline, subject)
+            plan = current["plan"] if current else build_plan(catalog, baseline, subject, target)
+            if all(c["objective_code"] != objective for c in plan):
+                raise SeedError(f"objective {objective} has no planned cell in the {subject} batch")
         batch = _open_or_resume(lock, catalog, baseline, subject, target)
         adopted = _adopt(lock, bank, catalog, batch)
         generated, calls, stop = 0, 0, None
-        gaps = [c for c in batch["plan"] if c["cell"] not in _active(links(url, batch["batch_id"]))]
+        gaps = [c for c in batch["plan"] if c["cell"] not in _active(links(url, batch["batch_id"]))
+                and objective in (None, c["objective_code"])]
         if gaps and max_calls > 0:
             generated, calls, stop = _generate(lock, catalog, batch, gaps, llm_factory, max_calls,
                                                limits or SetLimits.from_env())
@@ -226,6 +236,8 @@ def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_
     out = report(url, catalog, batch["batch_id"])
     out["run"] = {"adopted": adopted, "generated": generated, "calls": calls, "stop_reason": stop,
                   "status": status}
+    if objective is not None:
+        out["run"]["objective"] = objective
     return out
 
 
@@ -302,14 +314,17 @@ def report(url: str, catalog: psycopg.Connection, batch_id: str) -> dict[str, An
     planned_objectives = {c["objective_code"] for c in batch["plan"]}
     planned_evidences = {c["evidence_id"] for c in batch["plan"]}
     filled = sum(1 for c in cells if c["status"] == "filled")
+    approved = _individually_approved(url, batch_id)
     return {
         "batch_id": batch_id, "subject": batch["subject"], "baseline_version": batch["baseline_version"],
         "status": batch["status"],
         "inventory": {"validated": len(active), "target": batch["target"],
                       "adopted": sum(1 for r in active.values() if r["origin"] == "adopted"),
                       "generated": sum(1 for r in active.values() if r["origin"] == "generated"),
-                      "held_from_practice": sum(1 for r in active.values() if r["origin"] == "generated")
+                      "held_from_practice": sum(1 for r in active.values() if r["origin"] == "generated"
+                                                and r["request_id"] not in approved)
                       if batch["review_status"] != "passed" else 0,
+                      "individually_approved": len(approved),
                       "seen_by_student": sum(1 for c in cells if c["seen"]),
                       "deactivated": sum(1 for r in rows if not r["active"])},
         "coverage": {
@@ -329,9 +344,12 @@ def report(url: str, catalog: psycopg.Connection, batch_id: str) -> dict[str, An
 # ---------------------------------------------------------------- educational review
 
 def _samples(url: str, batch_id: str) -> list[dict[str, Any]]:
+    # A sample's verdict is the latest one recorded since it was sampled: an earlier individual approval (T051)
+    # never counts towards the batch gate, so a sampled question is always reviewed again for the batch.
     with _connect(url) as conn:
         return conn.execute(
             """SELECT s.*, (SELECT v.verdict FROM generation.bank_item_review v WHERE v.request_id = s.request_id
+                              AND v.recorded_at >= s.sampled_at
                             ORDER BY v.review_id DESC LIMIT 1) AS verdict
                FROM generation.bank_review_sample s WHERE s.batch_id = %s ORDER BY s.round, s.position""",
             (batch_id,)).fetchall()
@@ -501,3 +519,74 @@ def quarantine(url: str, request_id: str, reason: str, reviewer: str = "tutor") 
                              (request_id,)).fetchone()
         _record_verdict(conn, request_id, batch["batch_id"] if batch else None, "quarantined", reason, reviewer)
     return {"request_id": request_id, "quarantined": True, "batch_id": batch["batch_id"] if batch else None}
+
+
+# ---------------------------------------------------------------- individual review (T051)
+
+def _individually_approved(url: str, batch_id: str) -> set[str]:
+    """Active generated questions of the batch servable through an individual approval (`QuestionBank` rule)."""
+    with _connect(url) as conn:
+        return {r["request_id"] for r in conn.execute(
+            f"""SELECT q.request_id FROM generation.bank_batch_item bi
+                JOIN generation.bank_batch b USING (batch_id) JOIN generation.question_attempt q USING (request_id)
+                WHERE bi.batch_id = %s AND bi.active AND bi.origin = 'generated' AND {INDIVIDUALLY_APPROVED_SQL}""",
+            (batch_id,))}
+
+
+def _awaiting_item_review(url: str, batch_id: str, objective: str | None = None) -> dict[str, dict[str, Any]]:
+    """Active seeder-generated links of the batch never reviewed (request_id -> link), optionally one objective."""
+    with _connect(url) as conn:
+        reviewed = {r["request_id"] for r in conn.execute("SELECT DISTINCT request_id FROM generation.bank_item_review")}
+    objective_of = {c["cell"]: c["objective_code"] for c in get_batch(url, batch_id)["plan"]}
+    return {r["request_id"]: r for r in _active(links(url, batch_id)).values()
+            if r["origin"] == "generated" and r["request_id"] not in reviewed
+            and objective in (None, objective_of[r["cell"]])}
+
+
+def item_review_export(url: str, catalog: psycopg.Connection, batch_id: str,
+                       objective: str | None = None) -> dict[str, Any]:
+    """The tutor's file for every unreviewed generated question of the batch, whatever the batch status.
+
+    Unlike the batch sample this is a full review of the exported questions; it does not touch the batch gate.
+    """
+    batch = get_batch(url, batch_id)
+    plan = {c["cell"]: c for c in batch["plan"]}
+    objectives = {o["workbook_code"]: o for o in select_objectives(
+        catalog, batch["baseline_version"], PracticeScope.SUBJECT_SIMULATION, batch["subject"]).objectives}
+    questions = []
+    for request_id, link in sorted(_awaiting_item_review(url, batch_id, objective).items(),
+                                   key=lambda kv: kv[1]["cell"]):
+        item, cell = link["item"], plan[link["cell"]]
+        objective_row = objectives[cell["objective_code"]]
+        evidence = next(e for e in objective_row["evidences"] if e["id"] == cell["evidence_id"])
+        questions.append({
+            "request_id": request_id, "cell": link["cell"],
+            "objective_code": cell["objective_code"], "objective_es": objective_row["text_es"],
+            "evidencia_es": evidence.get("text_es", ""), "difficulty": cell["difficulty"],
+            "stimulus": item.get("stimulus"), "stem": item["stem"], "options": item["options"],
+            "answer_key": item["answer_key"], "explanation": item.get("explanation"),
+            "verdict": "", "reason": ""})
+    return {"batch_id": batch_id, "review": "individual",
+            "instructions": "verdict: approved | quarantined; reason (quarantined): " + " | ".join(REASONS),
+            "questions": questions}
+
+
+def item_review_record(url: str, batch_id: str, decisions: list[dict[str, str]],
+                       reviewer: str = "tutor") -> dict[str, Any]:
+    """Record individual verdicts (all or nothing). An approved question becomes servable while it stays actively
+    linked; a quarantined one is excluded at once and its cell reopens. The batch gate is not evaluated."""
+    awaiting = _awaiting_item_review(url, batch_id)
+    checked = []
+    for d in decisions:
+        if d.get("request_id") not in awaiting:
+            raise SeedError(f"{d.get('request_id')} is not awaiting individual review in this batch")
+        checked.append((d["request_id"], *_check(d.get("verdict", ""), d.get("reason", ""))))
+    if len({c[0] for c in checked}) != len(checked):
+        raise SeedError("a question appears twice in the decisions")
+    with _connect(url) as conn, conn.transaction():
+        for request_id, verdict, reason in checked:
+            _record_verdict(conn, request_id, batch_id, verdict, reason, reviewer)
+    return {"batch_id": batch_id, "recorded": len(checked),
+            "approved": sum(1 for c in checked if c[1] == "approved"),
+            "quarantined": sum(1 for c in checked if c[1] == "quarantined"),
+            "review_status": get_batch(url, batch_id)["review_status"]}

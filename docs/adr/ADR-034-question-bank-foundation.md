@@ -2,7 +2,7 @@
 
 > **Status:** Accepted (Product Owner task T047, 2026-11-01). Amends
 > [ADR-014](ADR-014-validated-question-bank.md).
-> **Date:** 2026-11-01
+> **Date:** 2026-11-01. Amended by T051 (2026-11-03, PO approval).
 
 ---
 
@@ -92,6 +92,38 @@ Questions the seeder generated are held from practices until their batch
 review passes (`QuestionBank.eligible`). Adopted questions stay servable,
 as before, unless quarantined. Validation, routes, the student UI, the
 generation pipeline and the LLM budget are unchanged.
+
+### Amendment T051 (2026-11-03): targeted seeding and individual review
+
+Context: a 100-cell batch takes weeks to fill at the shared budget, and
+until then no generated question could reach a practice. A whole-subject
+practice always uses the same objectives (`allocate` spreads them
+deterministically), so a few targeted questions unlock it: Matemáticas
+size 5 needs M01, M05, M09, M14 and M18, and the bank has nothing for M09.
+
+- `run --objective CODE` generates only that objective's unfilled planned
+  cells. Adoption still covers the whole plan. The plan, exact cell
+  matching, D01, the lock, the budget, resumption and crash recovery are
+  unchanged. An objective with no planned cell is refused before a batch
+  is opened.
+- `item-review-sample` exports every active generated question of the
+  current batch that has never been reviewed (optionally one objective),
+  whatever the batch status. `item-review-record` stores verdicts all or
+  nothing in `generation.bank_item_review` with the existing reasons. A
+  quarantine works as before: excluded at once, cell reopened, evidence
+  kept.
+- **Serving:** a held question is also servable when it is actively
+  linked to a batch whose review is `pending`, its latest verdict is
+  `approved`, and it was never drawn into a batch review sample.
+  Automated eligibility and quarantine rules apply unchanged.
+- **The batch gate is independent.** A sample's verdict is the latest one
+  recorded since the question was sampled, so an earlier individual
+  approval never counts. Once sampled, a question is released only by the
+  batch gate. A `failed` batch releases nothing, and a post-release
+  quarantine holds sample-approved questions again, as before.
+- No schema change and no migration. `report` adds
+  `inventory.individually_approved`, and `held_from_practice` excludes
+  those questions.
 
 ---
 

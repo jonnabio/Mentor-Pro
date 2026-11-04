@@ -1,11 +1,10 @@
-# Active Context: Session Handoff 2026-11-01
+# Active Context: Session Handoff 2026-11-03
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-02, session end (release `v2026.11.02-1`,
-  T047 + T048 + T049, deployed with bank-only off; T050 browser
-  acceptance pending)
-- **Active Role:** Architect
+- **Last Updated:** 2026-11-03 (T051 developed, PR into `dev` open; not
+  merged, released or deployed)
+- **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
   ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/` and
@@ -13,14 +12,20 @@
 
 ## Current Objective
 
-None open. The question bank and configurable practice cycle is
-released: T047 (Increment 1,
-[ADR-034](../adr/ADR-034-question-bank-foundation.md)), T048 (Increment 2,
-[ADR-035](../adr/ADR-035-bank-only-configurable-practice.md)) and T049
-(default-off switch `MENTOR_PRO_BANK_ONLY_ENABLED`) run in production as
-`v2026.11.02-1`, switch off. Only the PO browser acceptance (switch off)
-remains. Seeding, live generation and enabling bank-only each need a
-separate authorization.
+T051, Matemáticas question bank population and activation (fast track).
+
+- **Stage A done (read-only):** whole-subject size 5 always uses M01, M05,
+  M09, M14, M18; M09 is empty and none of the five has a `hard` question.
+  Size 10 also needs M07, M12, M20. No batch exists in production.
+  [T051 result](../progress/task_T051_result.md).
+- **Change developed (PO approval 2026-11-03):** `run --objective`,
+  `item-review-sample` / `item-review-record`, and individual approval
+  as a serving path (ADR-034 amendment T051). The PR also carries the T050
+  records (`074e133`).
+- **Still separate authorizations:** merge, release, deployment, the
+  production pilot (`run --subject matematicas --objective M09
+  --max-calls 10`), live generation, provider limits and enabling
+  `MENTOR_PRO_BANK_ONLY_ENABLED`.
 
 ## Handoff Summary
 
@@ -60,10 +65,15 @@ separate authorization.
   - [Release record](../progress/2026-11-02-production-release.md).
   - Closure PR #46 merged into `dev` as `167c985` (CI 41523840735 and
     `dev` CI 41525157754 green); `dev` now contains `main`.
-- **T050 (browser acceptance) started 2026-11-02:** production rechecked
+- **T050 (browser acceptance) passed 2026-11-02:** production rechecked
   (`STATUS HEALTHY`, smoke 9/9, `bank_only: false`, sizes `[5]`); the PO
-  checklist was issued. **No acceptance results reported yet**; nothing
-  recorded as accepted.
+  reported PASS for practice form, a real five-question practice, navigation,
+  writing workflow and tutor navigation; no failures. The practice was real
+  use by the student under PO observation (ADR-017), not a synthetic test.
+  T047, T048 and T049 are `verified`;
+  [release record](../progress/2026-11-02-production-release.md). The PO
+  closed the cycle.
+- **T050 handoff records** (`074e133`) ride in the T051 PR.
 
 ### Current State
 
@@ -80,46 +90,26 @@ separate authorization.
 - **Repository:** `main` at `166acdc` (`v2026.11.02-1`); `dev` synced
   with `main` by the closure PR. No open feature branches. No `deploy/`
   or schema change since `v2026.10.31-1`.
-- **Tracker:** T046 `verified`; T047, T048, T049 `done` and released
-  (`verified` after PO browser acceptance). T034 and T035 pending
-  (maintenance).
+- **Production state (final, 2026-11-02):** `v2026.11.02-1`, bank-only
+  disabled, schema `0001`, `STATUS HEALTHY`.
+- **Tracker:** T046–T050 `verified`. T034 and T035 pending (maintenance).
 
 ### Next Steps
 
-1. T050: collect the PO's browser acceptance results for `v2026.11.02-1`
-   (switch off) on the house Wi-Fi:
-   - only size 5 and the note "Por ahora las prácticas tienen 5
-     preguntas.";
-   - a practice is generated, answered to the summary, "Mi progreso"
-     updates (needs the step-2 decision below);
-   - "Salir de la práctica" and "Volver al menú principal";
-   - writing exercise and earlier feedback visible (look only);
-   - tutor page through the 8081 tunnel, "Volver a Mentor Pro".
-
-   Record the actual results only; never infer acceptance from tests.
-   All pass: T047–T049 become `verified` (records ride in the next
-   functional PR). A failure: PO decides rollback to `v2026.10.31-1` or
-   a fix. [Checklist](../planning/2026-11-01-release-checklist-T047-T048.md).
-   Inventory recheck, seeding pilot and enabling bank-only are separate
-   authorizations. No further feature work is authorized.
+1. **T051:** PO review and merge of the T051 PR, then release and
+   deployment, the targeted M09 pilot, individual tutor review, and the
+   activation decision. Each step needs its own authorization.
 2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.
    - Assess CI on PRs into `dev`.
-3. Stage 6.3 close: the student completes a five-question Matemáticas
-   practice on the student's own device, and progress survives a
-   restart (ADR-030 criterion 8).
-4. Content: seed the Matemáticas bank with T047 (authorized run only)
-   and the tutor's review, so practice does not wait about 5 minutes.
-5. With separate authorization only: remove the obsolete server files
+3. Stage 6.3 close: check whether the T050 practice on the student's own
+   device, plus progress surviving a restart, satisfies ADR-030 criterion 8
+   (restart part not yet shown).
+4. With separate authorization only: remove the obsolete server files
    listed in runbook section 0.
 
 ### Blockers/Issues
-
-- **Pending PO decision (T050 step 2):** the practice check generates
-  questions and records answers. Options: (a) the student does a real
-  practice while the PO watches (recommended, ADR-017); (b) the PO
-  authorizes doing it and classifies it afterwards; (c) skip it.
 
 - **Pending PO decision:** the sudo rule covers every `mentorpro`
   command, including `migrate`, `rollback`, `maintenance`, `rehearse`
