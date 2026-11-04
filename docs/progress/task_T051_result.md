@@ -2,8 +2,10 @@
 
 - **Date:** 2026-11-03
 - **Role:** Developer
-- **Status:** Done (PO approval 2026-11-03). Not merged, released or
-  deployed. No production seeding, no live generation, budget unchanged.
+- **Status:** Done. PO final approval 2026-11-03; PR #48 (head
+  `2a4fb4e`, CI 41729749634) merged into `dev` as `3b99f02` (`dev` CI
+  41747414133 green). Not released or deployed. No production seeding, no live generation,
+  budget unchanged.
 - **Decision record:** [ADR-034](../adr/ADR-034-question-bank-foundation.md)
   (amendment T051)
 

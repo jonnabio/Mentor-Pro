@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-03 (T051 developed, PR into `dev` open; not
-  merged, released or deployed)
+- **Last Updated:** 2026-11-03 (T051 merged into `dev` as `3b99f02`;
+  not released or deployed)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
@@ -20,9 +20,13 @@ T051, Matemáticas question bank population and activation (fast track).
   [T051 result](../progress/task_T051_result.md).
 - **Change developed (PO approval 2026-11-03):** `run --objective`,
   `item-review-sample` / `item-review-record`, and individual approval
-  as a serving path (ADR-034 amendment T051). The PR also carries the T050
-  records (`074e133`).
-- **Still separate authorizations:** merge, release, deployment, the
+  as a serving path (ADR-034 amendment T051). PR #48 (head `2a4fb4e`, CI
+  41729749634) merged into `dev` as `3b99f02` (`dev` CI 41747414133
+  green), with the T050 records (`074e133`).
+- **Release candidate:** `dev` at `3b99f02` plus this handoff record;
+  only `app/practice/` changed since `v2026.11.02-1` (no `deploy/`,
+  schema, Dockerfile or requirements change, so no tool reinstall).
+- **Still separate authorizations:** release, deployment, the
   production pilot (`run --subject matematicas --objective M09
   --max-calls 10`), live generation, provider limits and enabling
   `MENTOR_PRO_BANK_ONLY_ENABLED`.
@@ -73,7 +77,7 @@ T051, Matemáticas question bank population and activation (fast track).
   T047, T048 and T049 are `verified`;
   [release record](../progress/2026-11-02-production-release.md). The PO
   closed the cycle.
-- **T050 handoff records** (`074e133`) ride in the T051 PR.
+- **T050 handoff records** (`074e133`) merged with PR #48.
 
 ### Current State
 
@@ -96,9 +100,9 @@ T051, Matemáticas question bank population and activation (fast track).
 
 ### Next Steps
 
-1. **T051:** PO review and merge of the T051 PR, then release and
-   deployment, the targeted M09 pilot, individual tutor review, and the
-   activation decision. Each step needs its own authorization.
+1. **T051:** release PR from `handoff/T051-merged` into `main` (as for
+   `v2026.11.02-1`), then deployment, the targeted M09 pilot, individual
+   tutor review, and the activation decision. Each step needs its own authorization.
 2. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.
