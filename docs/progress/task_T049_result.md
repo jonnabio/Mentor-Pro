@@ -30,3 +30,9 @@
   fixed: `.segmented label` display overrode `hidden`.
 - ACE gate: `VERIFY_RESULT=pass gate=all`; pytest 926 passed, 9 skipped
   (opt-in latency and browser tests).
+
+## Release
+
+Released in `v2026.11.02-1` (`main` `166acdc`), deployed 2026-11-02 with
+bank-only off: [release record](2026-11-02-production-release.md). PO
+browser acceptance (T050) passed 2026-11-02; status `verified`.
