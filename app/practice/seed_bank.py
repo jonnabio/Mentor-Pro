@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--target", type=int, default=seeding.DEFAULT_TARGET)
     run.add_argument("--max-calls", type=int, default=20)
     run.add_argument("--objective", help="generate only this objective's planned gap cells (T051)")
+    run.add_argument("--paid-authorization", help="an adult-approved paid authorization for this exact run (T055)")
     rep = sub.add_parser("report")
     rep.add_argument("--cells", action="store_true", help="include the per-cell rows")
     sample = sub.add_parser("review-sample")
@@ -78,8 +79,21 @@ def main(argv: list[str] | None = None) -> int:
     conn = catalog.open_catalog(url)
     try:
         if args.command == "run":
+            opener, questions = None, None
+            if args.paid_authorization:
+                from app.llm import paid
+                store = paid.AuthorizationStore(url)
+                row = store.get(args.paid_authorization)
+                questions = row["questions"] if row else None
+
+                def opener(client, usage_store):
+                    try:
+                        return paid.open_grant(store, client, usage_store, args.paid_authorization, args.subject,
+                                               args.objective)
+                    except paid.PaidRefused as exc:
+                        raise seeding.SeedError(f"paid authorization refused, no paid call: {exc}") from None
             out = seeding.run(url, conn, baseline, args.subject, _llm_factory(url), args.target, args.max_calls,
-                              objective=args.objective)
+                              objective=args.objective, paid_opener=opener, paid_questions=questions)
             out["coverage"].pop("cells")
         elif args.command == "report":
             out = seeding.report(url, conn, _batch_id(url, baseline, args.subject))

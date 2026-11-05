@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS llm.usage_record (
     started_at       TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_usage_started ON llm.usage_record (started_at);
+-- T055: additive, nullable columns (old rows read as unknown).
+ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS subject TEXT;
+ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS objective_code TEXT;
+ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS reasoning_tokens INTEGER CHECK (reasoning_tokens >= 0);
+ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS failure_category TEXT;
+ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS authorization_id TEXT;
 """
 
 
@@ -50,6 +56,9 @@ class UsageContext:
     request_id: str
     purpose: str
     practice_set_id: str | None = None
+    subject: str | None = None              # T055: never student data
+    objective_code: str | None = None
+    authorization_id: str | None = None     # set on paid calls made under an adult's approval
 
 
 def to_record(attempt: Attempt, ctx: UsageContext, tier: str, is_fallback: bool,
@@ -76,12 +85,17 @@ def to_record(attempt: Attempt, ctx: UsageContext, tier: str, is_fallback: bool,
         "started_at": (started_at or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "generation_id": attempt.generation_id,
         "error_kind": attempt.error_kind,
+        "subject": ctx.subject,
+        "objective_code": ctx.objective_code,
+        "reasoning_tokens": attempt.reasoning_tokens,
+        "failure_category": attempt.failure_category,
+        "authorization_id": ctx.authorization_id if tier == "paid" else None,
     }
 
 
 def blocked_record(model: str, ctx: UsageContext, tier: str, is_fallback: bool, attempt: int = 1) -> dict[str, Any]:
     """Record for a call that budget enforcement refused to send."""
-    return to_record(Attempt(model, attempt, "budget_blocked", 0), ctx, tier, is_fallback)
+    return to_record(Attempt(model, attempt, "budget_blocked", 0, error_kind="budget"), ctx, tier, is_fallback)
 
 
 class UsageStore:
@@ -115,6 +129,30 @@ class UsageStore:
             ).fetchone()
         return {"requests": row["requests"], "paid_usd": float(row["paid_usd"]), "paid_unknown": row["paid_unknown"]}
 
+    def token_profile(self, days: int) -> dict[str, dict[str, float]]:
+        """Observed tokens of successful calls per purpose (T055 estimates): calls, max_in, mean_in, mean_out."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """SELECT purpose, COUNT(*) AS calls, MAX(tokens_in) AS max_in, AVG(tokens_in) AS mean_in,
+                          AVG(tokens_out) AS mean_out FROM llm.usage_record
+                   WHERE status = 'ok' AND tokens_in IS NOT NULL AND tokens_out IS NOT NULL
+                     AND started_at >= now() - make_interval(days => %s) GROUP BY purpose""", (days,)).fetchall()
+        return {r["purpose"]: {"calls": r["calls"], "max_in": int(r["max_in"]), "mean_in": float(r["mean_in"]),
+                               "mean_out": float(r["mean_out"])} for r in rows}
+
+    def rows_since(self, since: datetime) -> list[dict[str, Any]]:
+        """Usage rows since `since` (T055 cost report); IDs and metrics only."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT * FROM llm.usage_record WHERE started_at >= %s ORDER BY started_at",
+                                (since,)).fetchall()
+        return [{**r, "cost_usd": None if r["cost_usd"] is None else float(r["cost_usd"])} for r in rows]
+
+    def set_cost(self, call_id: str, cost: float) -> None:
+        """Reconciliation: fill a missing cost from OpenRouter's generation metadata (never overwrites)."""
+        with self._connect() as conn:
+            conn.execute("UPDATE llm.usage_record SET cost_usd = %s, cost_source = 'generation_endpoint' "
+                         "WHERE call_id = %s AND cost_usd IS NULL", (cost, call_id))
+
 
 class MemoryUsageStore:
     """In-memory store with the same interface (tests, dry runs)."""
@@ -133,3 +171,23 @@ class MemoryUsageStore:
             "paid_usd": sum(r["cost_usd"] or 0 for r in paid),
             "paid_unknown": sum(1 for r in paid if r["status"] == "ok" and r["cost_usd"] is None),
         }
+
+    def token_profile(self, days: int) -> dict[str, dict[str, float]]:
+        out: dict[str, dict[str, float]] = {}
+        for purpose in {r["purpose"] for r in self.records}:
+            ok = [r for r in self.records if r["purpose"] == purpose and r["status"] == "ok"
+                  and r.get("tokens_in") is not None and r.get("tokens_out") is not None]
+            if ok:
+                out[purpose] = {"calls": len(ok), "max_in": max(r["tokens_in"] for r in ok),
+                                "mean_in": sum(r["tokens_in"] for r in ok) / len(ok),
+                                "mean_out": sum(r["tokens_out"] for r in ok) / len(ok)}
+        return out
+
+    def rows_since(self, since: datetime) -> list[dict[str, Any]]:
+        stamp = since.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return [dict(r) for r in self.records if r["started_at"] >= stamp]
+
+    def set_cost(self, call_id: str, cost: float) -> None:
+        for r in self.records:
+            if r["call_id"] == call_id and r["cost_usd"] is None:
+                r["cost_usd"], r["cost_source"] = cost, "generation_endpoint"

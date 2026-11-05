@@ -65,6 +65,10 @@ class LlmSettings:
     question_generation_models: tuple[str, ...] = ()
     max_requests_per_day: int = 50
     max_usd_per_day: float = 0.0
+    # T055: ceiling an adult may approve for one paid operation; 0 = paid approval impossible (default).
+    paid_max_usd_per_operation: float = 0.0
+    # T055: optional administrator management key, read-only use for GET /credits; never logged or returned.
+    management_key: str = field(default="", repr=False)
     app_title: str = "Mentor Pro"
 
     @classmethod
@@ -99,6 +103,8 @@ class LlmSettings:
                     m.strip() for m in get("OPENROUTER_QUESTION_GENERATION_MODELS").split(",") if m.strip()),
                 max_requests_per_day=int(get("OPENROUTER_MAX_REQUESTS_PER_DAY", "50")),
                 max_usd_per_day=float(get("OPENROUTER_MAX_USD_PER_DAY", "0")),
+                paid_max_usd_per_operation=float(get("OPENROUTER_PAID_MAX_USD_PER_OPERATION", "0")),
+                management_key=get("OPENROUTER_MANAGEMENT_KEY"),
             )
         except ValueError as exc:
             raise LlmConfigurationError(f"invalid OpenRouter setting: {exc}") from exc
@@ -110,7 +116,8 @@ class LlmSettings:
             raise LlmConfigurationError("OPENROUTER_BASE_URL must use https")
         if not 0 <= self.max_retries <= 5:
             raise LlmConfigurationError("OPENROUTER_MAX_RETRIES must be 0..5")
-        if self.timeout_s <= 0 or self.max_tokens <= 0 or self.max_requests_per_day < 0 or self.max_usd_per_day < 0:
+        if (self.timeout_s <= 0 or self.max_tokens <= 0 or self.max_requests_per_day < 0 or self.max_usd_per_day < 0
+                or self.paid_max_usd_per_operation < 0):
             raise LlmConfigurationError("timeouts, token and budget limits must be positive")
         if not GENERATION_MAX_TOKENS_MIN <= self.generation_max_tokens <= GENERATION_MAX_TOKENS_MAX:
             raise LlmConfigurationError(f"OPENROUTER_GENERATION_MAX_TOKENS must be "
@@ -126,3 +133,5 @@ class LlmSettings:
             raise LlmConfigurationError("OPENROUTER_QUESTION_GENERATION_MODELS lists a model excluded from generation")
         if self.allow_paid and not self.paid_model:
             raise LlmConfigurationError("OPENROUTER_ALLOW_PAID=true requires OPENROUTER_PAID_MODEL")
+        if self.management_key and self.management_key == self.api_key:
+            raise LlmConfigurationError("OPENROUTER_MANAGEMENT_KEY must be a separate key")

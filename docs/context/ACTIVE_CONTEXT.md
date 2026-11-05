@@ -2,9 +2,9 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-05 (session end: T053 released and deployed
-  as `v2026.11.05-1`; T054 M09 pilot done, 1 question awaiting tutor
-  review)
+- **Last Updated:** 2026-11-05 (T055 paid approval and cost tracking:
+  feature PR into `dev`; not released; T054 M09 question still awaiting
+  tutor review)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T050, deployment stages 6.1–6.3, ADR-030 to
@@ -37,7 +37,12 @@ five-question bank-only Matemáticas practice (ADR-035).
   calls, 244 s, 1 question accepted (M09 cell 41, medium, by Nemotron);
   Gemma reached 6 times, all HTTP 429. Question exported for tutor review;
   no verdict. [T054 result](../progress/task_T054_result.md).
-- This handoff PR syncs `dev` with `main` (`27fd409`).
+- Handoff PR #52 merged into `dev` as `ff5fb8b` (`dev` synced with
+  `main` `27fd409`).
+- **T055** paid generation only with adult approval, read-only
+  credit checks and cost tracking (ADR-009 amendment T055). Feature PR
+  into `dev`; mocked tests only; no live request and no production
+  change. [T055 result](../progress/task_T055_result.md).
 
 ### Current State
 
@@ -53,10 +58,14 @@ five-question bank-only Matemáticas practice (ADR-035).
   (6 adopted, 1 generated and held). M09 1/5. Eligible Matemáticas
   inventory 12. Review file
   `~/mentor-pro-review/T054-M09-2026-11-05.json` on the server (private).
-- **Repository:** `main` `27fd409`; `dev` synced with `main` by this
-  handoff PR. No open feature branches from this session.
-- **Tracker:** T053 `verified`; T054 `done`; T052 `pending` (superseded by
-  T054); T034, T035 pending.
+- **Repository:** `main` `27fd409`; `dev` `ff5fb8b`; feature branch
+  `feature/T055-paid-approval` (PR into `dev`, awaiting PO review).
+- **Tracker:** T053 `verified`; T054, T055 `done`; T052 `pending`
+  (superseded by T054); T034, T035 pending.
+- **Paid generation:** off in production and staying off. The release
+  adds `llm.paid_authorization` and five nullable `llm.usage_record`
+  columns at application start (additive DDL, like the existing usage
+  table). Writing schema `0001` is unchanged.
 - **Locks:** none (no seeding advisory lock, no lane claim).
 
 ### Next Steps
@@ -64,10 +73,11 @@ five-question bank-only Matemáticas practice (ADR-035).
 1. Tutor reviews the exported M09 question; record the verdict with
    `seed_bank item-review-record --subject matematicas --decisions <file>`
    (needs PO authorization).
-2. PO decision on provider capacity: Gemma free tier returns 429 and
-   Nemotron truncates at 4,000 tokens; options include another listed
-   fallback, a higher generation `max_tokens`, or retrying later. Any
-   change is a separate authorized task.
+2. PO review and merge of the T055 PR. Then decide whether to release
+   it and, separately, whether to enable paid approval in production
+   (`OPENROUTER_ALLOW_PAID`, `OPENROUTER_PAID_MODEL`,
+   `OPENROUTER_PAID_MAX_USD_PER_OPERATION`, optional management key). Each
+   is a separate authorized step.
 3. Continue seeding M05, M09, M14, M18 (and a `hard` cell, target 42) so
    size-5 bank-only practice can be composed; each run separately
    authorized.

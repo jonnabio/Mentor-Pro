@@ -207,13 +207,19 @@ def _set_fill_status(lock: SeedLock, batch: dict[str, Any]) -> str:
 
 def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_factory: Callable[[], tuple],
         target: int = DEFAULT_TARGET, max_calls: int = 20, limits: SetLimits | None = None,
-        objective: str | None = None) -> dict[str, Any]:
+        objective: str | None = None, paid_opener: Callable[..., Any] | None = None,
+        paid_questions: int | None = None) -> dict[str, Any]:
     """One resumable seeding run (adopt, then generate gaps). Raises SeedBusy or LockLost; returns a report.
 
     `objective` (T051) generates only that objective's planned gap cells; adoption still covers the whole plan.
+    `paid_opener(client, usage_store)` (T055) claims an adult's approved paid authorization for this exact run
+    and returns its PaidGrant; at most `paid_questions` cells are generated then. Without it the run is free-only
+    and reports `paid_option` when free generation failed.
     """
     if max_calls < 0:
         raise SeedError("max_calls must be zero or positive")
+    if paid_opener is not None and objective is None:
+        raise SeedError("a paid run must name the approved --objective")
     bank = QuestionBank(url)
     with SeedLock(url, baseline, subject) as lock:
         if objective is not None:  # refused before a batch is opened
@@ -226,29 +232,43 @@ def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_
         generated, calls, stop = 0, 0, None
         gaps = [c for c in batch["plan"] if c["cell"] not in _active(links(url, batch["batch_id"]))
                 and objective in (None, c["objective_code"])]
+        if paid_opener is not None:
+            gaps = gaps[:paid_questions or 1]
+        extra: dict[str, Any] = {}
         if gaps and max_calls > 0:
             generated, calls, stop = _generate(lock, catalog, batch, gaps, llm_factory, max_calls,
-                                               limits or SetLimits.from_env())
+                                               limits or SetLimits.from_env(), paid_opener, extra)
         elif gaps:
             stop = "run_call_limit"
         status = _set_fill_status(lock, batch)
         lock.verify()
     out = report(url, catalog, batch["batch_id"])
     out["run"] = {"adopted": adopted, "generated": generated, "calls": calls, "stop_reason": stop,
-                  "status": status}
+                  "status": status, **extra}
     if objective is not None:
         out["run"]["objective"] = objective
     return out
 
 
 def _generate(lock: SeedLock, catalog: psycopg.Connection, batch: dict[str, Any], gaps: list[dict[str, Any]],
-              llm_factory: Callable[[], tuple], max_calls: int, base: SetLimits) -> tuple[int, int, str | None]:
-    """Generate gap cells one at a time with the unchanged pipeline; link each accepted, non-duplicate item."""
+              llm_factory: Callable[[], tuple], max_calls: int, base: SetLimits,
+              paid_opener: Callable[..., Any] | None = None,
+              extra: dict[str, Any] | None = None) -> tuple[int, int, str | None]:
+    """Generate gap cells one at a time with the unchanged pipeline; link each accepted, non-duplicate item.
+
+    T055: with `paid_opener` the claimed PaidGrant is passed to the pipeline (the paid model is tried after the
+    free models, within the approval ceiling) and its final spend goes to `extra["paid"]`. Without it, a free
+    failure adds `extra["paid_option"]` (an offer to request approval, never an automatic switch).
+    """
     client, usage_store, generation_store = llm_factory()
     run_id = f"seed-{batch['batch_id']}-{uuid.uuid4().hex[:6]}"
     objective_of = {c["cell"]: c["objective_code"] for c in batch["plan"]}
     generated = calls = 0
+    extra = extra if extra is not None else {}
+    grant = None
     try:
+        if paid_opener is not None:
+            grant = paid_opener(client, usage_store)  # raises before any call when the approval is not usable
         for cell in gaps:
             remaining = max_calls - calls
             if remaining <= 0:
@@ -264,19 +284,40 @@ def _generate(lock: SeedLock, catalog: psycopg.Connection, batch: dict[str, Any]
             limits = replace(base, max_questions=1, max_calls_per_set=remaining, concurrency=1)
             result = generate_set(catalog, client, usage_store, generation_store, batch["baseline_version"],
                                   batch["subject"], allocation, limits, practice_set_id=run_id,
-                                  seed_items=same_objective)
+                                  seed_items=same_objective, paid=grant)
             calls += result.summary()["calls"]
             slot = result.slots[0]
             if slot.status == "accepted" and duplicate_reason(slot.item, chosen) is None \
                     and all(slot.item["item_id"] != i["item_id"] for i in chosen):
                 _link(lock, batch, cell["cell"], slot.request_id, "generated")
                 generated += 1
+            elif grant is None and "paid_option" not in extra:
+                option = _paid_option(client, result)
+                if option:
+                    extra["paid_option"] = option
+            if grant is not None and grant.stopped and grant.stopped != "authorization_ceiling":
+                return generated, calls, f"paid_{grant.stopped}"
             if result.stop_reason in BUDGET_STOPS:  # the set call limit is this run's remaining max_calls
                 return generated, calls, ("run_call_limit" if result.stop_reason == "set_call_limit"
                                           else result.stop_reason)
         return generated, calls, None
     finally:
+        if grant is not None:
+            extra["paid"] = grant.finish()
         client.close()
+
+
+def _paid_option(client: Any, result: Any) -> dict[str, Any] | None:
+    """T055: after free generation failed, say whether paid generation can be requested (never started here)."""
+    requests = [r for s in result.slots for r in s.requests if r["status"] == "unavailable"]
+    if not requests:
+        return None
+    available = any(r.get("paid_available") for r in requests)
+    reasons = sorted({reason for r in requests for a in r["attempts"] for reason in a.get("reasons", [])})
+    return {"available": available, "requires_adult_approval": True,
+            "model": client.settings.paid_model if available else None, "free_failure": reasons[:5],
+            "next_step": ("python -m app.llm.paid estimate --subject <subject> --objective <objective>"
+                          if available else "paid generation is disabled (OPENROUTER_ALLOW_PAID=false)")}
 
 
 # ---------------------------------------------------------------- reporting
