@@ -40,9 +40,11 @@ five-question bank-only Matemáticas practice (ADR-035).
 - Handoff PR #52 merged into `dev` as `ff5fb8b` (`dev` synced with
   `main` `27fd409`).
 - **T055** paid generation only with adult approval, read-only
-  credit checks and cost tracking (ADR-009 amendment T055). Feature PR
-  into `dev`; mocked tests only; no live request and no production
-  change. [T055 result](../progress/task_T055_result.md).
+  credit checks and cost tracking (ADR-009 amendment T055). PR #53 (head
+  `500c74b`, CI 42114069387) merged into `dev` as `07d7238` (`dev` CI
+  42117635772 green). Release and deployment authorized under
+  `PO-T055-2026-11-05` (in progress).
+  [T055 result](../progress/task_T055_result.md).
 
 ### Current State
 
@@ -58,8 +60,8 @@ five-question bank-only Matemáticas practice (ADR-035).
   (6 adopted, 1 generated and held). M09 1/5. Eligible Matemáticas
   inventory 12. Review file
   `~/mentor-pro-review/T054-M09-2026-11-05.json` on the server (private).
-- **Repository:** `main` `27fd409`; `dev` `ff5fb8b`; feature branch
-  `feature/T055-paid-approval` (PR into `dev`, awaiting PO review).
+- **Repository:** `main` `27fd409`; `dev` `07d7238` (T055); release PR
+  from `handoff/T055-merged` into `main`.
 - **Tracker:** T053 `verified`; T054, T055 `done`; T052 `pending`
   (superseded by T054); T034, T035 pending.
 - **Paid generation:** off in production and staying off. T055 adds no
@@ -75,11 +77,10 @@ five-question bank-only Matemáticas practice (ADR-035).
 1. Tutor reviews the exported M09 question; record the verdict with
    `seed_bank item-review-record --subject matematicas --decisions <file>`
    (needs PO authorization).
-2. PO review and merge of the T055 PR. Then decide whether to release
-   it and, separately, whether to enable paid approval in production
-   (`OPENROUTER_ALLOW_PAID`, `OPENROUTER_PAID_MODEL`,
-   `OPENROUTER_PAID_MAX_USD_PER_OPERATION`, optional management key). Each
-   is a separate authorized step.
+2. T055 release, L001 and deployment (`PO-T055-2026-11-05`). Enabling
+   paid approval in production (`OPENROUTER_ALLOW_PAID`,
+   `OPENROUTER_PAID_MODEL`, `OPENROUTER_PAID_MAX_USD_PER_OPERATION`,
+   optional management key) remains a separate authorized step.
 3. Continue seeding M05, M09, M14, M18 (and a `hard` cell, target 42) so
    size-5 bank-only practice can be composed; each run separately
    authorized.

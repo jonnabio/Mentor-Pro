@@ -1763,7 +1763,7 @@
       "failures": [
         "2026-11-05 PO review PR #53: runtime DDL instead of explicit migration; unknown paid costs missing from daily headroom across authorizations (fixed in attempt 2)"
       ],
-      "notes": "Mocked tests only; no live OpenRouter request, no production change. Paid stays off in production (OPENROUTER_ALLOW_PAID absent/false, OPENROUTER_PAID_MAX_USD_PER_OPERATION 0)."
+      "notes": "Mocked tests only; no live OpenRouter request, no production change. Paid stays off in production (OPENROUTER_ALLOW_PAID absent/false, OPENROUTER_PAID_MAX_USD_PER_OPERATION 0). PR #53 (head 500c74b, CI 42114069387) merged into dev as 07d7238 (dev CI 42117635772). Release and deployment authorized: PO-T055-2026-11-05."
     }
   ]
 }
