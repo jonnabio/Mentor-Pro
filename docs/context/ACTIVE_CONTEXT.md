@@ -2,8 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-05 (T052 pilot stopped on provider
-  timeouts; T053 generation fallback developed, PR into `dev`)
+- **Last Updated:** 2026-11-05 (T053 merged into `dev` as `647af18`;
+  release checklist prepared; not released or deployed)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
@@ -24,10 +24,13 @@ Matemáticas question bank population and activation (fast track).
   [T052 result](../progress/task_T052_result.md).
 - **T053 developed:** `OPENROUTER_QUESTION_GENERATION_MODELS`, an explicit
   primary/fallback list for question generation, fallback on provider
-  failure only (ADR-009 amendment). Proposed fallback
-  `google/gemma-4-26b-a4b-it:free`, not yet tested live.
+  failure only (ADR-009 amendment). PR #50 merged into `dev` as
+  `647af18` (CI 42045557140, `dev` CI 42050399265 green). Fallback
+  `google/gemma-4-26b-a4b-it:free` rechecked 2026-11-05 (listed, free,
+  compatible), not yet tested live.
+  [Release checklist](../planning/2026-11-05-release-checklist-T053.md).
   [T053 result](../progress/task_T053_result.md).
-- **Still separate authorizations:** merge, release, deployment, the
+- **Still separate authorizations:** release, deployment, the
   production setting, any live call, seeding, review verdicts, provider
   limits and enabling `MENTOR_PRO_BANK_ONLY_ENABLED`.
 
@@ -94,17 +97,17 @@ Matemáticas question bank population and activation (fast track).
   `open`/`pending`, 6/100 cells (adopted). Bank-only sizes 5 and 10:
   `largest_available: 0`; blocker M09 (target cell 42, M09 E2 hard).
 - **Repository:** `main` at `6cc15dc` (`v2026.11.04-1`); `dev` at
-  `3b99f02`, brought level with `main` by the T053 PR.
+  `647af18` (contains `main`).
 - **Tracker:** T046–T050 `verified`; T051 `done` (deployed); T052
   `pending` (stopped); T053 `done`. T034 and T035 pending (maintenance).
 
 ### Next Steps
 
-1. **T053:** PO review and merge, then release and deployment, then the
+1. **T053:** release PR from `handoff/T053-merged` into `main`, the
    production setting `OPENROUTER_QUESTION_GENERATION_MODELS=
    nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free`
-   (administrator edit of `/etc/mentor-pro/app.env`). Each step needs its
-   own authorization.
+   (administrator edit of `/etc/mentor-pro/app.env`, before the
+   deployment), then deployment. Each step needs its own authorization.
 2. **T052 resume:** the M09 pilot with at least `--max-calls 3` per probe
    (an accepted question needs generation and review), then
    `item-review-sample --objective M09` and tutor review.

@@ -2,8 +2,10 @@
 
 - **Date:** 2026-11-05
 - **Role:** Developer
-- **Status:** Done (PO authorization 2026-11-05). Not merged, released or
-  deployed. No production configuration change, no live generation call.
+- **Status:** Done. PO approval 2026-11-05; PR #50 (head `ba71309`, CI
+  42045557140) merged into `dev` as `647af18` (`dev` CI 42050399265
+  green). Not released or deployed. No production configuration change,
+  no live generation call.
 - **Decision record:** [ADR-009](../adr/ADR-009-openrouter-integration.md)
   (amendment T053). Evidence: [T052 result](task_T052_result.md).
 
