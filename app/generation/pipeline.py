@@ -138,9 +138,11 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
 
     for number in range(1, MAX_GENERATION_ATTEMPTS + 1):
         messages = prompts.generation_messages(bundle, difficulty, revision_notes=notes, avoid_stems=avoid_stems)
+        # T053: an explicit ordered list (primary, then fallbacks on provider failure) when configured.
         gen = route(client, store, messages, purpose="generation",
                     max_tokens=client.settings.generation_max_tokens, request_id=request_id,
-                    practice_set_id=practice_set_id, gate=gate)
+                    practice_set_id=practice_set_id, gate=gate,
+                    models=client.settings.question_generation_models or None)
         outcome.usage += gen.records
         if gen.status != "ok":
             outcome.status = "unavailable"
