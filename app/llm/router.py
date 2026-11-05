@@ -95,6 +95,9 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
         return RouteResult(status="auth_error", message=str(exc))
     except TransientError as exc:
         return RouteResult(status="discovery_error", message=str(exc))
+    # T053: an explicitly listed model that is not currently listed as free is skipped, never substituted, and
+    # named in the failure message (a delisted fallback must not disappear silently).
+    unlisted = [m for m in models or () if m not in free]
     if purpose == "generation":
         # T012: some models are kept for blind solve and review but never generate questions.
         free = [m for m in free if m not in settings.generation_excluded_models]
@@ -106,6 +109,8 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
     result.candidates = [m for m, _ in plan]
     if not plan:
         result.message = "no qualified free model available and paid fallback disabled"
+        if unlisted:
+            result.message += f" (not listed as free: {', '.join(unlisted)})"
         return result
 
     gate = gate or BudgetGate(store, settings)
@@ -146,4 +151,6 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
             result.status, result.content, result.final, result.tier = "ok", final.content, final, tier
             return result
     result.message = result.message or "all candidate models failed"
+    if unlisted:
+        result.message += f" (not listed as free: {', '.join(unlisted)})"
     return result

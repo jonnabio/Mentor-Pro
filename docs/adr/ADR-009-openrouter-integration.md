@@ -1,7 +1,7 @@
 # ADR-009: OpenRouter Integration (Connectivity, Routing, Usage)
 
 > **Status:** Accepted (Product Owner task T005)
-> **Date:** 2026-10-21
+> **Date:** 2026-10-21. Amended by T053 (2026-11-05).
 
 ---
 
@@ -55,6 +55,39 @@ enforced, and every call recorded in USD without student data.
   `GET /generation?id=`, else `NULL` with `cost_source = missing`.
 - `model_used` is the response `model` field.
 - Usage rows hold IDs and metrics only — no prompts, responses or keys.
+
+### Amendment T053 (2026-11-05): question generation fallback
+
+Context: in the T052 pilot, every question-generation call (11 of 11)
+timed out at 60 s on `nvidia/nemotron-3-ultra-550b-a55b:free`. The
+configured fallback `minimax/minimax-m3.1-flash:free` had been delisted,
+and the router drops unlisted models silently, so generation had one
+model.
+
+- `OPENROUTER_QUESTION_GENERATION_MODELS`: an explicit ordered list for
+  question generation only (`app/generation/pipeline.py`). The first model
+  is the primary; the next ones are fallbacks. Empty (default) keeps the
+  earlier behavior (`OPENROUTER_FREE_MODELS`). Duplicates and models in
+  `OPENROUTER_GENERATION_EXCLUDED_MODELS` are refused at load.
+- Routing is the existing `route()` with `models=`. The fallback is
+  called only when the primary's final attempt is not a usable response
+  (timeout, HTTP 429 or 5xx after the bounded retries, connection error,
+  402, other 4xx, empty or truncated output). Educational validation runs
+  after routing, so a rejected question never switches models; a revision
+  round routes from the primary again.
+- Bound per generation request: models × (`OPENROUTER_MAX_RETRIES` + 1)
+  calls, then `unavailable`. Every attempt reserves the shared daily
+  budget before it is sent and is recorded (`model_requested`, `status`,
+  `error_kind`, `latency_ms`, `is_fallback`). Timeout and retry settings
+  are unchanged.
+- A listed model that is not currently free is skipped, never
+  substituted, and named in the failure reason ("not listed as free").
+- Blind solve and review keep their own routing and still avoid the model
+  that generated the item. Writing generation is unchanged.
+- Fallback chosen for production (configuration, separately authorized):
+  `google/gemma-4-26b-a4b-it:free` (Google, distinct from Nvidia;
+  262,144 context; listed with `response_format` and `reasoning`). Not yet
+  tested live.
 
 ---
 

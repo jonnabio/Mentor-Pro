@@ -1,9 +1,9 @@
-# Active Context: Session Handoff 2026-11-03
+# Active Context: Session Handoff 2026-11-05
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-03 (T051 merged into `dev` as `3b99f02`;
-  not released or deployed)
+- **Last Updated:** 2026-11-05 (T053 merged into `dev` as `647af18`;
+  release checklist prepared; not released or deployed)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
 - **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
@@ -12,24 +12,27 @@
 
 ## Current Objective
 
-T051, Matemáticas question bank population and activation (fast track).
+Matemáticas question bank population and activation (fast track).
 
-- **Stage A done (read-only):** whole-subject size 5 always uses M01, M05,
-  M09, M14, M18; M09 is empty and none of the five has a `hard` question.
-  Size 10 also needs M07, M12, M20. No batch exists in production.
-  [T051 result](../progress/task_T051_result.md).
-- **Change developed (PO approval 2026-11-03):** `run --objective`,
-  `item-review-sample` / `item-review-record`, and individual approval
-  as a serving path (ADR-034 amendment T051). PR #48 (head `2a4fb4e`, CI
-  41729749634) merged into `dev` as `3b99f02` (`dev` CI 41747414133
-  green), with the T050 records (`074e133`).
-- **Release candidate:** `dev` at `3b99f02` plus this handoff record;
-  only `app/practice/` changed since `v2026.11.02-1` (no `deploy/`,
-  schema, Dockerfile or requirements change, so no tool reinstall).
+- **T051 released and deployed** as `v2026.11.04-1` (2026-11-04 01:20
+  UTC): `run --objective`, individual review as a serving path (ADR-034
+  amendment). [Release record](../progress/2026-11-04-production-release.md).
+- **T052 pilot stopped:** 11 of 11 generation calls to
+  `nvidia/nemotron-3-ultra-550b-a55b:free` timed out at 60 s; 0 questions.
+  The configured fallback (minimax) had been delisted and was dropped
+  silently. Batch `bb-matematicas-cd792836` open, 6 adopted cells, M09 0/5.
+  [T052 result](../progress/task_T052_result.md).
+- **T053 developed:** `OPENROUTER_QUESTION_GENERATION_MODELS`, an explicit
+  primary/fallback list for question generation, fallback on provider
+  failure only (ADR-009 amendment). PR #50 merged into `dev` as
+  `647af18` (CI 42045557140, `dev` CI 42050399265 green). Fallback
+  `google/gemma-4-26b-a4b-it:free` rechecked 2026-11-05 (listed, free,
+  compatible), not yet tested live.
+  [Release checklist](../planning/2026-11-05-release-checklist-T053.md).
+  [T053 result](../progress/task_T053_result.md).
 - **Still separate authorizations:** release, deployment, the
-  production pilot (`run --subject matematicas --objective M09
-  --max-calls 10`), live generation, provider limits and enabling
-  `MENTOR_PRO_BANK_ONLY_ENABLED`.
+  production setting, any live call, seeding, review verdicts, provider
+  limits and enabling `MENTOR_PRO_BANK_ONLY_ENABLED`.
 
 ## Handoff Summary
 
@@ -82,35 +85,40 @@ T051, Matemáticas question bank population and activation (fast track).
 ### Current State
 
 - **Production** (macedonianserver):
-  - `v2026.11.02-1` (`738af74e…547a`) for app and tutor, `postgres:17.6`;
+  - `v2026.11.04-1` (`6a661861…c5d1`) for app and tutor, `postgres:17.6`;
     `MENTOR_PRO_BANK_ONLY_ENABLED` absent (off).
-  - Schema `current 0001`; 6 dumps (no automatic deletion).
-  - Rollback target: `v2026.10.31-1` (`e7dd6edb…3215`), same schema, with
-    `mentor_pro_2026-11-02_205333.dump`.
-- **Production inventory (read-only, 2026-11-02):** 34 accepted questions
-  (Matemáticas 12, Estudios Sociales 9, Español 8, Ciencias 5), all checker
-  1.6.0, about one per cell; 31 already seen. No subject simulation can be
-  filled bank-only; five-question practices only for some objective sets.
-- **Repository:** `main` at `166acdc` (`v2026.11.02-1`); `dev` synced
-  with `main` by the closure PR. No open feature branches. No `deploy/`
-  or schema change since `v2026.10.31-1`.
-- **Production state (final, 2026-11-02):** `v2026.11.02-1`, bank-only
-  disabled, schema `0001`, `STATUS HEALTHY`.
-- **Tracker:** T046–T050 `verified`. T034 and T035 pending (maintenance).
+  - Schema `current 0001`; 7 dumps (no automatic deletion).
+  - Rollback target: `v2026.11.02-1` (`738af74e…547a`), same schema, with
+    `mentor_pro_2026-11-04_011934.dump`.
+  - LLM: daily request limit 200; generation free models
+    `nemotron-3-ultra` only in practice (see T052).
+- **Production inventory (2026-11-05):** Matemáticas 12 eligible
+  questions, unchanged; Matemáticas batch `bb-matematicas-cd792836`
+  `open`/`pending`, 6/100 cells (adopted). Bank-only sizes 5 and 10:
+  `largest_available: 0`; blocker M09 (target cell 42, M09 E2 hard).
+- **Repository:** `main` at `6cc15dc` (`v2026.11.04-1`); `dev` at
+  `647af18` (contains `main`).
+- **Tracker:** T046–T050 `verified`; T051 `done` (deployed); T052
+  `pending` (stopped); T053 `done`. T034 and T035 pending (maintenance).
 
 ### Next Steps
 
-1. **T051:** release PR from `handoff/T051-merged` into `main` (as for
-   `v2026.11.02-1`), then deployment, the targeted M09 pilot, individual
-   tutor review, and the activation decision. Each step needs its own authorization.
-2. Maintenance candidates, each a separate verified change:
+1. **T053:** release PR from `handoff/T053-merged` into `main`, the
+   production setting `OPENROUTER_QUESTION_GENERATION_MODELS=
+   nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free`
+   (administrator edit of `/etc/mentor-pro/app.env`, before the
+   deployment), then deployment. Each step needs its own authorization.
+2. **T052 resume:** the M09 pilot with at least `--max-calls 3` per probe
+   (an accepted question needs generation and review), then
+   `item-review-sample --objective M09` and tutor review.
+3. Maintenance candidates, each a separate verified change:
    - T035: tutor exit 78 for tokens of 1–15 characters.
    - T034: deterministic practice-set test.
    - Assess CI on PRs into `dev`.
-3. Stage 6.3 close: check whether the T050 practice on the student's own
+4. Stage 6.3 close: check whether the T050 practice on the student's own
    device, plus progress surviving a restart, satisfies ADR-030 criterion 8
    (restart part not yet shown).
-4. With separate authorization only: remove the obsolete server files
+5. With separate authorization only: remove the obsolete server files
    listed in runbook section 0.
 
 ### Blockers/Issues

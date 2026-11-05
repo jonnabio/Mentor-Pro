@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-11-03",
+  "updated": "2026-11-05",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -1609,7 +1609,8 @@
       "role": "Developer",
       "files": {
         "create": [
-          "docs/progress/task_T051_result.md"
+          "docs/progress/task_T051_result.md",
+          "docs/progress/2026-11-04-production-release.md"
         ],
         "modify": [
           "app/practice/seeding.py",
@@ -1630,7 +1631,64 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T051_result.md",
       "failures": [],
-      "notes": "PO final approval 2026-11-03; PR #48 (head 2a4fb4e, CI 41729749634) merged into dev as 3b99f02 (dev CI 41747414133 green). Not released or deployed; no production seeding or live generation; budget unchanged."
+      "notes": "PO final approval 2026-11-03; PR #48 (head 2a4fb4e, CI 41729749634) merged into dev as 3b99f02 (dev CI 41747414133 green). Not released or deployed; no production seeding or live generation; budget unchanged. Released as v2026.11.04-1 (PR #49 -> main 6cc15dc, CI 41751979521) and deployed 2026-11-04 01:20 UTC (PO-T051-2026-11-03): STATUS HEALTHY, smoke 9/9, bank-only off; docs/progress/2026-11-04-production-release.md."
+    },
+    {
+      "id": "T052",
+      "name": "Matemáticas M09 seeding pilot (production)",
+      "objective": "One targeted run (--objective M09 --max-calls 10), then one recovery probe (--max-calls 1); measure calls, generated questions, coverage and feasibility; export for review only.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T052_result.md"
+        ],
+        "modify": []
+      },
+      "dependencies": [
+        "T051"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "PO review of pilot evidence",
+      "attempts": 2,
+      "result_file": "docs/progress/task_T052_result.md",
+      "failures": [
+        "2026-11-05 pilot: 10/10 generation calls timed out at 60 s (nemotron-3-ultra free), 0 generated",
+        "2026-11-05 probe: 1/1 call timed out, 0 generated"
+      ],
+      "notes": "Stopped per PO rules. Batch bb-matematicas-cd792836 open (6 adopted cells), M09 0/5. Root cause of single-model exposure: configured fallback minimax-m3.1-flash delisted; fixed by T053. Resume after T053 is released and configured."
+    },
+    {
+      "id": "T053",
+      "name": "Question generation provider fallback",
+      "objective": "OPENROUTER_QUESTION_GENERATION_MODELS: explicit ordered primary/fallback list for question generation; fallback only on provider failure; bounded, budgeted and recorded; unlisted models named (ADR-009 amendment).",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_question_generation_fallback.py",
+          "docs/progress/task_T053_result.md",
+          "docs/planning/2026-11-05-release-checklist-T053.md"
+        ],
+        "modify": [
+          "app/llm/settings.py",
+          "app/llm/router.py",
+          "app/generation/pipeline.py",
+          ".env.example",
+          "docs/adr/ADR-009-openrouter-integration.md",
+          "docs/progress/tasks.json",
+          "docs/context/ACTIVE_CONTEXT.md"
+        ]
+      },
+      "dependencies": [
+        "T052"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T053_result.md",
+      "failures": [],
+      "notes": "PO approval 2026-11-05; PR #50 (head ba71309, CI 42045557140) merged into dev as 647af18 (dev CI 42050399265 green). Not released or deployed; no production configuration change; no live provider request. Release checklist: docs/planning/2026-11-05-release-checklist-T053.md."
     }
   ]
 }
