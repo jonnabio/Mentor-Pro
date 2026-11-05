@@ -18,6 +18,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from app.llm.usage import paid_exposure
+
 
 def _when(row: dict[str, Any]) -> datetime:
     value = row["started_at"]
@@ -42,6 +44,9 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "actual_usd": round(sum(r["cost_usd"] for r in known), 8),
             "unknown_cost_calls": len(sent) - len(known),
             "unknown_cost_paid_calls": sum(r["tier"] == "paid" and r["cost_usd"] is None for r in sent),
+            # Worst-case USD still held for paid attempts whose cost is unknown (until reconciled).
+            "unreconciled_liability_usd": round(sum(paid_exposure(r) for r in sent if r["cost_usd"] is None), 8),
+            "paid_exposure_usd": round(sum(paid_exposure(r) for r in sent), 8),
             "tokens_in": sum(r.get("tokens_in") or 0 for r in sent),
             "tokens_out": sum(r.get("tokens_out") or 0 for r in sent),
             "reasoning_tokens": sum(r.get("reasoning_tokens") or 0 for r in sent)}
@@ -62,7 +67,7 @@ def report(store: Any, settings: Any, now: datetime | None = None,
     month = store.rows_since(month_start)
     day = [r for r in month if _when(r) >= day_start]
     today = summarize(day)
-    paid_today = sum(r["cost_usd"] or 0 for r in day if r["tier"] == "paid")
+    paid_today = sum(paid_exposure(r) for r in day)   # actual costs plus unreconciled liabilities
     return {
         "currency": "USD",
         "generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -75,7 +80,7 @@ def report(store: Any, settings: Any, now: datetime | None = None,
         "month_by_failure": _group([r for r in month if r.get("failure_category")], lambda r: r["failure_category"]),
         "budget": {"requests_today": today["calls_sent"], "max_requests_per_day": settings.max_requests_per_day,
                    "requests_remaining": max(0, settings.max_requests_per_day - today["calls_sent"]),
-                   "paid_usd_today": round(paid_today, 8), "max_usd_per_day": settings.max_usd_per_day,
+                   "paid_exposure_usd_today": round(paid_today, 8), "max_usd_per_day": settings.max_usd_per_day,
                    "paid_usd_remaining": round(max(0.0, settings.max_usd_per_day - paid_today), 8),
                    "paid_unknown_today": today["unknown_cost_paid_calls"]},
         "openrouter_credits": balance or {"status": "not_checked"},

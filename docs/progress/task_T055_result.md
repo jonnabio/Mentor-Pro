@@ -88,23 +88,69 @@ case would pass 0.50 USD. The output marks `covers_maximum: false`.
 
 - New nullable columns on `llm.usage_record` (schema and JSON schema):
   `subject`, `objective_code`, `reasoning_tokens`, `failure_category`,
-  `authorization_id`. 401 and 402 responses are now recorded as sent
-  `error` rows.
+  `authorization_id`, `liability_usd`. 401 and 402 responses are now
+  recorded as sent `error` rows, together with the retries before them.
 - Unknown cost stays `NULL` and is never counted as zero. In an approval
   it is counted at its full reservation.
+- The daily budget uses the paid exposure: the actual cost, or the
+  liability until reconciled. It holds across authorizations and
+  counts nothing twice.
 - `python -m app.llm.costs report [--credits]` shows today and this month,
   by model, subject, purpose, batch (`seed-<batch>-<run>`) and failure. It
-  gives actual USD, unknown-cost calls, never-sent calls, budget used and
-  remaining, and credits.
+  gives actual USD, paid exposure, unreconciled liability, unknown-cost
+  calls, never-sent calls, budget used and remaining, and credits.
 - `reconcile` fills missing costs from `GET /generation` and lists
   mismatches for comparison with OpenRouter Activity. Recorded costs are
   never overwritten.
 
+## PO review of PR #53 (changes requested, 2026-11-05)
+
+1. **Controlled schema evolution.** No T055 DDL runs at start-up.
+   - Explicit migration `L001_paid_cost_tracking`: `python -m
+     app.llm.migrate status|apply [--dry-run]|rollback`.
+   - It uses a ledger and an advisory lock, is idempotent and refuses a
+     drifted schema. Existing usage rows are checked unchanged by count
+     and digest.
+   - An unmigrated database keeps the image free-only, and an older
+     image runs on a migrated one.
+   - The writing range stays `0001..0001`, so `deploy/` is unchanged and
+     the administrator does not need to reinstall the root-owned tool.
+   - `rollback` refuses while L001 data exists.
+2. **Unknown paid costs.**
+   - Every paid attempt's record keeps its worst-case reservation as
+     `liability_usd`.
+   - `today()` reports `paid_exposure_usd`, which is the cost or else the
+     liability. The budget gate and each later authorization's daily
+     headroom use it.
+   - Reconciliation replaces the liability with the actual cost.
+3. **Operator access.**
+   - No HTTP route reaches the paid, cost or migration commands, and a
+     test checks this.
+   - Access is SSH (server key) plus docker-group membership into the
+     app container, which is the only place holding the database and
+     OpenRouter credentials.
+   - `--approver` is attribution, not authentication.
+
+Regression tests are in `tests/app/test_paid_migration_and_exposure.py`
+(15). Each migration test uses a throwaway database. They cover:
+
+- no start-up DDL, and dry-run, apply, idempotence and drift refusal;
+- older-image inserts on a migrated database, and guarded rollback;
+- successive authorizations with an unknown cost, and reconciliation
+  without double counting;
+- concurrent PostgreSQL reservations against the daily exposure;
+- a 402 with its earlier retry recorded;
+- no web route reaching the commands.
+
+Test 10 in `test_paid_approval.py` now checks that the ceiling blocks
+the paid retry and the later paid call.
+
 ## Verification
 
-- `tests/app/test_paid_approval.py`: 47 tests, covering scenarios 1–14 of
-  the brief, plus bounds, expiry, an operation-scope check and a
-  PostgreSQL reservation race.
+- `tests/app/test_paid_approval.py`: 46 tests, covering scenarios 1–14 of
+  the brief, plus bounds, expiry and an operation-scope check. The
+  PostgreSQL race moved to the migration file.
+- `tests/app/test_paid_migration_and_exposure.py`: 15 tests (PO review).
 - `tests/app/test_openrouter.py`: three tests that expected an automatic
   paid fallback became one test asserting that it never happens. The 402
   test now expects a sent `error` row.
@@ -112,8 +158,8 @@ case would pass 0.50 USD. The output marks `covers_maximum: false`.
   `subject` and `objective_code` parameters were added. Verdict, proof and
   blind-solve logic are untouched; `tests/ace/test_item_checker.py` and
   `tests/app/test_generation.py` pass.
-- Full app tests: 799 passed, 9 skipped (5 min).
-- ACE gate: `VERIFY_RESULT=pass gate=all` (test 316 s, lint 1.7 s).
+- Full gate tests (ace, curriculum, app): 1004 passed, 9 skipped (attempt 2).
+- ACE gate: `VERIFY_RESULT=pass gate=all` (test 335 s, lint 1.9 s; log 20261105-152943-714).
 
 ## Not done (not authorized)
 

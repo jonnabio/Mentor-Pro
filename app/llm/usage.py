@@ -42,13 +42,18 @@ CREATE TABLE IF NOT EXISTS llm.usage_record (
     started_at       TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_usage_started ON llm.usage_record (started_at);
--- T055: additive, nullable columns (old rows read as unknown).
-ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS subject TEXT;
-ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS objective_code TEXT;
-ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS reasoning_tokens INTEGER CHECK (reasoning_tokens >= 0);
-ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS failure_category TEXT;
-ALTER TABLE llm.usage_record ADD COLUMN IF NOT EXISTS authorization_id TEXT;
 """
+# T055 columns are added only by the explicit migration L001 (app/llm/migrations.py), never at start-up.
+
+
+def paid_exposure(record: dict[str, Any]) -> float:
+    """USD a paid attempt counts against the daily budget: the actual cost once known, else the worst-case
+    liability held when it was sent (T055). Reconciling a cost replaces the liability, never adds to it."""
+    if record.get("tier") != "paid" or record.get("status") == "budget_blocked":
+        return 0.0
+    if record.get("cost_usd") is not None:
+        return float(record["cost_usd"])
+    return float(record.get("liability_usd") or 0.0)
 
 
 @dataclass(frozen=True)
@@ -90,6 +95,7 @@ def to_record(attempt: Attempt, ctx: UsageContext, tier: str, is_fallback: bool,
         "reasoning_tokens": attempt.reasoning_tokens,
         "failure_category": attempt.failure_category,
         "authorization_id": ctx.authorization_id if tier == "paid" else None,
+        "liability_usd": None,   # set by the router for paid attempts (worst-case USD reserved)
     }
 
 
@@ -102,15 +108,24 @@ class UsageStore:
     """PostgreSQL-backed store. Use MemoryUsageStore in tests that need no database."""
 
     def __init__(self, url: str):
+        from app.llm.migrations import usage_columns
+
         self.url = url
         with self._connect() as conn:
-            conn.execute(SCHEMA_SQL)
+            conn.execute(SCHEMA_SQL)  # the original table only (pre-T055 behavior)
+            self.columns = usage_columns(conn)
+
+    @property
+    def migrated(self) -> bool:
+        """True when L001's columns exist (written only by `python -m app.llm.migrate apply`)."""
+        return "liability_usd" in self.columns
 
     def _connect(self) -> psycopg.Connection:
         return psycopg.connect(self.url, row_factory=dict_row, autocommit=True)
 
     def add(self, record: dict[str, Any]) -> None:
-        columns = [c for c in record if c != "schema_version"]
+        # Unmigrated database: T055 fields are dropped, so the row is exactly what earlier images wrote.
+        columns = [c for c in record if c in self.columns]
         with self._connect() as conn:
             conn.execute(
                 f"INSERT INTO llm.usage_record ({', '.join(columns)}) VALUES ({', '.join(['%s'] * len(columns))})",
@@ -123,11 +138,14 @@ class UsageStore:
             row = conn.execute(
                 """SELECT COUNT(*) FILTER (WHERE status <> 'budget_blocked') AS requests,
                           COALESCE(SUM(cost_usd) FILTER (WHERE tier = 'paid'), 0) AS paid_usd,
+                          COALESCE(SUM(COALESCE(cost_usd, {liability}, 0))
+                                   FILTER (WHERE tier = 'paid' AND status <> 'budget_blocked'), 0) AS paid_exposure,
                           COUNT(*) FILTER (WHERE tier = 'paid' AND status = 'ok' AND cost_usd IS NULL) AS paid_unknown
                    FROM llm.usage_record WHERE started_at >= date_trunc('day', now() AT TIME ZONE 'UTC')
-                         AT TIME ZONE 'UTC'"""
+                         AT TIME ZONE 'UTC'""".format(liability="liability_usd" if self.migrated else "NULL")
             ).fetchone()
-        return {"requests": row["requests"], "paid_usd": float(row["paid_usd"]), "paid_unknown": row["paid_unknown"]}
+        return {"requests": row["requests"], "paid_usd": float(row["paid_usd"]),
+                "paid_exposure_usd": float(row["paid_exposure"]), "paid_unknown": row["paid_unknown"]}
 
     def token_profile(self, days: int) -> dict[str, dict[str, float]]:
         """Observed tokens of successful calls per purpose (T055 estimates): calls, max_in, mean_in, mean_out."""
@@ -145,7 +163,8 @@ class UsageStore:
         with self._connect() as conn:
             rows = conn.execute("SELECT * FROM llm.usage_record WHERE started_at >= %s ORDER BY started_at",
                                 (since,)).fetchall()
-        return [{**r, "cost_usd": None if r["cost_usd"] is None else float(r["cost_usd"])} for r in rows]
+        return [{**r, **{k: None if r.get(k) is None else float(r[k]) for k in ("cost_usd", "liability_usd")}}
+                for r in rows]
 
     def set_cost(self, call_id: str, cost: float) -> None:
         """Reconciliation: fill a missing cost from OpenRouter's generation metadata (never overwrites)."""
@@ -169,6 +188,7 @@ class MemoryUsageStore:
         return {
             "requests": len(sent),
             "paid_usd": sum(r["cost_usd"] or 0 for r in paid),
+            "paid_exposure_usd": sum(paid_exposure(r) for r in paid),
             "paid_unknown": sum(1 for r in paid if r["status"] == "ok" and r["cost_usd"] is None),
         }
 

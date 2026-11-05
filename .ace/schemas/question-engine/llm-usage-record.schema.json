@@ -185,6 +185,14 @@
         "null"
       ],
       "description": "T055: adult paid-generation approval used."
+    },
+    "liability_usd": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "T055: worst-case USD held for a paid attempt until its actual cost is known."
     }
   }
 }

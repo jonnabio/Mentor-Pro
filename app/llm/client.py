@@ -30,6 +30,7 @@ class OpenRouterError(Exception):
 
     kind = "error"
     attempt: "Attempt | None" = None
+    attempts: "list[Attempt]" = []   # T055: every attempt of the call, including earlier retries
 
 
 class AuthenticationError(OpenRouterError):
@@ -253,7 +254,7 @@ class OpenRouterClient:
                 exc: OpenRouterError = (AuthenticationError("OpenRouter rejected the API key (HTTP 401)")
                                         if response.status_code == 401 else
                                         PaymentRequiredError(f"OpenRouter returned HTTP 402 ({sent.failure_category})"))
-                exc.attempt = sent
+                exc.attempt, exc.attempts = sent, [*attempts, sent]
                 raise exc
             if response.status_code in RETRY_STATUSES:
                 status = "rate_limited" if response.status_code == 429 else "error"

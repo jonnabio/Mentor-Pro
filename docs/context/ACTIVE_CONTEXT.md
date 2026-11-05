@@ -62,10 +62,12 @@ five-question bank-only Matemáticas practice (ADR-035).
   `feature/T055-paid-approval` (PR into `dev`, awaiting PO review).
 - **Tracker:** T053 `verified`; T054, T055 `done`; T052 `pending`
   (superseded by T054); T034, T035 pending.
-- **Paid generation:** off in production and staying off. The release
-  adds `llm.paid_authorization` and five nullable `llm.usage_record`
-  columns at application start (additive DDL, like the existing usage
-  table). Writing schema `0001` is unchanged.
+- **Paid generation:** off in production and staying off. T055 adds no
+  DDL at start-up. The explicit migration `L001_paid_cost_tracking`
+  (`python -m app.llm.migrate apply`, after a verified backup, separately
+  authorized) adds `llm.paid_authorization` and six nullable
+  `llm.usage_record` columns. Without it the image runs free-only.
+  Writing schema `0001` and `deploy/` are unchanged.
 - **Locks:** none (no seeding advisory lock, no lane claim).
 
 ### Next Steps

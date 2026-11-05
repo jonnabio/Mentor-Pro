@@ -330,11 +330,16 @@ def test_9_paid_call_whose_worst_case_exceeds_the_ceiling_is_never_sent():
 def test_10_retry_that_would_pass_the_ceiling_is_blocked():
     fake = Billing({**failing_free(), PAID: [(503, {}, {}), (200, completion(PAID, cost=0.01), {})]})
     client, usage = make(fake, max_retries=2), history()
-    grant, _ = grant_for(client, usage, ceiling=0.07)   # room for one worst-case generation call only
-    result = route(client, usage, MSG, "generation", paid=grant, max_tokens=4000)
-    assert result.status == "budget_blocked" and fake.chat_models().count(PAID) == 1
+    grant, _ = grant_for(client, usage, ceiling=0.1)    # room for one worst-case generation call only
+    first = route(client, usage, MSG, "generation", paid=grant, max_tokens=4000)
+    # The 503 attempt holds 0.06375; its retry would need another 0.06375 > 0.1, so it is never sent.
+    assert first.status == "budget_blocked" and fake.chat_models().count(PAID) == 1
+    assert grant.stopped == "authorization_ceiling"
+    assert route(client, usage, MSG, "generation", paid=grant).status == "exhausted"   # no further paid call
+    assert fake.chat_models().count(PAID) == 1
     # The failed 503 attempt has no reported cost: counted at its full reservation, never as zero.
-    assert grant.finish()["unknown_cost_calls"] == 1
+    done = grant.finish()
+    assert done["unknown_cost_calls"] == 1 and done["spent_usd"] == pytest.approx(0.06375)
 
 
 def test_11_concurrent_reservations_never_exceed_the_ceiling():
@@ -372,33 +377,6 @@ def test_11_daily_usd_budget_caps_paid_spending():
     grant.today_paid = lambda: 1.99                       # spent earlier today by another operation
     assert grant.reserve("generation", 4000) is None and grant.stopped == "authorization_ceiling"
 
-
-def test_11_postgres_store_reservations_are_atomic():
-    from workbook_fixtures import new_target
-
-    store = paid.AuthorizationStore(new_target().url)
-    auth_id = f"PA-test-{threading.get_ident()}-{datetime.now().timestamp():.0f}"
-    store._connect().execute("DELETE FROM llm.paid_authorization WHERE status IN ('pending', 'approved', 'in_use') "
-                             "AND authorization_id LIKE 'PA-test-%'")
-    try:
-        store.create({"authorization_id": auth_id, "subject": "matematicas", "objective_code": "M09", "questions": 1,
-                      "model": PAID, "estimate": {"status": "ok"}})
-        assert store.decide(auth_id, True, 0.1, "parent") and store.claim(auth_id)
-        won = []
-
-        def worker():
-            if store.reserve(auth_id, 0.03, 10.0):
-                won.append(1)
-
-        threads = [threading.Thread(target=worker) for _ in range(8)]
-        [t.start() for t in threads]
-        [t.join() for t in threads]
-        assert len(won) == 3
-        store.settle(auth_id, 0.03, None)
-        row = store.get(auth_id)
-        assert row["spent_usd"] == pytest.approx(0.03) and row["unknown_cost_calls"] == 1
-    finally:
-        store._connect().execute("DELETE FROM llm.paid_authorization WHERE authorization_id = %s", (auth_id,))
 
 
 # ---------------------------------------------------------------- 12: cost tracking and reconciliation

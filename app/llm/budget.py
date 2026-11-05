@@ -38,8 +38,10 @@ class BudgetGate:
                 return self._refuse("daily request budget reached")
             if tier == "paid":
                 # Cost is known only after the call: allow one paid call in flight at a time.
+                # T055: unknown paid costs count at their worst-case liability until reconciled.
+                exposure = usage.get("paid_exposure_usd", usage["paid_usd"])
                 if (self._paid_in_flight or usage["paid_unknown"] > 0
-                        or usage["paid_usd"] >= self.settings.max_usd_per_day):
+                        or exposure >= self.settings.max_usd_per_day):
                     return self._refuse("paid fallback blocked by the daily USD budget")
                 self._paid_in_flight += 1
             self._in_flight += 1

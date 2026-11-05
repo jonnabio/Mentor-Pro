@@ -152,14 +152,18 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
             attempts = client.chat(model, messages, max_tokens=max_tokens, before_attempt=reserve,
                                    extra_body=reasoning_body(client, model, purpose))
         except (AuthenticationError, PaymentRequiredError) as exc:
-            if exc.attempt is not None:  # the request was sent: record it
-                record = to_record(exc.attempt, ctx, tier, is_fallback)
+            sent = list(exc.attempts)   # every request of this call was sent: record each one
+            for number, attempt in enumerate(sent):
+                record = to_record(attempt, ctx, tier, is_fallback)
+                if tier == "paid" and number < len(holds):
+                    # A 401/402 response is not a charged completion; earlier retries keep their liability.
+                    record["liability_usd"] = 0.0 if attempt is exc.attempt else holds[number]
                 store.add(record)
                 result.records.append(record)
             if tier == "paid" and holds:
                 for amount in holds[:-1]:   # earlier retries of this call: cost unknown, counted in full
                     paid.settle(amount, None)
-                paid.settle(holds[-1], 0.0)  # a 401/402 response is not a charged completion
+                paid.settle(holds[-1], 0.0)
             gate.settle(reserved[0], reserved[0] if tier == "paid" else 0)
             if isinstance(exc, AuthenticationError):
                 return RouteResult(status="auth_error", candidates=result.candidates, records=result.records,
@@ -171,8 +175,14 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
                                    message=f"{exc}; paid generation stopped, nothing purchased")
             continue
 
+        sent_index = 0
         for attempt in attempts:
             record = to_record(attempt, ctx, tier, is_fallback)
+            if tier == "paid" and attempt.status != "budget_blocked":
+                # The worst-case reservation stays on the record as the daily-budget liability until the
+                # actual cost is known (paid_exposure); it is never added to a known cost.
+                record["liability_usd"] = holds[sent_index]
+                sent_index += 1
             store.add(record)
             result.records.append(record)
         if tier == "paid":

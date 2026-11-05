@@ -199,29 +199,7 @@ def estimate(settings: Any, pricing: Pricing | None, pricing_problem: str | None
 
 # ---------------------------------------------------------------- authorization store
 
-SCHEMA_SQL = """
-CREATE SCHEMA IF NOT EXISTS llm;
-CREATE TABLE IF NOT EXISTS llm.paid_authorization (
-    authorization_id  TEXT PRIMARY KEY,
-    status            TEXT NOT NULL CHECK (status IN ('pending', 'declined', 'approved', 'in_use', 'consumed',
-                                                      'stopped', 'expired')),
-    subject           TEXT NOT NULL,
-    objective_code    TEXT,
-    questions         INTEGER NOT NULL CHECK (questions >= 1),
-    model             TEXT NOT NULL,
-    estimate          JSONB NOT NULL,
-    ceiling_usd       NUMERIC(14, 8) CHECK (ceiling_usd > 0),
-    reserved_usd      NUMERIC(14, 8) NOT NULL DEFAULT 0 CHECK (reserved_usd >= 0),
-    spent_usd         NUMERIC(14, 8) NOT NULL DEFAULT 0 CHECK (spent_usd >= 0),
-    unknown_cost_calls INTEGER NOT NULL DEFAULT 0,
-    approver_role     TEXT CHECK (approver_role IN ('parent', 'administrator')),
-    stop_reason       TEXT,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    expires_at        TIMESTAMPTZ NOT NULL,
-    decided_at        TIMESTAMPTZ,
-    finished_at       TIMESTAMPTZ
-);
-"""
+# The table is created by migration L001 (app/llm/migrations.py).
 
 _LIVE = ("pending", "approved", "in_use")
 
@@ -311,9 +289,13 @@ class AuthorizationStore:
     def __init__(self, url: str):
         import psycopg
         from psycopg.rows import dict_row
+
+        from app.llm import migrations
         self._connect = lambda: psycopg.connect(url, row_factory=dict_row, autocommit=True)
-        with self._connect() as conn:
-            conn.execute(SCHEMA_SQL)
+        with self._connect() as conn:  # never creates anything: L001 is an explicit migration
+            if migrations.state(conn)["state"] != "current":
+                raise PaidRefused(f"llm migration {migrations.L001} is not applied; paid generation is unavailable "
+                                  "(python -m app.llm.migrate apply, after a verified backup)")
 
     def _expire(self, conn: Any) -> None:
         conn.execute("UPDATE llm.paid_authorization SET status = 'expired', stop_reason = COALESCE(stop_reason, "
@@ -472,6 +454,9 @@ class PaidGrant:
             if self.stopped:
                 return None
             amount = call_ceiling(self.pricing, self.input_max.get(purpose, max(self.input_max.values())), max_tokens)
+            # Today's paid exposure: actual costs plus the liability of every paid attempt whose cost is still
+            # unknown, from this and earlier authorizations (T055 review). In-flight reservations of this
+            # authorization are checked by the store.
             headroom = self.max_usd_per_day - self.today_paid()
             if not self.store.reserve(self.authorization_id, amount, headroom):
                 self.stopped = "authorization_ceiling"
@@ -528,7 +513,7 @@ def open_grant(store: Any, client: Any, usage_store: Any, auth_id: str, subject:
     per_call = row["estimate"]["per_call"]
     return PaidGrant(store, auth_id, row["model"], pricing,
                      {p: per_call[p]["input_tokens_max"] for p in WORKFLOW}, settings.max_usd_per_day,
-                     lambda: usage_store.today()["paid_usd"])
+                     lambda: usage_store.today()["paid_exposure_usd"])
 
 
 # ---------------------------------------------------------------- CLI

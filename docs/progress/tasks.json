@@ -1729,7 +1729,10 @@
           "app/llm/paid.py",
           "app/llm/costs.py",
           "tests/app/test_paid_approval.py",
-          "docs/progress/task_T055_result.md"
+          "docs/progress/task_T055_result.md",
+          "app/llm/migrations.py",
+          "app/llm/migrate.py",
+          "tests/app/test_paid_migration_and_exposure.py"
         ],
         "modify": [
           "app/llm/client.py",
@@ -1746,7 +1749,8 @@
           "tests/app/test_openrouter.py",
           "docs/adr/ADR-009-openrouter-integration.md",
           "docs/progress/tasks.json",
-          "docs/context/ACTIVE_CONTEXT.md"
+          "docs/context/ACTIVE_CONTEXT.md",
+          "app/llm/budget.py"
         ]
       },
       "dependencies": [
@@ -1754,9 +1758,11 @@
       ],
       "complexity": "M",
       "acceptance_cmd": "bash .ace/scripts/verify.sh",
-      "attempts": 1,
+      "attempts": 2,
       "result_file": "docs/progress/task_T055_result.md",
-      "failures": [],
+      "failures": [
+        "2026-11-05 PO review PR #53: runtime DDL instead of explicit migration; unknown paid costs missing from daily headroom across authorizations (fixed in attempt 2)"
+      ],
       "notes": "Mocked tests only; no live OpenRouter request, no production change. Paid stays off in production (OPENROUTER_ALLOW_PAID absent/false, OPENROUTER_PAID_MAX_USD_PER_OPERATION 0)."
     }
   ]

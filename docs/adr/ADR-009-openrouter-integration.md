@@ -135,9 +135,47 @@ consent.
   connection errors and 5xx are `provider_failure`. A 402 on the paid
   model stops paid execution. Credits are never bought.
 - Usage records gain nullable `subject`, `objective_code`,
-  `reasoning_tokens`, `failure_category` and `authorization_id`. A
-  401/402 response is now recorded as a sent `error`, not as
-  `budget_blocked`.
+  `reasoning_tokens`, `failure_category`, `authorization_id` and
+  `liability_usd`. A 401 or 402 response is now recorded as a sent
+  `error`, not as `budget_blocked`, together with the retries before it.
+- **Schema changes are explicit (PO review of PR #53).** Nothing is
+  added at application start. Migration `L001_paid_cost_tracking`
+  (`python -m app.llm.migrate status|apply [--dry-run]|rollback`, ledger
+  `llm.schema_migration`) adds the six columns and
+  `llm.paid_authorization`. It runs in one transaction under an advisory
+  lock. It is idempotent, refuses a drifted schema, and checks that
+  existing usage rows are unchanged (count and digest). Run it after a
+  verified backup, as a separately authorized step.
+- **Compatibility:**
+  - A T055 image on an unmigrated database writes usage rows without the
+    new columns, and every paid command refuses, so it runs free-only as
+    before.
+  - An older image on a migrated database keeps working, because the new
+    columns are nullable and its inserts name their columns.
+  - The writing schema range stays `0001..0001`, so `deploy/` and the
+    root-owned tool are unchanged.
+- **Rollback:**
+  - The image rolls back without touching the schema.
+  - `migrate rollback` removes L001 only while no authorization exists
+    and no row uses a new column. Otherwise it refuses, because data
+    would be lost; recovery is then from the backup, by PO decision.
+- **Daily exposure (PO review):**
+  - Each paid attempt's record keeps its worst-case reservation as
+    `liability_usd`.
+  - The daily USD check of the budget gate and of every later
+    authorization uses the paid exposure: the actual cost when known,
+    otherwise the liability.
+  - Reconciliation fills the cost, which replaces the liability, so
+    nothing is counted twice.
+  - The existing rule still holds: a successful paid call with unknown
+    cost blocks further paid calls that UTC day.
+- **Operator access:**
+  - There is no HTTP route; a test checks this.
+  - The commands run only inside the app container, reached by SSH with
+    the server key and docker-group membership. The database and
+    OpenRouter credentials exist only there.
+  - `--approver parent|administrator` records who decided. It is not
+    authentication.
 - `python -m app.llm.costs report [--credits]`: shows today and this
   month, by model, subject, purpose, batch and failure. It gives actual
   USD, calls with unknown cost, calls never sent, budget left and
