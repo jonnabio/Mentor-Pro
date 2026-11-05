@@ -1717,6 +1717,53 @@
         "2026-11-05: fallback google/gemma-4-26b-a4b-it:free reached 6 times, all HTTP 429 (rate limited), 0 output"
       ],
       "notes": "Authorization PO-T054-M09-2026-11-05. 10 calls, 244 s, 1 question accepted (M09 cell 41, medium) by nemotron-3-ultra; held for tutor review; export private on server; no verdict recorded."
+    },
+    {
+      "id": "T055",
+      "name": "Free-first generation, paid approval and cost tracking",
+      "objective": "Paid generation only after an adult approves an operation-specific estimate and USD ceiling; read-only key/credit checks; categorized provider failures; extended usage records; operator cost report and reconciliation (ADR-009 amendment).",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/llm/paid.py",
+          "app/llm/costs.py",
+          "tests/app/test_paid_approval.py",
+          "docs/progress/task_T055_result.md",
+          "app/llm/migrations.py",
+          "app/llm/migrate.py",
+          "tests/app/test_paid_migration_and_exposure.py"
+        ],
+        "modify": [
+          "app/llm/client.py",
+          "app/llm/router.py",
+          "app/llm/settings.py",
+          "app/llm/usage.py",
+          "app/generation/pipeline.py",
+          "app/generation/practice_set.py",
+          "app/practice/seeding.py",
+          "app/practice/seed_bank.py",
+          ".ace/schemas/question-engine/llm-usage-record.schema.json",
+          ".ace/skills/openrouter-model-routing/SKILL.md",
+          ".env.example",
+          "tests/app/test_openrouter.py",
+          "docs/adr/ADR-009-openrouter-integration.md",
+          "docs/progress/tasks.json",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "app/llm/budget.py"
+        ]
+      },
+      "dependencies": [
+        "T054"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 2,
+      "result_file": "docs/progress/task_T055_result.md",
+      "failures": [
+        "2026-11-05 PO review PR #53: runtime DDL instead of explicit migration; unknown paid costs missing from daily headroom across authorizations (fixed in attempt 2)"
+      ],
+      "notes": "Mocked tests only; no live OpenRouter request, no production change. Paid stays off in production (OPENROUTER_ALLOW_PAID absent/false, OPENROUTER_PAID_MAX_USD_PER_OPERATION 0)."
     }
   ]
 }
