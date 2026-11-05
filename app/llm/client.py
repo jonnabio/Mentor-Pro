@@ -23,9 +23,14 @@ MODELS_CACHE_S = 3600.0
 
 
 class OpenRouterError(Exception):
-    """Base class. `kind` is a stable code; messages never contain the API key."""
+    """Base class. `kind` is a stable code; messages never contain the API key.
+
+    `attempt` is set when an HTTP request was actually sent (so the caller can record it).
+    """
 
     kind = "error"
+    attempt: "Attempt | None" = None
+    attempts: "list[Attempt]" = []   # T055: every attempt of the call, including earlier retries
 
 
 class AuthenticationError(OpenRouterError):
@@ -44,6 +49,33 @@ class TransientError(OpenRouterError):
     kind = "transient"
 
 
+def failure_category(http_status: int | None, error_kind: str | None = None,
+                     body: Any = None) -> str | None:
+    """Stable failure category (T055). Never inferred from free-form message text.
+
+    402 is `insufficient_credits` only when the error body confirms code 402; otherwise `payment_required`.
+    429 is a rate limit, never a billing problem; timeouts, connection errors and 5xx are provider failures.
+    """
+    if error_kind in ("timeout", "connection") or (http_status is not None and http_status >= 500):
+        return "provider_failure"
+    if error_kind in ("truncated", "empty", "invalid_response"):
+        return "invalid_output"
+    if error_kind == "budget":
+        return "budget_blocked"
+    if http_status == 402:
+        code = ((body or {}).get("error") or {}).get("code") if isinstance(body, dict) else None
+        return "insufficient_credits" if code == 402 else "payment_required"
+    return {401: "auth_invalid", 403: "forbidden", 408: "provider_failure", 429: "rate_limited"}.get(
+        http_status, "request_rejected" if http_status and http_status >= 400 else None)
+
+
+def _json(response: httpx.Response) -> Any:
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
 @dataclass(frozen=True)
 class ModelInfo:
     id: str
@@ -54,6 +86,8 @@ class ModelInfo:
     supported_parameters: tuple[str, ...]
     input_modalities: tuple[str, ...] = ("text",)
     output_modalities: tuple[str, ...] = ("text",)
+    request_price: str = ""            # USD per request, when OpenRouter lists one (T055)
+    reasoning_price: str = ""          # USD per internal reasoning token, when priced separately (T055)
 
     @property
     def is_text_chat(self) -> bool:
@@ -83,6 +117,12 @@ class Attempt:
     generation_id: str | None = None
     content: str | None = None
     error_kind: str | None = None
+    reasoning_tokens: int | None = None
+    failure_category: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.failure_category is None and self.status != "ok":
+            self.failure_category = failure_category(self.http_status, self.error_kind)
 
 
 NATIVE_LENGTH_REASONS = frozenset({"length", "max_tokens", "max_output_tokens", "model_length"})
@@ -153,6 +193,8 @@ class OpenRouterClient:
                 supported_parameters=tuple(m.get("supported_parameters") or ()),
                 input_modalities=tuple((m.get("architecture") or {}).get("input_modalities") or ("text",)),
                 output_modalities=tuple((m.get("architecture") or {}).get("output_modalities") or ("text",)),
+                request_price=str(m.get("pricing", {}).get("request", "") or ""),
+                reasoning_price=str(m.get("pricing", {}).get("internal_reasoning", "") or ""),
             )
             for m in response.json().get("data", [])
             if isinstance(m, dict) and m.get("id")
@@ -204,10 +246,16 @@ class OpenRouterClient:
                 return attempts
 
             latency = self._elapsed(started)
-            if response.status_code == 401:
-                raise AuthenticationError("OpenRouter rejected the API key (HTTP 401)")
-            if response.status_code == 402:
-                raise PaymentRequiredError("OpenRouter reports insufficient credit (HTTP 402)")
+            if response.status_code in (401, 402):
+                body = _json(response)
+                sent = Attempt(model, number, "error", latency, response.status_code,
+                               error_kind=f"http_{response.status_code}",
+                               failure_category=failure_category(response.status_code, body=body))
+                exc: OpenRouterError = (AuthenticationError("OpenRouter rejected the API key (HTTP 401)")
+                                        if response.status_code == 401 else
+                                        PaymentRequiredError(f"OpenRouter returned HTTP 402 ({sent.failure_category})"))
+                exc.attempt, exc.attempts = sent, [*attempts, sent]
+                raise exc
             if response.status_code in RETRY_STATUSES:
                 status = "rate_limited" if response.status_code == 429 else "error"
                 attempts.append(Attempt(model, number, status, latency, response.status_code,
@@ -245,19 +293,52 @@ class OpenRouterClient:
             provider=body.get("provider"),
             tokens_in=usage.get("prompt_tokens"),
             tokens_out=usage.get("completion_tokens"),
+            reasoning_tokens=(usage.get("completion_tokens_details") or {}).get("reasoning_tokens"),
             generation_id=body.get("id"),
             content=content,
         )
         if reached_output_limit(choice, attempt.tokens_out, max_tokens):
             # Cut off by max_tokens (often reasoning models): the answer is incomplete.
-            attempt.status, attempt.error_kind = "invalid_output", "truncated"
+            attempt.status, attempt.error_kind, attempt.failure_category = "invalid_output", "truncated", "invalid_output"
         elif not (content or "").strip():
-            attempt.status, attempt.error_kind = "invalid_output", "empty"
+            attempt.status, attempt.error_kind, attempt.failure_category = "invalid_output", "empty", "invalid_output"
         if isinstance(usage.get("cost"), (int, float)):
             attempt.cost_usd, attempt.cost_source = float(usage["cost"]), "provider_reported"
         elif attempt.generation_id:
             self._fill_cost_from_generation(attempt)
         return attempt
+
+    def generation_stats(self, generation_id: str) -> dict[str, Any] | None:
+        """GET /generation?id=... (read-only, app key): OpenRouter's settled metadata, or None (T055 reconcile)."""
+        try:
+            response = self._http.get("/generation", params={"id": generation_id})
+        except httpx.HTTPError:
+            return None
+        if response.status_code != 200:
+            return None
+        return (_json(response) or {}).get("data") or None
+
+    def key_info(self) -> tuple[dict[str, Any] | None, str | None]:
+        """GET /key with the application key (T055): (data, None) or (None, failure category)."""
+        return self._read_only("/key", None)
+
+    def account_credits(self, management_key: str) -> tuple[dict[str, Any] | None, str | None]:
+        """GET /credits with a separate management key, read-only (T055). The key is sent only in this request's
+        Authorization header and is never logged or returned."""
+        return self._read_only("/credits", management_key)
+
+    def _read_only(self, path: str, key: str | None) -> tuple[dict[str, Any] | None, str | None]:
+        headers = {"Authorization": f"Bearer {key}"} if key else None
+        try:
+            response = self._http.get(path, headers=headers)
+        except httpx.TimeoutException:
+            return None, "provider_failure"
+        except httpx.TransportError:
+            return None, "provider_failure"
+        if response.status_code != 200:
+            return None, failure_category(response.status_code, body=_json(response))
+        data = (_json(response) or {}).get("data")
+        return (data, None) if isinstance(data, dict) else (None, "invalid_output")
 
     def _fill_cost_from_generation(self, attempt: Attempt) -> None:
         """Fallback: GET /generation?id=... (stats can lag; one short retry)."""

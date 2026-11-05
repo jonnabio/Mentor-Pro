@@ -1656,13 +1656,13 @@
         "2026-11-05 pilot: 10/10 generation calls timed out at 60 s (nemotron-3-ultra free), 0 generated",
         "2026-11-05 probe: 1/1 call timed out, 0 generated"
       ],
-      "notes": "Stopped per PO rules. Batch bb-matematicas-cd792836 open (6 adopted cells), M09 0/5. Root cause of single-model exposure: configured fallback minimax-m3.1-flash delisted; fixed by T053. Resume after T053 is released and configured."
+      "notes": "Stopped per PO rules. Batch bb-matematicas-cd792836 open (6 adopted cells), M09 0/5. Root cause of single-model exposure: configured fallback minimax-m3.1-flash delisted; fixed by T053. Resume after T053 is released and configured. Superseded by T054 (2026-11-05)."
     },
     {
       "id": "T053",
       "name": "Question generation provider fallback",
       "objective": "OPENROUTER_QUESTION_GENERATION_MODELS: explicit ordered primary/fallback list for question generation; fallback only on provider failure; bounded, budgeted and recorded; unlisted models named (ADR-009 amendment).",
-      "status": "done",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [
@@ -1688,7 +1688,82 @@
       "attempts": 1,
       "result_file": "docs/progress/task_T053_result.md",
       "failures": [],
-      "notes": "PO approval 2026-11-05; PR #50 (head ba71309, CI 42045557140) merged into dev as 647af18 (dev CI 42050399265 green). Not released or deployed; no production configuration change; no live provider request. Release checklist: docs/planning/2026-11-05-release-checklist-T053.md."
+      "notes": "PO approval 2026-11-05; PR #50 (head ba71309, CI 42045557140) merged into dev as 647af18 (dev CI 42050399265). Released as v2026.11.05-1: PR #51 (head b931847, CI 42056387499) merged into main as 27fd409 (main CI 42057883562, Tag and Release green); digest sha256:c1e6ba1a...e112; deployed 2026-11-05 18:54 UTC under PO-T053-2026-11-05 (window T053-2026-11-05). Record: docs/progress/2026-11-05-production-release.md."
+    },
+    {
+      "id": "T054",
+      "name": "Live fallback validation and Matemáticas M09 seeding pilot (production)",
+      "objective": "One run --subject matematicas --objective M09 --max-calls 10 on v2026.11.05-1; report fallback behavior, calls, coverage; export accepted questions for individual tutor review; no verdicts.",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T054_result.md",
+          "docs/progress/2026-11-05-production-release.md"
+        ],
+        "modify": [
+          "docs/progress/tasks.json",
+          "docs/context/ACTIVE_CONTEXT.md"
+        ]
+      },
+      "dependencies": [
+        "T053"
+      ],
+      "complexity": "S",
+      "acceptance_cmd": "PO review of pilot evidence",
+      "attempts": 1,
+      "result_file": "docs/progress/task_T054_result.md",
+      "failures": [
+        "2026-11-05: fallback google/gemma-4-26b-a4b-it:free reached 6 times, all HTTP 429 (rate limited), 0 output"
+      ],
+      "notes": "Authorization PO-T054-M09-2026-11-05. 10 calls, 244 s, 1 question accepted (M09 cell 41, medium) by nemotron-3-ultra; held for tutor review; export private on server; no verdict recorded."
+    },
+    {
+      "id": "T055",
+      "name": "Free-first generation, paid approval and cost tracking",
+      "objective": "Paid generation only after an adult approves an operation-specific estimate and USD ceiling; read-only key/credit checks; categorized provider failures; extended usage records; operator cost report and reconciliation (ADR-009 amendment).",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/llm/paid.py",
+          "app/llm/costs.py",
+          "tests/app/test_paid_approval.py",
+          "docs/progress/task_T055_result.md",
+          "app/llm/migrations.py",
+          "app/llm/migrate.py",
+          "tests/app/test_paid_migration_and_exposure.py"
+        ],
+        "modify": [
+          "app/llm/client.py",
+          "app/llm/router.py",
+          "app/llm/settings.py",
+          "app/llm/usage.py",
+          "app/generation/pipeline.py",
+          "app/generation/practice_set.py",
+          "app/practice/seeding.py",
+          "app/practice/seed_bank.py",
+          ".ace/schemas/question-engine/llm-usage-record.schema.json",
+          ".ace/skills/openrouter-model-routing/SKILL.md",
+          ".env.example",
+          "tests/app/test_openrouter.py",
+          "docs/adr/ADR-009-openrouter-integration.md",
+          "docs/progress/tasks.json",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "app/llm/budget.py"
+        ]
+      },
+      "dependencies": [
+        "T054"
+      ],
+      "complexity": "M",
+      "acceptance_cmd": "bash .ace/scripts/verify.sh",
+      "attempts": 2,
+      "result_file": "docs/progress/task_T055_result.md",
+      "failures": [
+        "2026-11-05 PO review PR #53: runtime DDL instead of explicit migration; unknown paid costs missing from daily headroom across authorizations (fixed in attempt 2)"
+      ],
+      "notes": "Mocked tests only; no live OpenRouter request, no production change. Paid stays off in production (OPENROUTER_ALLOW_PAID absent/false, OPENROUTER_PAID_MAX_USD_PER_OPERATION 0). PR #53 (head 500c74b, CI 42114069387) merged into dev as 07d7238 (dev CI 42117635772). Release and deployment authorized: PO-T055-2026-11-05."
     }
   ]
 }

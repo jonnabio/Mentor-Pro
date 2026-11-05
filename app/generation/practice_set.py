@@ -117,7 +117,7 @@ def _request_entry(outcome: GenerationOutcome) -> dict[str, Any]:
     attempts = (outcome.validation or {}).get("attempts") or [
         {"attempt": 1, "verdict": outcome.status, "reasons": outcome.reasons}]
     return {"request_id": outcome.request_id, "status": outcome.status, "attempts": attempts,
-            "usage": outcome.summary()}
+            "usage": outcome.summary(), "paid_available": outcome.paid_available}
 
 
 def _reject_as_duplicate(outcome: GenerationOutcome, reason: str) -> None:
@@ -135,7 +135,7 @@ def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store
                  practice_set_id: str | None = None,
                  clock: Callable[[], float] = time.monotonic,
                  on_slot_done: Callable[[SlotResult], None] | None = None,
-                 seed_items: list[dict[str, Any]] | None = None) -> PracticeSetResult:
+                 seed_items: list[dict[str, Any]] | None = None, paid: Any = None) -> PracticeSetResult:
     """Generate every slot of `allocation` (the `allocation` list returned by `allocate`).
 
     `on_slot_done` (progress reporting) is called from a worker thread when a slot finishes.
@@ -172,7 +172,7 @@ def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store
                 bank = list(committed)
             bank += generation_store.recent_stems(slot.evidence_id)
             outcome = generate_one(client, usage_store, bundles[slot.slot], slot.difficulty, bank=bank,
-                                   practice_set_id=set_id, gate=gate)
+                                   practice_set_id=set_id, gate=gate, paid=paid)
             if outcome.status == "accepted":
                 with lock:
                     duplicate = duplicate_reason(outcome.item, committed)

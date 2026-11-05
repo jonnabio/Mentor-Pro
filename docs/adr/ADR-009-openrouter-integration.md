@@ -1,7 +1,7 @@
 # ADR-009: OpenRouter Integration (Connectivity, Routing, Usage)
 
 > **Status:** Accepted (Product Owner task T005)
-> **Date:** 2026-10-21. Amended by T053 (2026-11-05).
+> **Date:** 2026-10-21. Amended by T053 and T055 (2026-11-05).
 
 ---
 
@@ -33,8 +33,10 @@ enforced, and every call recorded in USD without student data.
 | `OPENROUTER_API_KEY` | — (required) | Server-side only |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Must be https |
 | `OPENROUTER_FREE_MODELS` | empty | Ordered free models; empty = top 3 discovered free models by context length |
-| `OPENROUTER_PAID_MODEL` | empty | Optional fallback |
-| `OPENROUTER_ALLOW_PAID` | `false` | Paid fallback switch |
+| `OPENROUTER_PAID_MODEL` | empty | Paid model, used only under an approval (T055) |
+| `OPENROUTER_ALLOW_PAID` | `false` | Enables paid approval requests; never switches by itself (T055) |
+| `OPENROUTER_PAID_MAX_USD_PER_OPERATION` | `0` | Highest ceiling an adult may approve (T055) |
+| `OPENROUTER_MANAGEMENT_KEY` | empty | Optional, read-only `GET /credits` (T055) |
 | `OPENROUTER_MAX_USD_PER_DAY` | `0` | Paid spend cap (UTC day) |
 | `OPENROUTER_MAX_REQUESTS_PER_DAY` | `50` | All sent calls |
 | `OPENROUTER_TIMEOUT_S` | `60` | Per request |
@@ -46,8 +48,8 @@ enforced, and every call recorded in USD without student data.
 - Free = prompt and completion price both zero in `/models` (cached 1 h).
 - Configured free models that are missing or not free are skipped; if none
   remain, routing does not silently pick arbitrary models.
-- Paid fallback runs only if `ALLOW_PAID=true`, daily paid spend is below the
-  cap, and no paid call today has unknown cost.
+- Paid calls need an adult's approval for one operation (amendment T055),
+  daily paid spend below the cap, and no paid call today with unknown cost.
 - 401/403 stop routing; 402 skips the model; 400/404 move to the next model
   without retry; 429/5xx/timeouts retry with exponential backoff (cap 30 s)
   honouring `Retry-After`.
@@ -86,8 +88,99 @@ model.
   that generated the item. Writing generation is unchanged.
 - Fallback chosen for production (configuration, separately authorized):
   `google/gemma-4-26b-a4b-it:free` (Google, distinct from Nvidia;
-  262,144 context; listed with `response_format` and `reasoning`). Not yet
+  262,144 context; listed with `response_format` and `reasoning`. Not yet
   tested live.
+
+### Amendment T055 (2026-11-05): paid generation only with adult approval
+
+Context: in T054, Gemma returned HTTP 429 on all 6 requests and Nemotron
+truncated or timed out, so free generation alone is unreliable. Paying is
+acceptable only with a parent's or administrator's explicit, bounded
+consent.
+
+- Routing never adds the paid model by itself, even with
+  `OPENROUTER_ALLOW_PAID=true`. It is tried after the free models only
+  when the caller passes a claimed `PaidGrant`. Without one, an exhausted
+  route reports `paid_available`, and a seeding run reports
+  `run.paid_option`. Student practice never passes a grant, so it stays
+  free-only.
+- Operator CLI `python -m app.llm.paid`: `estimate` stores a `pending`
+  authorization in `llm.paid_authorization` (at most 3 pending, expiring
+  after 24 h). `approve --max-usd X --approver parent|administrator` and
+  `decline` follow. `seed_bank run --objective O --paid-authorization ID`
+  runs it. There is no HTTP endpoint and no student-facing path.
+- Estimate: current `/models` prices (input, output, per-request and
+  reasoning tokens), observed token history (30 days, input × 1.25), the
+  whole workflow (generation and revision, independent solve, review,
+  bounded retries), and an expected and a maximum USD figure with the
+  price timestamp. With no prices or no history it returns
+  `estimate_unavailable`, and nothing can be approved.
+- Approval is refused when the ceiling is above
+  `OPENROUTER_PAID_MAX_USD_PER_OPERATION` or the daily USD budget, below
+  the expected cost, or above a verified balance or key allowance.
+- Execution claims the approval once (`approved` → `in_use`, one paid
+  operation at a time), for the approved subject and objective only. It
+  re-checks prices (any rise stops the run) and the balance. Every paid
+  HTTP attempt first reserves its worst-case cost against the ceiling and
+  the daily budget in one conditional `UPDATE`. A cost that is not
+  reported is counted at its full reservation. The approval ends
+  `consumed` or `stopped` and never carries over to another operation.
+- Balance: `GET /key` (application key) gives the key's limit and
+  remaining allowance, which is not the account balance. `GET /credits`
+  is read only with the separate `OPENROUTER_MANAGEMENT_KEY`. Without it,
+  or on any error, the status is `balance_unknown`, with the reason.
+- Failure categories, which never come from message text: 402 with error
+  code 402 is `insufficient_credits` (otherwise `payment_required`); 429
+  is `rate_limited`; 401 `auth_invalid`; 403 `forbidden`; timeouts,
+  connection errors and 5xx are `provider_failure`. A 402 on the paid
+  model stops paid execution. Credits are never bought.
+- Usage records gain nullable `subject`, `objective_code`,
+  `reasoning_tokens`, `failure_category`, `authorization_id` and
+  `liability_usd`. A 401 or 402 response is now recorded as a sent
+  `error`, not as `budget_blocked`, together with the retries before it.
+- **Schema changes are explicit (PO review of PR #53).** Nothing is
+  added at application start. Migration `L001_paid_cost_tracking`
+  (`python -m app.llm.migrate status|apply [--dry-run]|rollback`, ledger
+  `llm.schema_migration`) adds the six columns and
+  `llm.paid_authorization`. It runs in one transaction under an advisory
+  lock. It is idempotent, refuses a drifted schema, and checks that
+  existing usage rows are unchanged (count and digest). Run it after a
+  verified backup, as a separately authorized step.
+- **Compatibility:**
+  - A T055 image on an unmigrated database writes usage rows without the
+    new columns, and every paid command refuses, so it runs free-only as
+    before.
+  - An older image on a migrated database keeps working, because the new
+    columns are nullable and its inserts name their columns.
+  - The writing schema range stays `0001..0001`, so `deploy/` and the
+    root-owned tool are unchanged.
+- **Rollback:**
+  - The image rolls back without touching the schema.
+  - `migrate rollback` removes L001 only while no authorization exists
+    and no row uses a new column. Otherwise it refuses, because data
+    would be lost; recovery is then from the backup, by PO decision.
+- **Daily exposure (PO review):**
+  - Each paid attempt's record keeps its worst-case reservation as
+    `liability_usd`.
+  - The daily USD check of the budget gate and of every later
+    authorization uses the paid exposure: the actual cost when known,
+    otherwise the liability.
+  - Reconciliation fills the cost, which replaces the liability, so
+    nothing is counted twice.
+  - The existing rule still holds: a successful paid call with unknown
+    cost blocks further paid calls that UTC day.
+- **Operator access:**
+  - There is no HTTP route; a test checks this.
+  - The commands run only inside the app container, reached by SSH with
+    the server key and docker-group membership. The database and
+    OpenRouter credentials exist only there.
+  - `--approver parent|administrator` records who decided. It is not
+    authentication.
+- `python -m app.llm.costs report [--credits]`: shows today and this
+  month, by model, subject, purpose, batch and failure. It gives actual
+  USD, calls with unknown cost, calls never sent, budget left and
+  credits. `reconcile` fills missing costs from `GET /generation` and
+  lists mismatches; recorded costs are never overwritten.
 
 ---
 

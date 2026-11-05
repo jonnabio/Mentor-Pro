@@ -259,30 +259,15 @@ def test_paid_model_never_used_when_disabled():
     assert result.status == "exhausted" and "acme/pro" not in fake.chat_models()
 
 
-def test_paid_fallback_when_enabled_and_budgeted():
+def test_paid_model_never_used_without_an_approved_authorization():
+    """T055: OPENROUTER_ALLOW_PAID=true alone no longer switches to the paid model (see test_paid_approval.py)."""
     fake = FakeOpenRouter({**failing_free(), "acme/pro": [(200, completion("acme/pro", cost=0.0021), {})]})
     client, _ = make(fake, max_retries=0, paid_model="acme/pro", allow_paid=True, max_usd_per_day=1.0)
     store = MemoryUsageStore()
     result = route(client, store, MSG, "connectivity_test")
-    assert result.status == "ok" and result.tier == "paid" and result.final.cost_usd == 0.0021
-    assert store.records[-1]["tier"] == "paid" and store.records[-1]["is_fallback"] is True
-
-
-def test_paid_fallback_blocked_by_zero_budget():
-    fake = FakeOpenRouter(failing_free())
-    client, _ = make(fake, max_retries=0, paid_model="acme/pro", allow_paid=True, max_usd_per_day=0.0)
-    store = MemoryUsageStore()
-    result = route(client, store, MSG, "connectivity_test")
-    assert result.status == "budget_blocked" and "acme/pro" not in fake.chat_models()
-    assert store.records[-1]["status"] == "budget_blocked"
-
-
-def test_paid_fallback_blocked_when_paid_cost_unknown():
-    store = MemoryUsageStore()
-    store.add({"status": "ok", "tier": "paid", "cost_usd": None})
-    fake = FakeOpenRouter(failing_free())
-    client, _ = make(fake, max_retries=0, paid_model="acme/pro", allow_paid=True, max_usd_per_day=5.0)
-    assert route(client, store, MSG, "connectivity_test").status == "budget_blocked"
+    assert result.status == "exhausted" and result.paid_available is True
+    assert "adult approval" in result.message and "acme/pro" not in fake.chat_models()
+    assert all(r["tier"] == "free" for r in store.records)
 
 
 def test_daily_request_budget_blocks_calls():
@@ -299,7 +284,9 @@ def test_402_skips_model():
     client, _ = make(fake)
     store = MemoryUsageStore()
     result = route(client, store, MSG, "connectivity_test")
-    assert result.status == "ok" and store.records[0]["status"] == "budget_blocked"
+    # T055: the 402 request was sent, so it is recorded as an error (not as a never-sent budget block).
+    assert result.status == "ok" and store.records[0]["status"] == "error"
+    assert store.records[0]["failure_category"] == "payment_required"
 
 
 # ---------------------------------------------------------------- connectivity check and storage

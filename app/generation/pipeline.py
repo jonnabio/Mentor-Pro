@@ -40,6 +40,7 @@ class GenerationOutcome:
     validation: dict[str, Any] | None = None
     reasons: list[str] = field(default_factory=list)
     usage: list[dict[str, Any]] = field(default_factory=list)
+    paid_available: bool = False   # T055: free generation failed; paid generation needs adult approval
 
     def summary(self) -> dict[str, Any]:
         sent = [u for u in self.usage if u["status"] != "budget_blocked"]
@@ -128,7 +129,10 @@ def verdict(det: dict[str, Any], solve: dict[str, Any], rubric: dict[str, int] |
 
 def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle, difficulty: str,
                  bank: list[dict[str, Any]] | None = None, practice_set_id: str | None = None,
-                 gate: BudgetGate | None = None) -> GenerationOutcome:
+                 gate: BudgetGate | None = None, paid: Any = None) -> GenerationOutcome:
+    """`paid` (T055) is a claimed PaidGrant: the paid model is then tried after the free models, within the
+    approval ceiling. Validation, independent solve and review are unchanged for paid output."""
+    labels = {"paid": paid, "subject": bundle.subject, "objective_code": bundle.objective_code}
     request_id = f"req-{uuid.uuid4().hex[:16]}"
     outcome = GenerationOutcome("rejected", request_id, bundle.objective_code, bundle.evidence["id"])
     notes: list[str] = []
@@ -142,10 +146,11 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
         gen = route(client, store, messages, purpose="generation",
                     max_tokens=client.settings.generation_max_tokens, request_id=request_id,
                     practice_set_id=practice_set_id, gate=gate,
-                    models=client.settings.question_generation_models or None)
+                    models=client.settings.question_generation_models or None, **labels)
         outcome.usage += gen.records
         if gen.status != "ok":
             outcome.status = "unavailable"
+            outcome.paid_available = gen.paid_available
             outcome.reasons = [f"generation {gen.status}: {gen.message}"]
             return outcome
         try:
@@ -167,7 +172,7 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
                 solved = route(client, store, prompts.solve_messages(item), purpose="independent_solve",
                                max_tokens=SOLVE_MAX_TOKENS, request_id=request_id,
                                practice_set_id=practice_set_id, gate=gate,
-                               avoid=frozenset({gen.final.model_requested}))
+                               avoid=frozenset({gen.final.model_requested}), **labels)
                 outcome.usage += solved.records
                 if solved.status == "ok":
                     chosen = parse_solve(solved.content)
@@ -176,7 +181,7 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
             reviewed = route(client, store, prompts.rubric_messages(bundle, item, difficulty), purpose="review",
                              max_tokens=RUBRIC_MAX_TOKENS, request_id=request_id,
                              practice_set_id=practice_set_id, gate=gate,
-                             avoid=frozenset({gen.final.model_requested}))
+                             avoid=frozenset({gen.final.model_requested}), **labels)
             outcome.usage += reviewed.records
             if reviewed.status == "ok":
                 try:

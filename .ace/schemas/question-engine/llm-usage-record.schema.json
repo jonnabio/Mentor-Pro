@@ -144,6 +144,55 @@
         "null"
       ],
       "description": "Stable failure code, e.g. http_429, timeout, connection."
+    },
+    "subject": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "objective_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reasoning_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "failure_category": {
+      "enum": [
+        null,
+        "provider_failure",
+        "rate_limited",
+        "auth_invalid",
+        "forbidden",
+        "payment_required",
+        "insufficient_credits",
+        "invalid_output",
+        "budget_blocked",
+        "request_rejected"
+      ],
+      "description": "T055 stable category; 429 is never a billing failure."
+    },
+    "authorization_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "T055: adult paid-generation approval used."
+    },
+    "liability_usd": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "T055: worst-case USD held for a paid attempt until its actual cost is known."
     }
   }
 }

@@ -103,7 +103,9 @@ for model in free_candidates (+ paid_candidates if allow_paid):
 return exhausted
 ```
 
-- Escalate to paid only when `allow_paid: true` and all free candidates failed.
+- Escalate to paid only when `allow_paid: true`, all free candidates failed,
+  and an adult approved this operation's estimate and ceiling (T055,
+  `app/llm/paid.py`); never automatically.
 - Record every attempt (success or failure) through `llm-cost-observability`.
 - `model_used` comes from the response `model` field, never from the request.
 
