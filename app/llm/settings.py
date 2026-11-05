@@ -61,6 +61,8 @@ class LlmSettings:
     generation_reasoning_effort: str = ""   # optional; sent only to models that support `reasoning`
     # T031 (ADR-029): writing reviews only, ordered primary then qualified fallbacks; empty = free_models.
     writing_review_models: tuple[str, ...] = ()
+    # T053: question generation only, ordered primary then fallbacks; empty = free_models (earlier behavior).
+    question_generation_models: tuple[str, ...] = ()
     max_requests_per_day: int = 50
     max_usd_per_day: float = 0.0
     app_title: str = "Mentor Pro"
@@ -93,6 +95,8 @@ class LlmSettings:
                 generation_reasoning_effort=get("OPENROUTER_GENERATION_REASONING_EFFORT").lower(),
                 writing_review_models=tuple(
                     m.strip() for m in get("OPENROUTER_WRITING_REVIEW_MODELS").split(",") if m.strip()),
+                question_generation_models=tuple(
+                    m.strip() for m in get("OPENROUTER_QUESTION_GENERATION_MODELS").split(",") if m.strip()),
                 max_requests_per_day=int(get("OPENROUTER_MAX_REQUESTS_PER_DAY", "50")),
                 max_usd_per_day=float(get("OPENROUTER_MAX_USD_PER_DAY", "0")),
             )
@@ -116,5 +120,9 @@ class LlmSettings:
                                         "medium or high")
         if len(set(self.writing_review_models)) != len(self.writing_review_models):
             raise LlmConfigurationError("OPENROUTER_WRITING_REVIEW_MODELS lists a model twice")
+        if len(set(self.question_generation_models)) != len(self.question_generation_models):
+            raise LlmConfigurationError("OPENROUTER_QUESTION_GENERATION_MODELS lists a model twice")
+        if set(self.question_generation_models) & set(self.generation_excluded_models):
+            raise LlmConfigurationError("OPENROUTER_QUESTION_GENERATION_MODELS lists a model excluded from generation")
         if self.allow_paid and not self.paid_model:
             raise LlmConfigurationError("OPENROUTER_ALLOW_PAID=true requires OPENROUTER_PAID_MODEL")
