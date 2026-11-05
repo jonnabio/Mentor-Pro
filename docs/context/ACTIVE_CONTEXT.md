@@ -2,124 +2,78 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-05 (T053 merged into `dev` as `647af18`;
-  release checklist prepared; not released or deployed)
+- **Last Updated:** 2026-11-05 (session end: T053 released and deployed
+  as `v2026.11.05-1`; T054 M09 pilot done, 1 question awaiting tutor
+  review)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
-- **Earlier history:** T006–T045, deployment stages 6.1–6.3, ADR-030 to
-  ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/` and
-  this file's Git history (handoff of 2026-10-30).
+- **Earlier history:** T006–T050, deployment stages 6.1–6.3, ADR-030 to
+  ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/`,
+  release records in `docs/progress/` and this file's Git history.
 
 ## Current Objective
 
-Matemáticas question bank population and activation (fast track).
-
-- **T051 released and deployed** as `v2026.11.04-1` (2026-11-04 01:20
-  UTC): `run --objective`, individual review as a serving path (ADR-034
-  amendment). [Release record](../progress/2026-11-04-production-release.md).
-- **T052 pilot stopped:** 11 of 11 generation calls to
-  `nvidia/nemotron-3-ultra-550b-a55b:free` timed out at 60 s; 0 questions.
-  The configured fallback (minimax) had been delisted and was dropped
-  silently. Batch `bb-matematicas-cd792836` open, 6 adopted cells, M09 0/5.
-  [T052 result](../progress/task_T052_result.md).
-- **T053 developed:** `OPENROUTER_QUESTION_GENERATION_MODELS`, an explicit
-  primary/fallback list for question generation, fallback on provider
-  failure only (ADR-009 amendment). PR #50 merged into `dev` as
-  `647af18` (CI 42045557140, `dev` CI 42050399265 green). Fallback
-  `google/gemma-4-26b-a4b-it:free` rechecked 2026-11-05 (listed, free,
-  compatible), not yet tested live.
-  [Release checklist](../planning/2026-11-05-release-checklist-T053.md).
-  [T053 result](../progress/task_T053_result.md).
-- **Still separate authorizations:** release, deployment, the
-  production setting, any live call, seeding, review verdicts, provider
-  limits and enabling `MENTOR_PRO_BANK_ONLY_ENABLED`.
+Matemáticas question bank population and activation (fast track). Goal:
+five-question bank-only Matemáticas practice (ADR-035).
 
 ## Handoff Summary
 
 ### Completed
 
-- **Earlier releases, closed:** `v2026.10.30-1` (T036–T039, T045;
-  [record](../progress/2026-10-31-production-release.md)) and
-  `v2026.10.31-1` (T046, PO acceptance 2026-11-01;
-  [T046 result](../progress/task_T046_result.md)). Unattended deployment
-  with `sudo -n` enabled 2026-10-31. Closure PR #41 merged as `2000f42`.
-- **T047 (question bank foundation) developed, PR #42.** Fixed 100-cell
-  plan, adoption, resumable gap-only seeding under an advisory lock,
-  coverage and readiness report, question quarantine, 10-question review
-  gate. The PO accepted the post-approval quarantine rule (a passed batch
-  returns to `pending`). CI run 41322277632 failed: on a fresh database
-  `practice.item` did not exist when the seeding tests ran first; the test
-  fixture now creates it (`PracticeStore`). Application code unchanged.
-  [T047 result](../progress/task_T047_result.md). PO final approval
-  2026-11-01; PR #42 (head `6033edb`, CI 41350431996) merged into `dev`
-  as `9a09d38` (`dev` CI 41359022505 green).
-- **Release `v2026.11.02-1` (T047 + T048 + T049) deployed 2026-11-02
-  20:54 UTC**, window `T047-T049-2026-11-02`, authorization
-  `PO-T047-T049-2026-11-02`.
-  - T048 PR #43 merged as `0a776f9` (`dev` CI 41383980544); T049 PR #44
-    merged as `69e2c39` (`dev` CI 41481451161).
-  - Release PR #45 (head `ae3e09b`, CI 41517124354) merged into `main` as
-    `166acdc` (CI 41518476299, Tag and Release green). Digest
-    `sha256:738af74e…547a`; manifest sha256 `459ce7b3…e35b` on both sides.
-  - Switch: the administrator's key count returned `0`; the containers had
-    no such key.
-  - `status`/smoke 9/9; backup `mentor_pro_2026-11-02_205333.dump`
-    (sha256 `ad991fc0…00ff`, `VERIFY OK`); `PREFLIGHT OK` (schema `0001`);
-    `DEPLOY OK`; smoke 9/9; `STATUS HEALTHY`.
-  - `/api/subjects` reports `bank_only: false`, sizes `[5]`; a 10-question
-    request and a `bank_only` request are refused (422) before any write;
-    writing and tutor pages 200.
-  - [Release record](../progress/2026-11-02-production-release.md).
-  - Closure PR #46 merged into `dev` as `167c985` (CI 41523840735 and
-    `dev` CI 41525157754 green); `dev` now contains `main`.
-- **T050 (browser acceptance) passed 2026-11-02:** production rechecked
-  (`STATUS HEALTHY`, smoke 9/9, `bank_only: false`, sizes `[5]`); the PO
-  reported PASS for practice form, a real five-question practice, navigation,
-  writing workflow and tutor navigation; no failures. The practice was real
-  use by the student under PO observation (ADR-017), not a synthetic test.
-  T047, T048 and T049 are `verified`;
-  [release record](../progress/2026-11-02-production-release.md). The PO
-  closed the cycle.
-- **T050 handoff records** (`074e133`) merged with PR #48.
+- **T051** (targeted seeding, individual review; ADR-034 amendment):
+  released and deployed as `v2026.11.04-1` (2026-11-04 01:20 UTC).
+  [Record](../progress/2026-11-04-production-release.md).
+- **T052** M09 pilot stopped: 11/11 Nemotron generation calls timed out;
+  the configured fallback (minimax) had been delisted.
+  [T052 result](../progress/task_T052_result.md).
+- **T053** explicit generation model list
+  `OPENROUTER_QUESTION_GENERATION_MODELS` (ADR-009 amendment): PR #50 →
+  `dev` `647af18`; release PR #51 → `main` `27fd409` (CI 42057883562);
+  tag `v2026.11.05-1`, digest `c1e6ba1a…e112`. Administrator added the
+  setting (backup `app.env.bak-T053`). Deployed 2026-11-05 18:54 UTC under
+  `PO-T053-2026-11-05`; smoke 9/9, `STATUS HEALTHY`.
+  [Release record](../progress/2026-11-05-production-release.md).
+- **T054** live fallback and M09 pilot (`PO-T054-M09-2026-11-05`): 10
+  calls, 244 s, 1 question accepted (M09 cell 41, medium, by Nemotron);
+  Gemma reached 6 times, all HTTP 429. Question exported for tutor review;
+  no verdict. [T054 result](../progress/task_T054_result.md).
+- This handoff PR syncs `dev` with `main` (`27fd409`).
 
 ### Current State
 
-- **Production** (macedonianserver):
-  - `v2026.11.04-1` (`6a661861…c5d1`) for app and tutor, `postgres:17.6`;
-    `MENTOR_PRO_BANK_ONLY_ENABLED` absent (off).
-  - Schema `current 0001`; 7 dumps (no automatic deletion).
-  - Rollback target: `v2026.11.02-1` (`738af74e…547a`), same schema, with
-    `mentor_pro_2026-11-04_011934.dump`.
-  - LLM: daily request limit 200; generation free models
-    `nemotron-3-ultra` only in practice (see T052).
-- **Production inventory (2026-11-05):** Matemáticas 12 eligible
-  questions, unchanged; Matemáticas batch `bb-matematicas-cd792836`
-  `open`/`pending`, 6/100 cells (adopted). Bank-only sizes 5 and 10:
-  `largest_available: 0`; blocker M09 (target cell 42, M09 E2 hard).
-- **Repository:** `main` at `6cc15dc` (`v2026.11.04-1`); `dev` at
-  `647af18` (contains `main`).
-- **Tracker:** T046–T050 `verified`; T051 `done` (deployed); T052
-  `pending` (stopped); T053 `done`. T034 and T035 pending (maintenance).
+- **Production** (macedonianserver): `v2026.11.05-1`
+  (`c1e6ba1a…e112`) for app and tutor, `postgres:17.6`; schema `current
+  0001`; 8 dumps (latest `mentor_pro_2026-11-05_185406.dump`).
+  - `OPENROUTER_QUESTION_GENERATION_MODELS=nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free`;
+    `MENTOR_PRO_BANK_ONLY_ENABLED` absent (off); `/api/subjects`
+    `bank_only: false`, sizes `[5]`. Daily request limit 200 (23 used on
+    2026-11-05).
+  - Rollback target: `v2026.11.04-1` (`6a661861…c5d1`), same schema.
+- **Bank:** batch `bb-matematicas-cd792836` `open`/`pending`, 7/100 cells
+  (6 adopted, 1 generated and held). M09 1/5. Eligible Matemáticas
+  inventory 12. Review file
+  `~/mentor-pro-review/T054-M09-2026-11-05.json` on the server (private).
+- **Repository:** `main` `27fd409`; `dev` synced with `main` by this
+  handoff PR. No open feature branches from this session.
+- **Tracker:** T053 `verified`; T054 `done`; T052 `pending` (superseded by
+  T054); T034, T035 pending.
+- **Locks:** none (no seeding advisory lock, no lane claim).
 
 ### Next Steps
 
-1. **T053:** release PR from `handoff/T053-merged` into `main`, the
-   production setting `OPENROUTER_QUESTION_GENERATION_MODELS=
-   nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free`
-   (administrator edit of `/etc/mentor-pro/app.env`, before the
-   deployment), then deployment. Each step needs its own authorization.
-2. **T052 resume:** the M09 pilot with at least `--max-calls 3` per probe
-   (an accepted question needs generation and review), then
-   `item-review-sample --objective M09` and tutor review.
-3. Maintenance candidates, each a separate verified change:
-   - T035: tutor exit 78 for tokens of 1–15 characters.
-   - T034: deterministic practice-set test.
-   - Assess CI on PRs into `dev`.
-4. Stage 6.3 close: check whether the T050 practice on the student's own
-   device, plus progress surviving a restart, satisfies ADR-030 criterion 8
-   (restart part not yet shown).
-5. With separate authorization only: remove the obsolete server files
-   listed in runbook section 0.
+1. Tutor reviews the exported M09 question; record the verdict with
+   `seed_bank item-review-record --subject matematicas --decisions <file>`
+   (needs PO authorization).
+2. PO decision on provider capacity: Gemma free tier returns 429 and
+   Nemotron truncates at 4,000 tokens; options include another listed
+   fallback, a higher generation `max_tokens`, or retrying later. Any
+   change is a separate authorized task.
+3. Continue seeding M05, M09, M14, M18 (and a `hard` cell, target 42) so
+   size-5 bank-only practice can be composed; each run separately
+   authorized.
+4. Maintenance candidates: T035 (tutor exit 78 for short tokens), T034
+   (deterministic practice-set test), CI on PRs into `dev`.
+5. Stage 6.3 close: ADR-030 criterion 8 (restart part not yet shown).
 
 ### Blockers/Issues
 
@@ -138,6 +92,12 @@ Matemáticas question bank population and activation (fast track).
 - Never run a pre-T036 image on the migrated database. Recovery after a
   failed migration is the G3 restore, a PO decision. The protected dump
   is `mentor_pro_2026-10-31_170927.dump`.
+- **Provider capacity (T054):** Gemma 4 26B free returned HTTP 429 on
+  all 6 requests; Nemotron 3 Ultra truncated 2 of 3 generations at 4,000
+  tokens. An accepted question cost up to 5 calls.
+- **Bank-only blocker:** size 5 needs servable questions for M01, M05,
+  M09, M14, M18 and a `hard` question; M05, M14, M18 have none and M09's
+  one question awaits review.
 - T035, T034 pending (above).
 - CI skips 102 tests (baseline workbook not in Git); a green run is not
   a full release gate.
