@@ -1722,7 +1722,7 @@
       "id": "T055",
       "name": "Free-first generation, paid approval and cost tracking",
       "objective": "Paid generation only after an adult approves an operation-specific estimate and USD ceiling; read-only key/credit checks; categorized provider failures; extended usage records; operator cost report and reconciliation (ADR-009 amendment).",
-      "status": "done",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [
@@ -1764,6 +1764,25 @@
         "2026-11-05 PO review PR #53: runtime DDL instead of explicit migration; unknown paid costs missing from daily headroom across authorizations (fixed in attempt 2)"
       ],
       "notes": "Mocked tests only; no live OpenRouter request, no production change. Paid stays off in production (OPENROUTER_ALLOW_PAID absent/false, OPENROUTER_PAID_MAX_USD_PER_OPERATION 0). PR #53 (head 500c74b, CI 42114069387) merged into dev as 07d7238 (dev CI 42117635772). Release and deployment authorized: PO-T055-2026-11-05."
+    },
+    {
+      "id": "T056",
+      "name": "Matemáticas bank-only release readiness (fast track)",
+      "objective": "Read-only compose-check of what the real bank-only composer assembles per difficulty; inventory and size-5 shortages recorded as release evidence for T056–T059.",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T056_result.md"
+        ],
+        "modify": [
+          "app/practice/bank_allocation.py",
+          "app/practice/seed_bank.py",
+          "tests/app/test_bank_only_practice.py",
+          "docs/progress/task_T055_result.md",
+          "docs/progress/tasks.json"
+        ]
+      }
     }
   ]
 }
