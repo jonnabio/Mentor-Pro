@@ -2,8 +2,9 @@
 
 - **Date:** 2026-11-05
 - **Role:** Developer (fast track)
-- **Status:** Done locally; feature PR into `dev`. Not released or
-  deployed. No production configuration change. No live OpenRouter
+- **Status:** Done. PR #53 (head `500c74b`, CI 42114069387) merged into
+  `dev` as `07d7238` (`dev` CI 42117635772 green). Release, L001 and
+  deployment authorized under `PO-T055-2026-11-05`. No live OpenRouter
   request, free or paid; every test uses a mocked transport.
 - **Decision record:** [ADR-009](../adr/ADR-009-openrouter-integration.md)
   (amendment T055). Evidence: [T054 result](task_T054_result.md).
