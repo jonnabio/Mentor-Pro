@@ -388,3 +388,29 @@ def test_switch_on_still_accepts_earlier_five_question_clients(synthetic_client,
     assert session["slots_total"] == 5
     wait_ready(client, session["session_id"])
     assert runner.calls == 1
+
+
+# ---------------------------------------------------------------- readiness report (T056, read-only)
+
+def test_readiness_reports_counts_missing_objectives_and_largest_size_per_difficulty():
+    from app.practice.bank_allocation import readiness
+
+    objs = objectives(5, evidences=1)
+    rows = stock(objs[:4], 1)  # M05 has nothing
+    report = readiness(FakeBank(rows), None, SYNTHETIC, "matematicas", objs)
+    assert report["eligible"] == 12 and "M05" not in report["inventory"]
+    assert report["inventory"]["M01"] == {"easy": 1, "hard": 1, "medium": 1}
+    for difficulty in ("mixed", "easy", "medium", "hard"):
+        row = report["composition"][difficulty]
+        assert row["missing_objectives"] == ["M05"] and row["largest_size"] == 0
+    full = readiness(FakeBank(stock(objs, 1)), None, SYNTHETIC, "matematicas", objs)
+    assert full["composition"]["mixed"] == {"size5_objectives": ["M01", "M02", "M03", "M04", "M05"],
+                                            "missing_objectives": [], "largest_size": 15}
+
+
+def test_readiness_never_writes_or_reads_question_text():
+    from app.practice.bank_allocation import readiness
+
+    objs = objectives(5, evidences=1)
+    report = readiness(FakeBank(stock(objs, 1)), None, SYNTHETIC, "matematicas", objs)
+    assert "stem" not in repr(report) and "item_id" not in repr(report)
