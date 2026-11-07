@@ -6,6 +6,7 @@
     python -m app.practice.seed_bank review-record --subject matematicas --decisions FILE [--reviewer tutor]
     python -m app.practice.seed_bank item-review-sample --subject matematicas --out FILE [--objective M09]
     python -m app.practice.seed_bank item-review-record --subject matematicas --decisions FILE [--reviewer tutor]
+    python -m app.practice.seed_bank compose-check --subject matematicas
     python -m app.practice.seed_bank quarantine --request-id REQ --reason wrong_key [--reviewer tutor]
 
 Reads DATABASE_URL and CURRICULUM_BASELINE like the application; `run` uses the OpenRouter settings and the
@@ -64,9 +65,10 @@ def main(argv: list[str] | None = None) -> int:
     item_sample = sub.add_parser("item-review-sample", help="export unreviewed generated questions (T051)")
     item_sample.add_argument("--out", type=Path, required=True)
     item_sample.add_argument("--objective")
+    check = sub.add_parser("compose-check", help="read-only bank-only readiness (T056)")
     item_record = sub.add_parser("item-review-record", help="record individual verdicts (T051)")
     item_record.add_argument("--decisions", type=Path, required=True)
-    for p in (run, rep, sample, record, item_sample, item_record):
+    for p in (run, rep, sample, record, item_sample, item_record, check):
         p.add_argument("--subject", choices=SUBJECTS, required=True)
     for p in (record, item_record, quar := sub.add_parser("quarantine")):
         p.add_argument("--reviewer", default="tutor")
@@ -99,6 +101,11 @@ def main(argv: list[str] | None = None) -> int:
             out = seeding.report(url, conn, _batch_id(url, baseline, args.subject))
             if not args.cells:
                 out["coverage"].pop("cells")
+        elif args.command == "compose-check":
+            from app.practice.bank import QuestionBank
+            from app.practice.bank_allocation import readiness
+            selection = catalog.select_objectives(conn, baseline, "subject_simulation", args.subject, None)
+            out = readiness(QuestionBank(url), conn, baseline, args.subject, selection.objectives)
         elif args.command == "review-sample":
             batch_id = _batch_id(url, baseline, args.subject)
             rows = seeding.review_sample(url, batch_id)
