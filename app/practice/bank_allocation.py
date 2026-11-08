@@ -140,3 +140,33 @@ class BankComposer:
             return result
         largest = next((n for n in sorted(QUESTION_COUNTS, reverse=True) if n < count and self.compose(n)), 0)
         raise Shortage(count, largest)
+
+
+DIFFICULTIES = ("mixed", "easy", "medium", "hard")
+
+
+def readiness(bank: Any, catalog: Any, baseline: str, subject: str,
+              objectives: list[dict[str, Any]]) -> dict[str, Any]:
+    """Read-only bank-only readiness for a subject (T056): what the real composer can assemble now.
+
+    Counts only (no question text): eligible questions per objective and difficulty, and for each difficulty
+    the largest permitted whole-subject size it composes plus the objectives the size-5 plan needs but lacks.
+    """
+    first = BankComposer(bank, catalog, baseline, subject, objectives, "mixed")
+    inventory: dict[str, dict[str, int]] = {}
+    for objective in objectives:
+        counts = Counter(c["difficulty"] for c in first._candidates(objective))
+        if counts:
+            inventory[objective["workbook_code"]] = dict(sorted(counts.items()))
+    by_difficulty = {}
+    for difficulty in DIFFICULTIES:
+        composer = BankComposer(bank, catalog, baseline, subject, objectives, difficulty)
+        plan = allocate(objectives, 5, difficulty)["allocation"]
+        levels = MIXED_CYCLE if difficulty == "mixed" else (difficulty,)
+        missing = [r["workbook_code"] for r in plan if r["questions"]
+                   and not any(inventory.get(r["workbook_code"], {}).get(level) for level in levels)]
+        largest = next((n for n in sorted(QUESTION_COUNTS, reverse=True) if composer.compose(n)), 0)
+        by_difficulty[difficulty] = {"size5_objectives": [r["workbook_code"] for r in plan if r["questions"]],
+                                     "missing_objectives": missing, "largest_size": largest}
+    return {"subject": subject, "eligible": sum(sum(v.values()) for v in inventory.values()),
+            "seen": len(bank.seen_questions()), "inventory": inventory, "composition": by_difficulty}
