@@ -64,3 +64,11 @@ Español refuses bank-only and keeps the generated flow.
   sizes `[5]`.
 - `compose-check`: 16 eligible; mixed missing M09, largest size 0.
   Activation waits for the tutor verdict on `req-f2a9df9a48964c49`.
+
+## M09 Tutor Verdict (2026-11-08)
+
+- The tutor reviewed `req-f2a9df9a48964c49` (cell 41) and approved it as
+  medium (first rated it hard; confirmed medium is fair). Recorded once
+  with `item-review-record --reviewer tutor`: recorded 1, approved 1.
+- `compose-check`: 17 eligible; M09 `medium: 1`; mixed size 5
+  `missing_objectives: []`, `largest_size: 5`. Educational gate passed.
