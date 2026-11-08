@@ -47,3 +47,20 @@ Español refuses bank-only and keeps the generated flow.
 
 - PR #58 (CI 42441437450) merged into `dev` as `cd8d86a` (CI
   42444317937, green). Authorization `PO-T057-FASTTRACK-2026-11-07`.
+- Release PR #60 merged into `main` as `5cae693` (CI 42445890606: tests,
+  release identity, image, Tag and Release green). Tag `v2026.11.08-2`,
+  digest `sha256:1f8b8d3a...5c66`, manifest sha256 `95e5becb...e9ed`
+  (identical on the server).
+
+## Deployment (2026-11-07 local, 2026-11-08 UTC)
+
+- Before: `STATUS HEALTHY`. Preflight `DEPLOY COMPATIBLE`. Backup
+  `mentor_pro_2026-11-08_042316.dump` (33 tables, 1045 rows, sha256
+  `9cf262ad...c5a`) `VERIFY OK`.
+- Window `T057-2026-11-07`: `DEPLOY OK`, smoke 9/9, `STATUS HEALTHY`,
+  schema `current:0001`, L001 `current`.
+- Switches: `MENTOR_PRO_BANK_ONLY_SUBJECTS` and
+  `MENTOR_PRO_BANK_ONLY_ENABLED` absent; every subject `bank_only: false`,
+  sizes `[5]`.
+- `compose-check`: 16 eligible; mixed missing M09, largest size 0.
+  Activation waits for the tutor verdict on `req-f2a9df9a48964c49`.
