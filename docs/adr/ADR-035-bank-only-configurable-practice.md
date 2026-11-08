@@ -84,3 +84,18 @@ fail on exact cells while the bank holds suitable questions.
   [ADR-015](ADR-015-repeat-aware-learning-status.md),
   [ADR-034](ADR-034-question-bank-foundation.md)
 - Report: `docs/progress/task_T048_result.md`
+
+## Amendment T057 (2026-11-07): Per-Subject Switch
+
+- `MENTOR_PRO_BANK_ONLY_SUBJECTS` lists the subjects with bank-only
+  practice and their sizes, for example `matematicas` (size 5) or
+  `matematicas:5,10;ciencias`. Absent or empty means off. It takes
+  precedence over `MENTOR_PRO_BANK_ONLY_ENABLED`, which keeps its T049
+  meaning (every subject, every size). An unknown subject or size stops
+  the application from starting.
+- `/api/subjects` reports each subject's switch and sizes; the student UI
+  applies them when a subject is chosen. Subjects without the switch keep
+  the 5-question generated flow and refuse `source: bank_only` (422).
+- A bank-only request for a size the subject does not offer is refused
+  with 422 `invalid_question_count`; nothing is created. Composition rules
+  D1-D4 and the no-generation guarantee are unchanged.

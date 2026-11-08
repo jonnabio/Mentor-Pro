@@ -65,11 +65,40 @@ class PracticeConfig(BaseModel):
     question_count: QuestionCount
 
 
+def bank_only_config(value: bool | dict[str, tuple[int, ...]] | None) -> dict[str, tuple[int, ...]]:
+    """Subject -> permitted bank-only sizes (T057). Empty means bank-only is off everywhere.
+
+    From the environment (value None): MENTOR_PRO_BANK_ONLY_SUBJECTS, e.g. "matematicas" or "matematicas:5,10"
+    (size 5 when none is given), takes precedence; otherwise the T049 MENTOR_PRO_BANK_ONLY_ENABLED=true turns on
+    every subject and size. An unknown subject or size refuses to start instead of being ignored.
+    """
+    if isinstance(value, bool):
+        return {code: QUESTION_COUNTS for code in SUBJECT_CODES} if value else {}
+    if value is not None:
+        return dict(value)
+    spec = os.environ.get("MENTOR_PRO_BANK_ONLY_SUBJECTS", "").strip()
+    if not spec:
+        enabled = os.environ.get("MENTOR_PRO_BANK_ONLY_ENABLED", "").lower() in ("1", "true", "yes")
+        return {code: QUESTION_COUNTS for code in SUBJECT_CODES} if enabled else {}
+    out: dict[str, tuple[int, ...]] = {}
+    for entry in filter(None, (e.strip() for e in spec.split(";"))):
+        code, colon, sizes = entry.partition(":")
+        code = code.strip()
+        try:
+            counts = tuple(sorted({int(n) for n in sizes.split(",")})) if colon else (5,)
+        except ValueError:
+            counts = ()
+        if code not in SUBJECT_CODES or code in out or not counts or not set(counts) <= set(QUESTION_COUNTS):
+            raise ValueError(f"MENTOR_PRO_BANK_ONLY_SUBJECTS: invalid entry {entry!r}")
+        out[code] = counts
+    return out
+
+
 def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
                baseline: str = BASELINE_VERSION, dev_endpoints: bool | None = None,
                llm_factory: LlmFactory | None = None, practice_runner: SetRunner | None = None,
                tutor_token: str | None = None, tutor_hosts: frozenset[str] = LOOPBACK,
-               bank_only: bool | None = None) -> FastAPI:
+               bank_only: bool | dict[str, tuple[int, ...]] | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.writing.check_schema()  # T036: refuse to start on an unmigrated writing schema
@@ -78,9 +107,9 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
     app = FastAPI(title="Mentor Pro", version="0.4.0", docs_url="/api/docs", openapi_url="/api/openapi.json",
                   lifespan=lifespan)
     app.state.catalog_target = (database_url, schema)
-    # T049: bank-only configurable practice (ADR-035) only when enabled; absent or anything else means off.
-    if bank_only is None:
-        bank_only = os.environ.get("MENTOR_PRO_BANK_ONLY_ENABLED", "").lower() in ("1", "true", "yes")
+    # T049/T057: bank-only practice (ADR-035) per subject, off unless explicitly configured.
+    bank_only_sizes = bank_only_config(bank_only)
+    every_subject = all(bank_only_sizes.get(code) == QUESTION_COUNTS for code in SUBJECT_CODES)
 
     def catalog() -> Iterator[psycopg.Connection]:
         conn = open_catalog(database_url or db.database_url(), schema)
@@ -114,10 +143,14 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
     @app.get("/api/subjects")
     def get_subjects(conn: psycopg.Connection = Depends(catalog)) -> dict:
         subjects = [{"code": code, "name_es": name,
-                     "objective_count": len(list_objectives(conn, baseline, code))}
+                     "objective_count": len(list_objectives(conn, baseline, code)),
+                     "practice": {"bank_only": code in bank_only_sizes,
+                                  "question_counts": list(bank_only_sizes.get(code, (5,)))}}
                     for code, name in SUBJECTS]
+        # Top-level `practice` keeps the T049 meaning: on only when every subject is bank-only with every size.
         return {"baseline_version": baseline, "notice_es": GROUNDING_NOTICE_ES, "subjects": subjects,
-                "practice": {"bank_only": bank_only, "question_counts": list(QUESTION_COUNTS) if bank_only else [5]}}
+                "practice": {"bank_only": every_subject,
+                             "question_counts": list(QUESTION_COUNTS) if every_subject else [5]}}
 
     @app.get("/api/objectives")
     def get_objectives(subject: str = Query(...), conn: psycopg.Connection = Depends(catalog)) -> dict:
@@ -179,7 +212,7 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
 
     app.state.practice = PracticeService(lambda: database_url or db.database_url(), runner_factory)
     app.include_router(build_practice_router(catalog, baseline, app.state.practice, ApiError, _selection_message,
-                                             bank_only))
+                                             bank_only_sizes))
     # T022: Producción escrita (Español) reads stored exercises only; it never generates.
     app.state.writing = WritingService(lambda: database_url or db.database_url())
     app.include_router(build_writing_router(app.state.writing, ApiError))
