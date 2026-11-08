@@ -42,3 +42,8 @@ Español refuses bank-only and keeps the generated flow.
 - Full gate tests (ace, curriculum, app): 1019 passed, 9 skipped.
 - ACE gate: `VERIFY_RESULT=pass gate=all` (test 256 s, lint 1.7 s; log
   20261107-210342-841).
+
+## Release
+
+- PR #58 (CI 42441437450) merged into `dev` as `cd8d86a` (CI
+  42444317937, green). Authorization `PO-T057-FASTTRACK-2026-11-07`.
