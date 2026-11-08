@@ -97,6 +97,8 @@ def message_es(session: dict[str, Any], available: int) -> str:
     reason = STOP_ES.get(session["stop_reason"] or "", STOP_ES["internal_error"])
     if status == "partial":
         return f"{reason} Se prepararon {available} de {session['slots_total']} preguntas; puede practicar con ellas."
+    if (session.get("config") or {}).get("generation") == "whole_session":
+        return f"{reason} No se pudo preparar la práctica completa. Intente de nuevo más tarde."
     return f"{reason} No se pudo preparar ninguna pregunta. Intente de nuevo más tarde."
 
 
@@ -184,21 +186,37 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
             if request.question_count not in sizes:
                 raise api_error(422, "invalid_question_count",
                                 f"Por ahora las prácticas tienen {', '.join(map(str, sizes))} preguntas.")
-            return create_bank_only(request, selection, conn)
+            try:
+                return create_bank_only(request, selection, conn)
+            except Shortage as exc:
+                if request.question_count != 5:  # generation only makes 5-question practices
+                    raise api_error(409, "insufficient_inventory", shortage_message(exc.requested, exc.largest),
+                                    {"requested": exc.requested, "largest_available": exc.largest}) from exc
+                # T059: bank-first, generate-on-shortage. The whole practice is generated (no bank items), with
+                # the same subject, objectives and difficulty; it ends complete or failed, never partial.
+                return create_generated(request, selection, conn, whole_session=True)
         if request.question_count != 5:
             raise api_error(422, "invalid_question_count",
                             "Las prácticas con generación de preguntas tienen 5 preguntas.")
+        return create_generated(request, selection, conn)
+
+    def create_generated(request: SessionRequest, selection: Any, conn: psycopg.Connection,
+                         whole_session: bool = False) -> dict:
         plan = allocate(selection.objectives, request.question_count, request.difficulty)
         texts = {o["workbook_code"]: o["text_es"] for o in selection.objectives}
         for row in plan["allocation"]:
             row["text_es"] = texts[row["workbook_code"]]
         config = request.model_dump(mode="json", exclude={"client_request_id", "browser_token", "source"})
+        if whole_session:
+            config["generation"] = "whole_session"
         browser_hash = (hashlib.sha256(request.browser_token.encode("ascii")).hexdigest()
                         if request.browser_token else None)
         store, queue, bank = service.get()
         session, created = store.create_or_get(request.client_request_id, baseline, config, plan["allocation"],
                                                browser_hash)
-        if created:
+        if created and whole_session:
+            queue.submit(session["session_id"])
+        elif created:
             # Fill slots from the validated bank first; generate only what is missing (ADR-014).
             picks = bank.compose(conn, baseline, request.subject, plan["allocation"], browser_hash)
             complete = len(picks) == session["slots_total"]
@@ -208,19 +226,15 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
         return {**view(store, session), "created": created}
 
     def create_bank_only(request: SessionRequest, selection: Any, conn: psycopg.Connection) -> dict:
-        """A complete practice from the bank, or 409 with nothing created; no LLM call, no job (ADR-035)."""
+        """A complete practice from the bank (no LLM call, no job, ADR-035); Shortage: nothing created."""
         store, _, bank = service.get()
         existing = store.by_request(request.client_request_id)
         if existing is not None:
             return {**view(store, existing), "created": False}
-        try:
-            with bank.connect() as db:
-                composer = BankComposer(bank, conn, baseline, request.subject, selection.objectives,
-                                        request.difficulty, db)
-                allocation, picks = composer.compose_or_shortage(request.question_count)
-        except Shortage as exc:
-            raise api_error(409, "insufficient_inventory", shortage_message(exc.requested, exc.largest),
-                            {"requested": exc.requested, "largest_available": exc.largest}) from exc
+        with bank.connect() as db:
+            composer = BankComposer(bank, conn, baseline, request.subject, selection.objectives,
+                                    request.difficulty, db)
+            allocation, picks = composer.compose_or_shortage(request.question_count)
         texts = {o["workbook_code"]: o["text_es"] for o in selection.objectives}
         for row in allocation:
             row["text_es"] = texts[row["workbook_code"]]

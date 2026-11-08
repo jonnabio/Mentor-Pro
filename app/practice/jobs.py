@@ -83,13 +83,17 @@ class JobQueue:
             result = self.runner(pending, on_slot_done)
         except Exception as exc:  # noqa: BLE001 - any failure must end the job, not leave it running
             log.error("practice job %s failed: %s", session_id, type(exc).__name__)
-            self.store.finish(session_id, "partial" if existing else "failed", "internal_error", None, [])
+            whole = (session.get("config") or {}).get("generation") == "whole_session"
+            self.store.finish(session_id, "partial" if existing and not whole else "failed", "internal_error",
+                              None, [])
             return
         items = [{"slot": s.slot, "objective_code": s.objective_code, "evidence_id": s.evidence_id, "item": s.item,
                   "source": "generated", "source_request_id": s.request_id}
                  for s in result.slots if s.status == "accepted"]
         total = len(existing) + len(items)
         status = "complete" if total == session["slots_total"] else ("partial" if total else "failed")
+        if status == "partial" and (session.get("config") or {}).get("generation") == "whole_session":
+            status, items = "failed", []  # T059: a generate-on-shortage practice is complete or not usable
         stop_reason = None if status == "complete" else (result.stop_reason or "slot_retries_exhausted")
         self.store.finish(session_id, status, stop_reason, result.practice_set_id, items)
         log.info("practice job %s finished: %s (%s bank + %s generated of %s)", session_id, status,

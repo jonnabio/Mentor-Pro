@@ -1804,6 +1804,26 @@
           "docs/adr/ADR-035-bank-only-configurable-practice.md"
         ]
       }
+    },
+    {
+      "id": "T059",
+      "name": "Matemáticas bank-only acceptance; fix: generate on shortage (RCA-006)",
+      "objective": "Bank-first, generate-on-shortage for size-5 bank-only practices (whole-session fallback, complete or failed); supervised student and tutor acceptance.",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/rca/RCA-006-bank-only-shortage-dead-end.md",
+          "docs/progress/task_T059_result.md"
+        ],
+        "modify": [
+          "app/practice/routes.py",
+          "app/practice/jobs.py",
+          "tests/app/test_bank_only_practice.py",
+          "docs/rca/regression-guards.yaml",
+          "docs/progress/tasks.json"
+        ]
+      }
     }
   ]
 }

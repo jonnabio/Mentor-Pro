@@ -295,14 +295,70 @@ def test_a_shortage_creates_nothing_and_explains_in_spanish(synthetic_client, ur
     assert retry.status_code == 202 and retry.json()["status"] == "complete"
 
 
-def test_an_empty_bank_gives_no_smaller_option_and_never_generates(synthetic_client, url):
+def fallback_ready(client, body, runner, url):
+    """POST a bank-only request that the bank cannot fill: a whole generated practice (T059), no 409."""
+    out = client.post("/api/practice/sessions", json=body)
+    assert out.status_code == 202, out.json()
+    session = out.json()
+    assert session["created"] and session["slots_total"] == 5 and session["composition"]["bank"] == 0
+    assert "Todavía estamos preparando" not in session["message_es"]
+    return wait_ready(client, session["session_id"])
+
+
+def test_an_empty_bank_generates_the_whole_practice_once(synthetic_client, url):  # T059
     runner = FakeRunner()
     client = practice_client(synthetic_client, runner, bank_only=True)
     body = {**bank_only(question_count=5), "difficulty": "hard"}
-    out = client.post("/api/practice/sessions", json=body)
-    assert out.status_code == 409 and out.json()["largest_available"] == 0
-    assert "Todavía estamos preparando" in out.json()["message_es"]
-    assert sessions_with(url, body["client_request_id"]) == 0 and runner.calls == 0
+    done = fallback_ready(client, body, runner, url)
+    assert done["status"] == "complete" and done["composition"] == {"bank": 0, "generated": 5}
+    assert runner.calls == 1 and len(done["questions"]) == 5
+    again = client.post("/api/practice/sessions", json=body).json()  # retry: same practice, no new job
+    assert again["session_id"] == done["session_id"] and not again["created"] and runner.calls == 1
+    assert sessions_with(url, body["client_request_id"]) == 1
+    answer = client.post(f"/api/practice/sessions/{done['session_id']}/answers", json={"slot": 1, "label": "B"})
+    assert answer.status_code == 200
+    big = bank_only(question_count=10)  # larger sizes are bank-only: still an explained shortage, no job
+    out = client.post("/api/practice/sessions", json=big)
+    assert out.status_code == 409 and out.json()["error"] == "insufficient_inventory"
+    assert sessions_with(url, big["client_request_id"]) == 0 and runner.calls == 1
+
+
+def test_a_partial_bank_falls_back_to_a_whole_generated_practice(synthetic_client, url, catalog_conn):
+    fill_bank(url, catalog_conn, per_cell=2, levels=("easy",))  # mixed needs every level: shortage
+    runner = FakeRunner()
+    client = practice_client(synthetic_client, runner, bank_only=True)
+    done = fallback_ready(client, bank_only(question_count=5), runner, url)
+    assert done["status"] == "complete" and done["composition"] == {"bank": 0, "generated": 5}
+    assert runner.calls == 1  # no hybrid: the bank items are not mixed in
+
+
+def test_an_unstocked_objective_and_difficulty_fall_back_like_the_generated_flow(synthetic_client, url, catalog_conn):
+    fill_bank(url, catalog_conn, per_cell=2, levels=("easy",))
+    runner = FakeRunner()
+    client = practice_client(synthetic_client, runner, bank_only=True)
+    body = request_body(source="bank_only", scope="single_objective", objective_codes=["M03"], difficulty="hard")
+    done = fallback_ready(client, body, runner, url)
+    assert done["status"] == "complete" and done["difficulty"] == "hard"
+    assert {o["code"] for o in done["objectives"]} == {"M03"} and runner.calls == 1
+
+
+@pytest.mark.parametrize("runner", [FakeRunner(accepted=3, stop_reason="llm_unavailable"),
+                                    FakeRunner(accepted=0, stop_reason="daily_budget"),
+                                    FakeRunner(raise_error=True)], ids=["partial", "budget", "error"])
+def test_failed_generation_is_never_a_usable_practice(synthetic_client, url, runner):
+    client = practice_client(synthetic_client, runner, bank_only=True)
+    done = fallback_ready(client, bank_only(question_count=5), runner, url)
+    assert done["status"] == "failed" and done["questions"] == []
+    assert "No se pudo preparar la práctica completa" in done["message_es"]
+    answer = client.post(f"/api/practice/sessions/{done['session_id']}/answers", json={"slot": 1, "label": "B"})
+    assert answer.status_code == 409
+
+
+def test_failure_messages_name_the_cause(synthetic_client, url):
+    runner = FakeRunner(accepted=0, stop_reason="daily_budget")
+    client = practice_client(synthetic_client, runner, bank_only=True)
+    done = fallback_ready(client, bank_only(question_count=5), runner, url)
+    assert done["message_es"].startswith("Se alcanzó el límite diario de generación de preguntas.")
 
 
 def test_quarantined_questions_are_never_served(synthetic_client, url, catalog_conn):
@@ -312,9 +368,15 @@ def test_quarantined_questions_are_never_served(synthetic_client, url, catalog_c
                             "'bank-only-test' AND objective_code = 'M02'").fetchall()
     for (request_id,) in rows:
         seeding.quarantine(url, request_id, "wrong_key", "test")
-    client = practice_client(synthetic_client, FakeRunner(), bank_only=True)
+    runner = FakeRunner()
+    client = practice_client(synthetic_client, runner, bank_only=True)
     body = request_body(source="bank_only", scope="single_objective", objective_codes=["M02"], difficulty="easy")
-    assert client.post("/api/practice/sessions", json=body).status_code == 409
+    done = fallback_ready(client, body, runner, url)  # the quarantined stock does not count: generation instead
+    assert done["composition"] == {"bank": 0, "generated": 5} and runner.calls == 1
+    with psycopg.connect(url) as conn:
+        served = conn.execute("SELECT count(*) FROM practice.item WHERE session_id = %s AND source = 'bank'",
+                              (done["session_id"],)).fetchone()[0]
+    assert served == 0
 
 
 def test_generation_requests_keep_five_questions_and_their_flow(synthetic_client, url):
