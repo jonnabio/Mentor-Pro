@@ -14,6 +14,7 @@ const form = $("practice-form");
 const state = {
   objectives: [],
   bankOnly: false, // T049: set from /api/subjects
+  subjectPractice: {}, // T057: per-subject bank-only switch and sizes
   subjectNames: {},
   requestId: null,      // reused if the same submission is retried (server deduplicates)
   session: null,
@@ -112,13 +113,18 @@ async function loadSubjects() {
   try {
     const data = await api("/api/subjects");
     $("notice").textContent = data.notice_es;
-    setBankOnly(Boolean(data.practice && data.practice.bank_only));
+    state.globalPractice = data.practice || { bank_only: false, question_counts: [5] };
+    setBankOnly(state.globalPractice);
     const container = $("subjects");
     container.replaceChildren();
     for (const subject of data.subjects) {
       state.subjectNames[subject.code] = subject.name_es;
+      state.subjectPractice[subject.code] = subject.practice || state.globalPractice;
       const input = el("input", { type: "radio", name: "subject", value: subject.code });
-      input.addEventListener("change", () => loadObjectives(subject.code));
+      input.addEventListener("change", () => {
+        setBankOnly(state.subjectPractice[subject.code]);
+        loadObjectives(subject.code);
+      });
       container.append(el("label", {}, input, subject.name_es,
         el("small", {}, `${subject.objective_count} objetivos`)));
     }
@@ -232,14 +238,20 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-// T049: the server decides whether bank-only practice (sizes 5-30) is on; off keeps the 5-question flow.
-function setBankOnly(enabled) {
+// T049/T057: the server decides, per subject, whether bank-only practice is on and which sizes it offers;
+// off keeps the 5-question generated flow.
+function setBankOnly(practice) {
+  const enabled = Boolean(practice && practice.bank_only);
+  const counts = enabled ? practice.question_counts.map(Number) : [5];
   state.bankOnly = enabled;
   for (const label of form.querySelectorAll("label.bank-only")) {
-    label.hidden = !enabled;
-    label.querySelector("input").disabled = !enabled;
+    const input = label.querySelector("input");
+    const offered = counts.includes(Number(input.value));
+    label.hidden = !offered;
+    input.disabled = !offered;
+    if (!offered && input.checked) form.querySelector('input[name="question_count"][value="5"]').checked = true;
   }
-  $("count-note").hidden = enabled;
+  $("count-note").hidden = counts.length > 1;
 }
 
 // Shortage (409): one tap starts the largest practice the bank can fill now.
