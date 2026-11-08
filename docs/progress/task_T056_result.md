@@ -57,3 +57,9 @@ each. Every difficulty currently fails (largest size 0).
 - Full gate tests (ace, curriculum, app): 1006 passed, 9 skipped.
 - ACE gate: `VERIFY_RESULT=pass gate=all` (test 289 s, lint 5.1 s; log
   20261107-075106-343).
+
+## Release
+
+- PR #56 merged into `dev` as `b98a443` (CI 42420702854, green).
+- PO authorization `PO-T056-FASTTRACK-2026-11-07`, window
+  `T056-2026-11-07`.
