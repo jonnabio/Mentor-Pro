@@ -41,3 +41,7 @@ questions are held; other subjects keep the generated flow.
 - Browser E2E (mock): `E2E=pass` (485 checks, 0 failed).
 - Full gate tests (ace, curriculum, app): 1025 passed, 9 skipped.
 - ACE gate: `VERIFY_RESULT=pass gate=all` (log 20261108-130324-429).
+
+## Release
+
+- PR #61 merged into `dev` as `bcb6569` (CI 42514366739, green).
