@@ -414,3 +414,73 @@ def test_readiness_never_writes_or_reads_question_text():
     objs = objectives(5, evidences=1)
     report = readiness(FakeBank(stock(objs, 1)), None, SYNTHETIC, "matematicas", objs)
     assert "stem" not in repr(report) and "item_id" not in repr(report)
+
+
+# ---------------------------------------------------------------- T057 per-subject switch (Matemáticas only, size 5)
+
+MATHS_ONLY = {"matematicas": (5,)}
+
+
+@pytest.mark.parametrize(("subjects", "enabled", "expected"), [
+    (None, None, {}),
+    ("", "true", {code: QUESTION_COUNTS for code in ("espanol", "matematicas", "ciencias", "estudios_sociales")}),
+    ("matematicas", None, {"matematicas": (5,)}),
+    ("matematicas", "true", {"matematicas": (5,)}),  # the subject list takes precedence over the T049 switch
+    (" matematicas:10,5 ; ciencias ", None, {"matematicas": (5, 10), "ciencias": (5,)}),
+])
+def test_subject_configuration_is_off_by_default_and_parsed_exactly(monkeypatch, subjects, enabled, expected):
+    from app.main import bank_only_config
+
+    for name, value in (("MENTOR_PRO_BANK_ONLY_SUBJECTS", subjects), ("MENTOR_PRO_BANK_ONLY_ENABLED", enabled)):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    assert bank_only_config(None) == expected
+
+
+@pytest.mark.parametrize("spec", ["historia", "matematicas:7", "matematicas:", "matematicas;matematicas",
+                                  "matematicas:diez"])
+def test_an_invalid_subject_configuration_refuses_to_start(monkeypatch, spec):
+    from app.main import bank_only_config
+
+    monkeypatch.setenv("MENTOR_PRO_BANK_ONLY_SUBJECTS", spec)
+    with pytest.raises(ValueError):
+        bank_only_config(None)
+
+
+def test_subjects_report_their_own_switch_and_sizes(synthetic_client):
+    data = practice_client(synthetic_client, FakeRunner(), bank_only=MATHS_ONLY).get("/api/subjects").json()
+    practice = {s["code"]: s["practice"] for s in data["subjects"]}
+    assert practice["matematicas"] == {"bank_only": True, "question_counts": [5]}
+    for code in ("espanol", "ciencias", "estudios_sociales"):
+        assert practice[code] == {"bank_only": False, "question_counts": [5]}
+    assert data["practice"] == {"bank_only": False, "question_counts": [5]}  # no global switch, no larger sizes
+
+
+def test_maths_only_composes_five_from_the_bank_and_refuses_other_sizes(synthetic_client, url, catalog_conn):
+    fill_bank(url, catalog_conn, per_cell=4)
+    runner = FakeRunner()
+    client = practice_client(synthetic_client, runner, bank_only=MATHS_ONLY)
+    session = client.post("/api/practice/sessions", json=bank_only(question_count=5)).json()
+    assert session["status"] == "complete" and session["composition"] == {"bank": 5, "generated": 0}
+    for count in (10, 30):
+        body = bank_only(question_count=count)
+        out = client.post("/api/practice/sessions", json=body)
+        assert out.status_code == 422 and out.json()["error"] == "invalid_question_count"
+        assert sessions_with(url, body["client_request_id"]) == 0
+    assert runner.calls == 0  # never live generation
+
+
+def test_other_subjects_keep_the_generated_flow_and_refuse_bank_only(synthetic_client, url):
+    runner = FakeRunner()
+    client = practice_client(synthetic_client, runner, bank_only=MATHS_ONLY)
+    espanol = {"subject": "espanol", "scope": "single_objective", "objective_codes": ["EL01"]}
+    body = {**bank_only(), **espanol}
+    out = client.post("/api/practice/sessions", json=body)
+    assert out.status_code == 422 and out.json()["error"] == "bank_only_disabled"
+    assert sessions_with(url, body["client_request_id"]) == 0
+    session = client.post("/api/practice/sessions", json=request_body(**espanol)).json()
+    assert session["slots_total"] == 5
+    wait_ready(client, session["session_id"])
+    assert runner.calls == 1
