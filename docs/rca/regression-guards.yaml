@@ -182,3 +182,27 @@ guards:
     review_triggers:
       - "New third-party imports in app/, curriculum/ or runtime-loaded .ace scripts"
       - "Changes to the Dockerfile install step or the docker-build job"
+
+  - id: RCA-006
+    title: "Bank-only practice dead-ends on a bank shortage instead of generating"
+    severity: critical
+    created: 2026-11-08
+    rca_file: docs/rca/RCA-006-bank-only-shortage-dead-end.md
+
+    guarded_files:
+      - app/practice/routes.py
+      - app/practice/jobs.py
+
+    invariants:
+      - "A size-5 bank-only request the bank cannot fill starts generation of the whole practice"
+      - "A generate-on-shortage practice is complete or failed, never partial"
+      - "A complete bank practice makes no LLM call"
+      - "Quarantined or unreviewed questions never count as bank inventory"
+
+    tests:
+      - tests/app/test_bank_only_practice.py
+
+    standard_rule: "RCA-006 Lessons Learned (activation gates cover every UI option)"
+
+    review_triggers:
+      - "Changes to create_session, create_bank_only or the job status rules"
