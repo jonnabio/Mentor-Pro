@@ -45,3 +45,19 @@ questions are held; other subjects keep the generated flow.
 ## Release
 
 - PR #61 merged into `dev` as `bcb6569` (CI 42514366739, green).
+- Release PR #62 merged into `main` as `4fc0609` (CI 42515938057, all
+  four jobs green). Tag `v2026.11.08-3`, digest
+  `sha256:95fe5769...13c7`, manifest sha256 `d38b5b3c...7a71` (identical
+  on the server).
+
+## Deployment (2026-11-08)
+
+- Before: `STATUS HEALTHY`. Preflight `DEPLOY COMPATIBLE`. Backup
+  `mentor_pro_2026-11-08_194720.dump` (33 tables, 1046 rows, sha256
+  `df6963c1...334b`) `VERIFY OK`.
+- Window `T059-2026-11-08`, authorization reference
+  `PO-T059-FASTTRACK-2026-11-08` (fast-track authorization in the PO's
+  request; the reference name was assigned at deployment).
+- `DEPLOY OK`, smoke 9/9, `STATUS HEALTHY`, schema `current:0001`, L001
+  `current`. Matemáticas `bank_only: true`, `[5]`; other subjects
+  `false`, `[5]`; effective `allow_paid` false.
