@@ -75,7 +75,8 @@ smoke() {
   expect "tutor API refuses without the token" "$TUTOR_URL/api/tutor/queue" 403
   if [ -n "$WIFI_ADDR" ]; then
     expect "student on the Wi-Fi address" "http://$WIFI_ADDR:8080/" 200
-    expect "tutor not published on the Wi-Fi address" "http://$WIFI_ADDR:8081/tutor" 000
+    expect "tutor page on the Wi-Fi address" "http://$WIFI_ADDR:8081/tutor" 200
+    expect "tutor API on the Wi-Fi address refuses without the token" "http://$WIFI_ADDR:8081/api/tutor/queue" 403
   else
     echo "SKIP Wi-Fi checks (MENTORPRO_WIFI_ADDR empty)"
   fi

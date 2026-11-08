@@ -46,7 +46,8 @@ services:
     environment:
       MENTOR_PRO_DEV_ENDPOINTS: "false"
     ports:
-      - "127.0.0.1:8081:8000"       # never the Wi-Fi or wired address
+      - "127.0.0.1:8081:8000"
+      - "192.168.50.229:8081:8000"  # house Wi-Fi only, token required (ADR-031 amendment T058); never wired/public
     depends_on:
       postgres:
         condition: service_healthy

@@ -131,3 +131,29 @@ student app:
 - The gateway address must be checked if the compose network is ever
   recreated; a wrong address fails closed (403).
 - Tutor review needs SSH access from the parent's computer.
+
+## Amendment T058 (Product Owner, 2026-11-07): Tutor on the House Wi-Fi
+
+Decision 2 and step 4 change: the `tutor` service is also published on
+the house Wi-Fi address, `192.168.50.229:8081:8000`, so the parent opens
+`http://192.168.50.229:8081/tutor` from a device on the home network and
+enters the token. The SSH tunnel to `127.0.0.1:8081` keeps working.
+
+- **Unchanged:** the student app holds no token and has no tutor routes;
+  the tutor entrypoint, the 32-character minimum and constant-time token
+  check, the allowed-host check, `sessionStorage` handling and fail-closed
+  start. No wired, `0.0.0.0` or public binding; no router forwarding or
+  Tailscale sharing.
+- **Weaker than before (accepted by the PO):** Docker's userland proxy
+  presents every Wi-Fi client as the bridge gateway, so the allowed-host
+  check no longer separates the parent's devices from the student's. On
+  the Wi-Fi the token is the only barrier, and it travels over plain HTTP
+  inside the WPA-protected network. Mitigations: keep the token secret and
+  long, enter it only on the parent's device, close the tab after use
+  (the token is cleared), rotate it if exposed, and stop the tutor service
+  between review sessions if wanted.
+- **Smoke test:** "tutor not published on the Wi-Fi address (000)" is
+  replaced by "tutor page on the Wi-Fi address (200)" and "tutor API on
+  the Wi-Fi address refuses without the token (403)" (10 checks).
+- **Possible later hardening (not in scope):** per-device restriction in
+  the `DOCKER-USER` chain, or HTTPS with a local certificate.

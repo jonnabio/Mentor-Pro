@@ -46,7 +46,8 @@ def test_compose_holds_no_secret_and_interpolates_only_the_image():
 def test_compose_bindings_match_adr_030_and_031():
     app, tutor, postgres = service("app"), service("tutor"), service("postgres")
     assert re.findall(r'- "([\d.]+:\d+:\d+)"', app) == ["127.0.0.1:8080:8000", "192.168.50.229:8080:8000"]
-    assert re.findall(r'- "([\d.]+:\d+:\d+)"', tutor) == ["127.0.0.1:8081:8000"]  # loopback only
+    # T058: loopback and the house Wi-Fi address only (token required); never the wired or a public address
+    assert re.findall(r'- "([\d.]+:\d+:\d+)"', tutor) == ["127.0.0.1:8081:8000", "192.168.50.229:8081:8000"]
     assert "ports:" not in postgres and "0.0.0.0" not in COMPOSE
     assert "/etc/mentor-pro/tutor.env" in tutor and "tutor.env" not in app  # student service never holds the token
     assert 'command: ["python", "-m", "app.tutor_main"]' in tutor

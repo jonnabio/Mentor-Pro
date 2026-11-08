@@ -591,7 +591,7 @@ class Production:
         compose = (REPO / "deploy" / "compose.yml").read_text(encoding="utf-8")
         for name in ("app.env", "tutor.env", "postgres.env"):
             compose = compose.replace(f"/etc/mentor-pro/{name}", _posix(tmp_path / name))
-        compose = re.sub(r'\n\s+- "192\.168\.50\.229:8080:8000".*', "", compose)
+        compose = re.sub(r'\n\s+- "192\.168\.50\.229:808[01]:8000".*', "", compose)
         compose = compose.replace('"127.0.0.1:8080:8000"', f'"127.0.0.1:{app_port}:8000"')
         compose = compose.replace('"127.0.0.1:8081:8000"', f'"127.0.0.1:{tutor_port}:8000"')
         compose = compose.replace("interval: 30s", "interval: 2s").replace("start_period: 30s", "start_period: 1s")

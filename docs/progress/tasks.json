@@ -1788,7 +1788,7 @@
       "id": "T057",
       "name": "Matemáticas-only bank-only activation",
       "objective": "Per-subject bank-only switch (MENTOR_PRO_BANK_ONLY_SUBJECTS, default off); Matemáticas size 5 only; other subjects keep the generated flow; no live generation for bank-only sessions.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1802,6 +1802,27 @@
           "docs/progress/task_T056_result.md",
           "docs/progress/tasks.json",
           "docs/adr/ADR-035-bank-only-configurable-practice.md"
+        ]
+      }
+    },
+    {
+      "id": "T058",
+      "name": "Tutor web access on the house Wi-Fi",
+      "objective": "Publish the existing token-protected tutor service on 192.168.50.229:8081 (house Wi-Fi only); student service unchanged; smoke checks the tutor page (200) and token refusal (403) on the Wi-Fi address (ADR-031 amendment T058).",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T058_result.md"
+        ],
+        "modify": [
+          "deploy/compose.yml",
+          "deploy/mentorpro",
+          "tests/app/test_deploy.py",
+          "tests/app/test_deploy_migrate.py",
+          "tests/app/test_deploy_rollout.py",
+          "docs/adr/ADR-031-tutor-access-in-production.md",
+          "docs/progress/tasks.json"
         ]
       }
     }
