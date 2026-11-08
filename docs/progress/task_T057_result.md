@@ -47,3 +47,50 @@ Español refuses bank-only and keeps the generated flow.
 
 - PR #58 (CI 42441437450) merged into `dev` as `cd8d86a` (CI
   42444317937, green). Authorization `PO-T057-FASTTRACK-2026-11-07`.
+- Release PR #60 merged into `main` as `5cae693` (CI 42445890606: tests,
+  release identity, image, Tag and Release green). Tag `v2026.11.08-2`,
+  digest `sha256:1f8b8d3a...5c66`, manifest sha256 `95e5becb...e9ed`
+  (identical on the server).
+
+## Deployment (2026-11-07 local, 2026-11-08 UTC)
+
+- Before: `STATUS HEALTHY`. Preflight `DEPLOY COMPATIBLE`. Backup
+  `mentor_pro_2026-11-08_042316.dump` (33 tables, 1045 rows, sha256
+  `9cf262ad...c5a`) `VERIFY OK`.
+- Window `T057-2026-11-07`: `DEPLOY OK`, smoke 9/9, `STATUS HEALTHY`,
+  schema `current:0001`, L001 `current`.
+- Switches: `MENTOR_PRO_BANK_ONLY_SUBJECTS` and
+  `MENTOR_PRO_BANK_ONLY_ENABLED` absent; every subject `bank_only: false`,
+  sizes `[5]`.
+- `compose-check`: 16 eligible; mixed missing M09, largest size 0.
+  Activation waits for the tutor verdict on `req-f2a9df9a48964c49`.
+
+## M09 Tutor Verdict (2026-11-08)
+
+- The tutor reviewed `req-f2a9df9a48964c49` (cell 41) and approved it as
+  medium (first rated it hard; confirmed medium is fair). Recorded once
+  with `item-review-record --reviewer tutor`: recorded 1, approved 1.
+- `compose-check`: 17 eligible; M09 `medium: 1`; mixed size 5
+  `missing_objectives: []`, `largest_size: 5`. Educational gate passed.
+
+## Activation (2026-11-08)
+
+- The administrator added `MENTOR_PRO_BANK_ONLY_SUBJECTS=matematicas` to
+  `/etc/mentor-pro/app.env` (`MENTOR_PRO_BANK_ONLY_ENABLED` absent).
+- `deploy` of the running release reports `UNCHANGED` and does not
+  recreate containers, so the setting was not loaded (backup
+  `mentor_pro_2026-11-08_182722.dump` `VERIFY OK`). PO chose a reload
+  through the helper: window `T057-2026-11-08-config-reload`.
+  - `rollback --to v2026.11.08-1` (backup
+    `mentor_pro_2026-11-08_182938.dump` `VERIFY OK`): `ROLLBACK OK`,
+    smoke 9/9.
+  - Preflight `DEPLOY COMPATIBLE`; `deploy v2026.11.08-2` (backup
+    `mentor_pro_2026-11-08_182956.dump` `VERIFY OK`): `DEPLOY OK`, smoke
+    9/9, `STATUS HEALTHY`.
+- `/api/subjects` on `127.0.0.1:8080` and `192.168.50.229:8080`:
+  Matemáticas `bank_only: true`, sizes `[5]`; Español, Ciencias, Estudios
+  Sociales `bank_only: false`, `[5]`; top-level `bank_only: false`.
+- No synthetic production practice was created; the first bank-only
+  practice is the supervised student session.
+- Follow-up: `mentorpro deploy` needs a supported way to reload
+  configuration for the running release.
