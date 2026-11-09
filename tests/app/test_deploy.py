@@ -7,6 +7,7 @@ student and tutor processes on the isolated test database. Nothing here touches 
 from __future__ import annotations
 
 import http.server
+import json
 import os
 import re
 import shutil
@@ -30,6 +31,10 @@ TOKEN = "deploy-smoke-token-0123456789abcdef"  # test only, 35 characters
 SH, CURL = shutil.which("sh"), shutil.which("curl")
 
 
+def _posix(path):
+    return Path(path).as_posix()
+
+
 def service(name):
     """The text block of one top-level service."""
     match = re.search(rf"^  {name}:\n(.*?)(?=^  \w+:\n|^\S)", COMPOSE, re.M | re.S)
@@ -46,8 +51,7 @@ def test_compose_holds_no_secret_and_interpolates_only_the_image():
 def test_compose_bindings_match_adr_030_and_031():
     app, tutor, postgres = service("app"), service("tutor"), service("postgres")
     assert re.findall(r'- "([\d.]+:\d+:\d+)"', app) == ["127.0.0.1:8080:8000", "192.168.50.229:8080:8000"]
-    # T058: loopback and the house Wi-Fi address only (token required); never the wired or a public address
-    assert re.findall(r'- "([\d.]+:\d+:\d+)"', tutor) == ["127.0.0.1:8081:8000", "192.168.50.229:8081:8000"]
+    assert re.findall(r'- "([\d.]+:\d+:\d+)"', tutor) == ["127.0.0.1:8081:8000"]  # loopback only
     assert "ports:" not in postgres and "0.0.0.0" not in COMPOSE
     assert "/etc/mentor-pro/tutor.env" in tutor and "tutor.env" not in app  # student service never holds the token
     assert 'command: ["python", "-m", "app.tutor_main"]' in tutor
@@ -113,7 +117,7 @@ def _serve(code, port, env):
 
 
 def run(command, app_port, tutor_port, tmp_path, docker="mentorpro-test-no-docker", **extra):
-    env = {**os.environ, **extra, "MENTORPRO_DOCKER": docker, "MENTORPRO_APP_URL": f"http://127.0.0.1:{app_port}",
+    env = {**os.environ, "MENTORPRO_TAILNET_URL": "", **extra, "MENTORPRO_DOCKER": docker, "MENTORPRO_APP_URL": f"http://127.0.0.1:{app_port}",
            "MENTORPRO_TUTOR_URL": f"http://127.0.0.1:{tutor_port}", "MENTORPRO_WIFI_ADDR": "",
            "MENTORPRO_RELEASE_ENV": str(tmp_path / "release.env"), "MENTORPRO_RELEASES": str(tmp_path / "RELEASES"),
            "MENTORPRO_BACKUPS": str(tmp_path / "backups")}
@@ -160,6 +164,92 @@ def test_smoke_passes_on_healthy_services_and_fails_when_the_tutor_is_down(servi
     down = run("smoke", app_port, tutor_port, tmp_path)
     assert down.returncode == 1
     assert "FAIL tutor page (expected 200, got 000)" in down.stdout and "SMOKE FAIL (2 of 7 failed)" in down.stdout
+
+
+# ------------------------------------------------------------------ T058: tutor over Tailscale Serve (HTTPS)
+
+KUMA = {"Proxy": "http://127.0.0.1:3001"}
+
+
+def serve_json(port, tutor_port, funnel=False, target=None, extra_tutor_port=None):
+    web = {"macedonianserver.tailb0ac04.ts.net:443": {"Handlers": {"/": KUMA}},
+           f"macedonianserver.tailb0ac04.ts.net:{port}": {
+               "Handlers": {"/": {"Proxy": target or f"http://127.0.0.1:{tutor_port}"}}}}
+    tcp = {"443": {"HTTPS": True}, str(port): {"HTTPS": True}}
+    if extra_tutor_port:
+        web[f"macedonianserver.tailb0ac04.ts.net:{extra_tutor_port}"] = {
+            "Handlers": {"/": {"Proxy": f"http://127.0.0.1:{tutor_port}"}}}
+        tcp[str(extra_tutor_port)] = {"HTTPS": True}
+    cfg = {"TCP": tcp, "Web": web}
+    if funnel:
+        cfg["AllowFunnel"] = {f"macedonianserver.tailb0ac04.ts.net:{port}": True}
+    return json.dumps(cfg)
+
+
+def fake_tailscale(tmp_path, body):
+    """A stand-in `tailscale` that answers only `serve status --json` and records every call."""
+    (tmp_path / "serve.json").write_text(body, encoding="utf-8")
+    script = tmp_path / "tailscale"
+    script.write_text(f'''#!/bin/sh
+echo "$*" >> "{_posix(tmp_path / 'calls.log')}"
+[ "$*" = "serve status --json" ] && cat "{_posix(tmp_path / 'serve.json')}"
+''', encoding="utf-8", newline="\n")
+    script.chmod(0o755)
+    return _posix(script)
+
+
+def run_tailnet(app_port, tutor_port, tmp_path, body):
+    # The tutor port stands in for the Serve HTTPS port: same tutor, same token check.
+    return run("smoke", app_port, tutor_port, tmp_path, MENTORPRO_TAILNET_URL=f"http://127.0.0.1:{tutor_port}",
+               MENTORPRO_TAILSCALE=fake_tailscale(tmp_path, body), MENTORPRO_PYTHON=_posix(sys.executable))
+
+
+def test_smoke_checks_tutor_over_tailscale_serve(services, tmp_path):
+    app_port, tutor_port, _ = services
+    ok = run_tailnet(app_port, tutor_port, tmp_path, serve_json(tutor_port, tutor_port))
+    assert ok.returncode == 0, ok.stdout
+    assert f"PASS Tailscale Serve: port {tutor_port} only to the loopback tutor, Funnel off" in ok.stdout
+    assert "PASS tutor page over Tailscale HTTPS (200)" in ok.stdout
+    assert "PASS tutor API over HTTPS refuses without the token (403)" in ok.stdout
+    assert "PASS practice results over HTTPS refuse without the token (403)" in ok.stdout
+    assert "SMOKE PASS (11/11)" in ok.stdout and TOKEN not in ok.stdout
+    # Read only: the tool asked Serve for its status and nothing else (never set, reset, off or funnel).
+    assert (tmp_path / "calls.log").read_text(encoding="utf-8").splitlines() == ["serve status --json"]
+
+
+@pytest.mark.parametrize("case,expected", [
+    ("funnel", "funnel on"),
+    ("wrong target", "does not serve only"),
+    ("other port", "tutor also served on another port"),
+    ("missing", "does not serve only"),
+    ("unreadable", "unreadable"),
+])
+def test_smoke_fails_on_unsafe_or_missing_serve_configuration(services, tmp_path, case, expected):
+    app_port, tutor_port, _ = services
+    body = {"funnel": serve_json(tutor_port, tutor_port, funnel=True),
+            "wrong target": serve_json(tutor_port, tutor_port, target="http://127.0.0.1:3001"),
+            "other port": serve_json(tutor_port, tutor_port, extra_tutor_port=10000),
+            "missing": json.dumps({"TCP": {"443": {"HTTPS": True}},
+                                   "Web": {"macedonianserver.tailb0ac04.ts.net:443": {"Handlers": {"/": KUMA}}}}),
+            "unreadable": "not json"}[case]
+    result = run_tailnet(app_port, tutor_port, tmp_path, body)
+    assert result.returncode == 1 and "FAIL Tailscale Serve (" in result.stdout and expected in result.stdout
+
+
+def test_smoke_fails_without_tailscale(services, tmp_path):
+    app_port, tutor_port, _ = services
+    result = run("smoke", app_port, tutor_port, tmp_path, MENTORPRO_TAILNET_URL=f"http://127.0.0.1:{tutor_port}",
+                 MENTORPRO_TAILSCALE=_posix(tmp_path / "no-tailscale"), MENTORPRO_PYTHON=_posix(sys.executable))
+    assert result.returncode == 1 and "FAIL Tailscale Serve" in result.stdout
+
+
+def test_deploy_tool_never_changes_tailscale():
+    script = SCRIPT.read_text(encoding="utf-8")
+    # The only tailscale call reads the Serve status; nothing sets, resets or turns off Serve or Funnel.
+    assert re.findall(r'"\$TAILSCALE"[^|\n]*', script) == ['"$TAILSCALE" serve status --json 2>/dev/null ']
+    assert not re.search(r"tailscale\s+(funnel|serve\s+(--|reset|https|off))", script)
+    assert re.search(r"TAILNET_URL=\$\{MENTORPRO_TAILNET_URL-https://macedonianserver\.tailb0ac04\.ts\.net:8443\}",
+                     script)
 
 
 def test_status_is_read_only_and_reports_without_secrets(services, tmp_path):

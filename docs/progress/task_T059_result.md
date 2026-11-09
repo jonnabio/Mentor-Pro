@@ -1,0 +1,110 @@
+# T059 Result: Matemáticas Bank-Only Acceptance and Generate-on-Shortage Fix
+
+- **Role:** Developer (PO 2026-11-08, critical production fix)
+- **Status:** closed under PO acceptance (2026-11-09), with qualification:
+  - Bank-backed end-to-end acceptance: PASS.
+  - Generation fallback routing: PASS.
+  - Generated-practice end-to-end student completion: NOT VERIFIED.
+  - Free-provider reliability: OPEN operational issue (backlog T064).
+  - Tutor practice-results interface: NOT IMPLEMENTED (backlog T060).
+
+## Regression
+
+During supervised acceptance on `v2026.11.08-2`, a Matemáticas choice the
+bank could not fill answered "Todavía estamos preparando preguntas
+revisadas…" and created nothing. See
+[RCA-006](../rca/RCA-006-bank-only-shortage-dead-end.md).
+
+## Change
+
+- `app/practice/routes.py`: a bank-only request is composed from the bank
+  first (unchanged). On a shortage at size 5, the existing generated flow
+  starts for the whole practice with the same subject, objectives and
+  difficulty, marked `generation: whole_session`, with no bank items.
+  Other sizes keep the explained 409. Request retries return the same
+  practice. A whole-session failure says "No se pudo preparar la práctica
+  completa" after the cause.
+- `app/practice/jobs.py`: a whole-session practice ends `complete` or
+  `failed`, never `partial`; on failure nothing can be answered.
+- Unchanged: allocation, D1-D4, bank eligibility (quarantined and
+  unreviewed excluded), validation, provider fallback, budgets, paid
+  approval, the per-subject switch, other subjects.
+
+## Tests
+
+`tests/app/test_bank_only_practice.py`: empty bank generates the whole
+practice once (retry gives the same practice; size 10 still 409); partial
+bank falls back without mixing; unstocked objective and level fall back;
+failed generation (partial result, budget, exception) is `failed` with
+nothing to answer; failure names the cause; quarantined stock is never
+served. Existing: complete bank makes no LLM call; unreviewed generated
+questions are held; other subjects keep the generated flow.
+
+## Verification
+
+- `tests/app/test_bank_only_practice.py`: 54 passed, 1 skipped.
+- Browser E2E (mock): `E2E=pass` (485 checks, 0 failed).
+- Full gate tests (ace, curriculum, app): 1025 passed, 9 skipped.
+- ACE gate: `VERIFY_RESULT=pass gate=all` (log 20261108-130324-429).
+
+## Release
+
+- PR #61 merged into `dev` as `bcb6569` (CI 42514366739, green).
+- Release PR #62 merged into `main` as `4fc0609` (CI 42515938057, all
+  four jobs green). Tag `v2026.11.08-3`, digest
+  `sha256:95fe5769...13c7`, manifest sha256 `d38b5b3c...7a71` (identical
+  on the server).
+
+## Deployment (2026-11-08)
+
+- Before: `STATUS HEALTHY`. Preflight `DEPLOY COMPATIBLE`. Backup
+  `mentor_pro_2026-11-08_194720.dump` (33 tables, 1046 rows, sha256
+  `df6963c1...334b`) `VERIFY OK`.
+- Window `T059-2026-11-08`, authorization reference
+  `PO-T059-FASTTRACK-2026-11-08` (fast-track authorization in the PO's
+  request; the reference name was assigned at deployment).
+- `DEPLOY OK`, smoke 9/9, `STATUS HEALTHY`, schema `current:0001`, L001
+  `current`. Matemáticas `bank_only: true`, `[5]`; other subjects
+  `false`, `[5]`; effective `allow_paid` false.
+
+## Supervised Acceptance (2026-11-08/09, `v2026.11.08-3`)
+
+Read-only queries of production records; no data changed.
+
+- Bank practice `cf1b733e...` (whole subject, mixed): composed from the
+  bank immediately (bank 5, generated 0); 5 of 5 answered, 2 correct,
+  results shown. The PO and tutor confirmed the student finished it, saw
+  the results, and that the tutor results are correct (human validation
+  reported by the PO; not invented here).
+- Shortage practice `16160d0e...` (medium): started whole-session
+  generation automatically (bank 0, generated 5, `complete` in about
+  4 min); the student answered 1 and left (cancelled; answer kept).
+- Shortage practices `d284b902...` and `937034df...` (mixed, objective
+  subset): `failed`, `stop_reason: slot_retries_exhausted`, with nothing
+  to answer, as designed. Cause: free provider limits (15 HTTP 429, 5
+  truncated outputs).
+- Paid generation: 0 paid calls, $0, no paid authorizations.
+- Production after acceptance: `STATUS HEALTHY`, smoke 9/9.
+- Observation (not a defect): free-tier whole-session generation
+  completed 1 of 3 shortage practices; bank coverage (Phase B) reduces
+  reliance on it.
+- PO accepted: bank-first composition, generate-on-shortage, no paid
+  calls, production healthy (smoke 9/9).
+- Open: no generation-fallback practice has five saved answers yet; tutor
+  verification of both completed practices pending.
+
+## Bank-Backed MVP Acceptance (2026-11-09)
+
+PO-confirmed supervised session; read-only verification:
+
+- Latest completed Matemáticas practice `cf1b733e...`: `complete`, not
+  cancelled, classified student; composition bank 5, generated 0; 5 of 5
+  answers saved (2 correct, 40 %), last answer 00:28:44 UTC.
+- Results: the student saw the results screen (PO). The learning dashboard
+  includes the answers (Matemáticas 17 answers in total). The tutor
+  interface (`/tutor`) lists writing submissions only and has no practice
+  view; practice results are read on the learning dashboard. Earlier
+  tutor confirmation reported by the PO.
+- Production: `STATUS HEALTHY`.
+- Remaining for T059: a generation-fallback practice with five saved
+  answers and its results.

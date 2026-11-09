@@ -132,28 +132,37 @@ student app:
   recreated; a wrong address fails closed (403).
 - Tutor review needs SSH access from the parent's computer.
 
-## Amendment T058 (Product Owner, 2026-11-07): Tutor on the House Wi-Fi
+## Amendment T058 (Product Owner, 2026-11-09): Tutor over HTTPS via Tailscale Serve
 
-Decision 2 and step 4 change: the `tutor` service is also published on
-the house Wi-Fi address, `192.168.50.229:8081:8000`, so the parent opens
-`http://192.168.50.229:8081/tutor` from a device on the home network and
-enters the token. The SSH tunnel to `127.0.0.1:8081` keeps working.
+Authorization `PO-T058-TAILSCALE-2026-11-09`. Supersedes the first T058
+proposal (2026-11-07), which published the tutor on the house Wi-Fi
+address over plain HTTP; that binding was never deployed and is removed.
 
-- **Unchanged:** the student app holds no token and has no tutor routes;
-  the tutor entrypoint, the 32-character minimum and constant-time token
-  check, the allowed-host check, `sessionStorage` handling and fail-closed
-  start. No wired, `0.0.0.0` or public binding; no router forwarding or
-  Tailscale sharing.
-- **Weaker than before (accepted by the PO):** Docker's userland proxy
-  presents every Wi-Fi client as the bridge gateway, so the allowed-host
-  check no longer separates the parent's devices from the student's. On
-  the Wi-Fi the token is the only barrier, and it travels over plain HTTP
-  inside the WPA-protected network. Mitigations: keep the token secret and
-  long, enter it only on the parent's device, close the tab after use
-  (the token is cleared), rotate it if exposed, and stop the tutor service
-  between review sessions if wanted.
-- **Smoke test:** "tutor not published on the Wi-Fi address (000)" is
-  replaced by "tutor page on the Wi-Fi address (200)" and "tutor API on
-  the Wi-Fi address refuses without the token (403)" (10 checks).
-- **Possible later hardening (not in scope):** per-device restriction in
-  the `DOCKER-USER` chain, or HTTPS with a local certificate.
+- **Access:** `https://macedonianserver.tailb0ac04.ts.net:8443/tutor`
+  from a device signed in to the tailnet. Tailscale Serve terminates TLS
+  on port 8443 and proxies to `http://127.0.0.1:8081`. The SSH tunnel
+  keeps working.
+- **Certificate and trust:** a publicly trusted certificate for the
+  tailnet name, issued and renewed by Tailscale; nothing to install on
+  the device. The token never crosses the Wi-Fi in clear text.
+- **Unchanged:** the tutor service stays bound to `127.0.0.1:8081` only;
+  the student app holds no token and has no tutor routes; the token
+  check (32-character minimum, constant time), the allowed-host check
+  (Serve reaches the published port as the bridge gateway), fail-closed
+  start and the read-only practice results (T060).
+- **Not exposed:** Funnel stays off (tailnet only, never the internet);
+  no Wi-Fi, wired, `0.0.0.0` or router binding; no Caddy or other proxy.
+  The existing Serve entry on port 443 (Uptime Kuma) is not changed.
+- **Configuration:** a one-time administrator command (runbook J.1). The
+  deployment tool never changes Serve or Funnel; it only reads
+  `tailscale serve status --json`.
+- **Smoke test** (13 checks): Serve port 8443 proxies only to the
+  loopback tutor, no other Serve entry reaches the tutor, and Funnel is
+  off; the tutor page answers 200 over HTTPS; the tutor API and the
+  practice results refuse without the token (403); the Wi-Fi address
+  still refuses the tutor port (000).
+- **Accepted limitation:** a tutor device needs the Tailscale app signed
+  in to the tailnet; devices without it cannot open the page.
+- **Rejected:** Caddy on the Wi-Fi address (local certificate authority
+  to install on every device, an extra service) and the plain-HTTP Wi-Fi
+  binding (token in clear text, address check ineffective).

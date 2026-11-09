@@ -487,7 +487,7 @@ def test_docker_deploy_and_rollback_cycle(docker, tmp_path):
             "POSTGRES_HOST_AUTH_METHOD=trust\nPOSTGRES_USER=mentor_pro_admin\nPOSTGRES_DB=mentor_pro\n"))):
         (tmp_path / name).write_text(content, encoding="utf-8")
         compose = compose.replace(f"/etc/mentor-pro/{name}", _posix(tmp_path / name))
-    compose = re.sub(r'\n\s+- "192\.168\.50\.229:808[01]:8000".*', "", compose)
+    compose = re.sub(r'\n\s+- "192\.168\.50\.229:8080:8000".*', "", compose)
     compose = compose.replace('"127.0.0.1:8080:8000"', f'"127.0.0.1:{app_port}:8000"')
     compose = compose.replace('"127.0.0.1:8081:8000"', f'"127.0.0.1:{tutor_port}:8000"')
     compose = compose.replace("interval: 30s", "interval: 2s").replace("start_period: 30s", "start_period: 1s")
@@ -499,7 +499,7 @@ def test_docker_deploy_and_rollback_cycle(docker, tmp_path):
            "MENTORPRO_POSTGRES_CONTAINER": f"{project}-postgres-1", "MENTORPRO_BACKUPS": _posix(tmp_path / "b"),
            "MENTORPRO_BACKUP_SCHEMAS": "writing", "MENTORPRO_PYTHON": sys.executable,
            "MENTORPRO_APP_URL": f"http://127.0.0.1:{app_port}", "MENTORPRO_TUTOR_URL": f"http://127.0.0.1:{tutor_port}",
-           "MENTORPRO_WIFI_ADDR": "", "MENTORPRO_HEALTH_TIMEOUT": "90"}
+           "MENTORPRO_WIFI_ADDR": "", "MENTORPRO_TAILNET_URL": "", "MENTORPRO_HEALTH_TIMEOUT": "90"}
 
     def run(*args, **extra):
         out = subprocess.run([SH, str(SCRIPT), *args], env={**env, **extra}, capture_output=True, text=True,

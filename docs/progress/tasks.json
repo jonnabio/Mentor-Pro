@@ -1769,7 +1769,7 @@
       "id": "T056",
       "name": "Matemáticas bank-only release readiness (fast track)",
       "objective": "Read-only compose-check of what the real bank-only composer assembles per difficulty; inventory and size-5 shortages recorded as release evidence for T056–T059.",
-      "status": "done",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [
@@ -1788,7 +1788,7 @@
       "id": "T057",
       "name": "Matemáticas-only bank-only activation",
       "objective": "Per-subject bank-only switch (MENTOR_PRO_BANK_ONLY_SUBJECTS, default off); Matemáticas size 5 only; other subjects keep the generated flow; no live generation for bank-only sessions.",
-      "status": "done",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [
@@ -1807,8 +1807,8 @@
     },
     {
       "id": "T058",
-      "name": "Tutor web access on the house Wi-Fi",
-      "objective": "Publish the existing token-protected tutor service on 192.168.50.229:8081 (house Wi-Fi only); student service unchanged; smoke checks the tutor page (200) and token refusal (403) on the Wi-Fi address (ADR-031 amendment T058).",
+      "name": "Tutor HTTPS access via Tailscale Serve",
+      "objective": "Tutor reachable from tailnet devices over HTTPS via Tailscale Serve (port 8443 -> 127.0.0.1:8081); tutor stays loopback-only; no Wi-Fi HTTP exposure; Funnel off.",
       "status": "in_progress",
       "role": "Developer",
       "files": {
@@ -1816,14 +1816,103 @@
           "docs/progress/task_T058_result.md"
         ],
         "modify": [
-          "deploy/compose.yml",
           "deploy/mentorpro",
           "tests/app/test_deploy.py",
-          "tests/app/test_deploy_migrate.py",
-          "tests/app/test_deploy_rollout.py",
           "docs/adr/ADR-031-tutor-access-in-production.md",
+          "docs/runbooks/production-deployment.md",
           "docs/progress/tasks.json"
         ]
+      },
+      "notes": "PO-T058-TAILSCALE-2026-11-09. Replaces the plain-HTTP Wi-Fi binding of the first PR #59 revision."
+    },
+    {
+      "id": "T059",
+      "name": "Matemáticas bank-only acceptance; fix: generate on shortage (RCA-006)",
+      "objective": "Bank-first, generate-on-shortage for size-5 bank-only practices (whole-session fallback, complete or failed); supervised student and tutor acceptance.",
+      "status": "verified",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/rca/RCA-006-bank-only-shortage-dead-end.md",
+          "docs/progress/task_T059_result.md"
+        ],
+        "modify": [
+          "app/practice/routes.py",
+          "app/practice/jobs.py",
+          "tests/app/test_bank_only_practice.py",
+          "docs/rca/regression-guards.yaml",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "notes": "Closed under PO acceptance 2026-11-09 with qualification: bank-backed end-to-end acceptance PASS; generation fallback routing PASS; generated-practice end-to-end student completion NOT VERIFIED; free-provider reliability OPEN operational issue (T064); tutor practice-results interface NOT IMPLEMENTED (T060)."
+    },
+    {
+      "id": "T060",
+      "name": "Tutor visibility of practice results",
+      "objective": "Tutor service shows practice sessions, answers, scores and question-level success rates (read-only, tutor token).",
+      "status": "done",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/tutor_results.py",
+          "tests/app/test_tutor_practice_results.py",
+          "docs/progress/task_T060_result.md"
+        ],
+        "modify": [
+          "app/main.py",
+          "app/tutor_main.py",
+          "app/writing/tutor.py",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "app/static/styles.css",
+          "scripts/dev/practice_e2e.py",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "notes": "PO-T060-2026-11-08 fast track. Read-only; no schema, setting or dependency change. Deploy after PO review."
+    },
+    {
+      "id": "T061",
+      "name": "Performance-based bank replenishment",
+      "objective": "Identify bank cells to replenish from answer statistics and inventory gaps; free generation only, human review unchanged.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": []
+      }
+    },
+    {
+      "id": "T062",
+      "name": "Approved inventory expansion and more subjects",
+      "objective": "Fill single-objective and per-level Matemáticas cells; prepare bank-only for other subjects behind the per-subject switch.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": []
+      }
+    },
+    {
+      "id": "T063",
+      "name": "Larger configurable bank-only quizzes (5-30)",
+      "objective": "Offer sizes above 5 per subject when inventory allows; activation check covers every UI option (RCA-006).",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": []
+      }
+    },
+    {
+      "id": "T064",
+      "name": "Free-generation reliability",
+      "objective": "Back-off on HTTP 429 and handling of truncated outputs for whole-session generation; generated-practice student completion still to be observed.",
+      "status": "pending",
+      "role": "Developer",
+      "files": {
+        "create": [],
+        "modify": []
       }
     }
   ]

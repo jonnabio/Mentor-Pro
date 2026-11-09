@@ -13,7 +13,7 @@
     <div class="wrap">
       <p class="brand">Mentor Pro</p>
       <h1>Revisión del tutor</h1>
-      <p class="lead">Producción escrita · Evaluación con la rúbrica MEP 2026</p>
+      <p class="lead">Producción escrita · Resultados de práctica</p>
       <!-- T046: the student app on the house Wi-Fi (ADR-030 section 10); the tutor service has no "/". -->
       <p class="back-link"><a href="http://192.168.50.229:8080/">Volver a Mentor Pro</a></p>
     </div>
@@ -31,6 +31,12 @@
         <button type="button" id="tutor-enter" class="primary">Entrar</button>
       </div>
     </section>
+
+    <!-- T060: writing review and read-only practice results share the tutor code. -->
+    <nav id="tutor-nav" class="tutor-nav actions" aria-label="Secciones del tutor" hidden>
+      <button type="button" id="tutor-nav-writing" class="secondary" aria-pressed="true">Producción escrita</button>
+      <button type="button" id="tutor-nav-practice" class="secondary" aria-pressed="false">Resultados de práctica</button>
+    </nav>
 
     <section id="tutor-queue" class="card" hidden>
       <h2>Entregas</h2>
@@ -105,6 +111,48 @@
       </form>
       <p id="tutor-locked" class="choice-notice" hidden>Evaluación completada. Ya no se puede cambiar.</p>
       <button type="button" id="tutor-back" class="secondary">Volver a las entregas</button>
+    </section>
+
+    <!-- T060: read-only practice history, answers and Question Bank accuracy. Nothing here changes data. -->
+    <section id="tutor-practice" class="card" hidden>
+      <h2>Resultados de práctica</h2>
+      <p class="muted small">Solo lectura. Las prácticas de prueba automática no se muestran.</p>
+      <form id="practice-filters" class="practice-filters">
+        <label class="field-label" for="pf-subject">Materia
+          <select id="pf-subject"><option value="">Todas</option></select></label>
+        <label class="field-label" for="pf-objective">Objetivo (código)
+          <input id="pf-objective" type="text" maxlength="20" placeholder="Ej. M09" autocomplete="off"></label>
+        <label class="field-label" for="pf-from">Desde
+          <input id="pf-from" type="date"></label>
+        <label class="field-label" for="pf-to">Hasta
+          <input id="pf-to" type="date"></label>
+        <label class="field-label" for="pf-source">Origen
+          <select id="pf-source"><option value="">Banco y generadas</option>
+            <option value="bank">Banco</option><option value="generated">Generadas</option></select></label>
+        <div class="actions">
+          <button type="submit" id="pf-apply" class="primary">Aplicar filtros</button>
+          <button type="button" id="pf-clear" class="secondary">Quitar filtros</button>
+        </div>
+      </form>
+      <h3>Historial de prácticas</h3>
+      <p id="practice-empty" class="muted" hidden>No hay prácticas con estos filtros.</p>
+      <ul id="practice-list" class="plain-list writing-exercises"></ul>
+      <h3>Precisión por objetivo y dificultad</h3>
+      <p id="practice-groups-empty" class="muted" hidden>Sin preguntas presentadas.</p>
+      <ul id="practice-groups" class="plain-list feedback-scores"></ul>
+      <details id="practice-questions-block">
+        <summary><h3 class="inline-heading">Precisión por pregunta</h3></summary>
+        <p class="muted small">"Sin responder" cuenta preguntas presentadas que el estudiante no contestó; no son incorrectas.</p>
+        <ul id="practice-questions" class="plain-list feedback-scores"></ul>
+      </details>
+    </section>
+
+    <section id="tutor-practice-detail" class="card" hidden>
+      <p id="pd-meta" class="muted small"></p>
+      <h2 id="pd-title"></h2>
+      <p id="pd-summary" class="choice-notice"></p>
+      <ol id="pd-items" class="practice-review"></ol>
+      <button type="button" id="pd-back" class="secondary">Volver a los resultados</button>
     </section>
 
     <dialog id="tutor-dialog" aria-labelledby="tutor-dialog-title">

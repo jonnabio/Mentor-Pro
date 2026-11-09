@@ -28,6 +28,7 @@ from app.dev_routes import LlmFactory, build_dev_router
 from app.practice.jobs import SetRunner, live_set_runner
 from app.practice.mastery import NOTICE_ES, STATUS_LABELS_ES, STATUSES, Thresholds, subject_dashboard
 from app.practice.routes import PracticeService, build_practice_router
+from app.practice.tutor_results import PracticeResults, build_practice_results_router
 from app.writing.migrations import SchemaMigrationRequired
 from app.writing.routes import WritingService, build_writing_router
 from app.writing.tutor import LOOPBACK, build_tutor_router
@@ -220,6 +221,10 @@ def create_app(database_url: str | None = None, schema: str = db.DEFAULT_SCHEMA,
     tutor_token = tutor_token if tutor_token is not None else (db.setting("MENTOR_PRO_TUTOR_TOKEN") or "")
     if tutor_token:
         app.include_router(build_tutor_router(app.state.writing, ApiError, tutor_token, tutor_hosts))
+        # T060: read-only practice results and Question Bank analytics behind the same tutor check.
+        app.include_router(build_practice_results_router(
+            PracticeResults(lambda: database_url or db.database_url()), ApiError, tutor_token, tutor_hosts,
+            SUBJECTS))
 
         @app.get("/tutor", include_in_schema=False)
         def tutor_page() -> FileResponse:
