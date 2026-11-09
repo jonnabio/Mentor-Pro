@@ -1809,7 +1809,7 @@
       "id": "T058",
       "name": "Tutor HTTPS access via Tailscale Serve",
       "objective": "Tutor reachable from tailnet devices over HTTPS via Tailscale Serve (port 8443 -> 127.0.0.1:8081); tutor stays loopback-only; no Wi-Fi HTTP exposure; Funnel off.",
-      "status": "in_progress",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [
