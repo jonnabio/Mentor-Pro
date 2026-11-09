@@ -1830,7 +1830,7 @@
       "id": "T060",
       "name": "Tutor visibility of practice results",
       "objective": "Tutor service shows practice sessions, answers, scores and question-level success rates (read-only, tutor token).",
-      "status": "done",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [
@@ -1849,7 +1849,7 @@
           "docs/progress/tasks.json"
         ]
       },
-      "notes": "PO-T060-2026-11-08 fast track. Read-only; no schema, setting or dependency change. Deploy after PO review."
+      "notes": "PO-T060-2026-11-08 fast track; released as v2026.11.09-1 and deployed under PO-T060-RELEASE-2026-11-08 (2026-11-09). Read-only; no schema, setting or dependency change."
     },
     {
       "id": "T061",

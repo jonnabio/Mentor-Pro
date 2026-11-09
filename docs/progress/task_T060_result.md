@@ -1,7 +1,7 @@
 # T060 Result: Tutor Practice Results and Question Bank Analytics
 
 - **Role:** Developer (PO authorization PO-T060-2026-11-08, fast track)
-- **Status:** done (PR into `dev`; deployment after PO review)
+- **Status:** verified (deployed `v2026.11.09-1`, 2026-11-09)
 
 ## Change
 
@@ -63,3 +63,25 @@
 
 - PR #63 (CI 42548953882, green) merged into `dev` as `9c96d53` (dev CI
   42551550335, green). Release authorization `PO-T060-RELEASE-2026-11-08`.
+- Release PR #64 merged into `main` as `0f0a393` (CI 42619187352, all
+  four jobs green). Tag `v2026.11.09-1`, digest `sha256:2370bb9c...57f3`,
+  manifest sha256 `de826491...d95d` (identical on the server).
+
+## Deployment (2026-11-09)
+
+- Before: `STATUS HEALTHY`; preflight `DEPLOY COMPATIBLE` (schema
+  0001..0001). Backup `mentor_pro_2026-11-09_125220.dump` (33 tables,
+  1202 rows, sha256 `68592510...f26b`) `VERIFY OK`.
+- Window `T060-2026-11-09`, authorization `PO-T060-RELEASE-2026-11-08`.
+  `DEPLOY OK`, smoke 9/9, `STATUS HEALTHY`, schema `current:0001`.
+- Tutor access (SSH tunnel address `127.0.0.1:8081`): practice results
+  without the token 403, wrong token 403, POST with the token 405; the
+  student service has no such route (404). The token was never printed.
+- Results against production records (read-only): 15 student sessions
+  (states completed, left, not started, failed); the latest completed
+  practice shows bank 5, generated 0, 5 answered, 2 correct, 40 %, with
+  per-question results. Matemáticas question totals (30 served, 17
+  answered, 14 correct) equal a direct read-only database count.
+- Unchanged: Matemáticas `bank_only: true` `[5]`, other subjects `false`
+  `[5]`; effective `allow_paid` false. No data changed, no generation, no
+  paid calls. T058 (Wi-Fi tutor access) not included.
