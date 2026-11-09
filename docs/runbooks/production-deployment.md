@@ -468,6 +468,38 @@ ssh -N -L 8081:127.0.0.1:8081 jonnabio@100.64.84.15
 # then open http://127.0.0.1:8081/tutor and enter the token
 ```
 
+### J.1 Tutor over HTTPS (Tailscale Serve, ADR-031 amendment T058)
+
+One time, by the administrator, **before** deploying a release whose
+smoke test includes the Tailscale checks. Port 443 (Uptime Kuma) must
+stay as it is.
+
+```bash
+tailscale serve status --json        # before: note the :443 entry; expect no :8443 and no AllowFunnel
+```
+
+**Stop** if `:8443` already exists with another target or any
+`AllowFunnel` entry is present.
+
+```bash
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:8081
+tailscale serve status               # :443 / -> 127.0.0.1:3001 unchanged; :8443 / -> 127.0.0.1:8081; tailnet only
+tailscale funnel status              # no Funnel
+curl -s -o /dev/null -w '%{http_code}
+' https://macedonianserver.tailb0ac04.ts.net:8443/tutor             # 200
+curl -s -o /dev/null -w '%{http_code}
+' https://macedonianserver.tailb0ac04.ts.net:8443/api/tutor/queue   # 403
+curl -s -o /dev/null -w '%{http_code}
+' https://macedonianserver.tailb0ac04.ts.net/                       # Uptime Kuma
+sudo -n /usr/local/lib/mentor-pro/mentorpro smoke                                                        # SMOKE PASS (13/13)
+```
+
+Undo: `sudo tailscale serve --https=8443 off` (port 443 is untouched).
+
+Tutor use: on a device signed in to the tailnet, open
+`https://macedonianserver.tailb0ac04.ts.net:8443/tutor` and enter the
+token. Never enable Funnel for this port.
+
 A refused start exits 78 (`tutor configuration rejected: …`); a token of 1–15
 characters currently exits 1 with `ValueError` from the student module
 import (still refused; T035). A start failure with `TutorConfigurationError` means the token or the

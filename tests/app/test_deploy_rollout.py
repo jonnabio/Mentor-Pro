@@ -499,7 +499,7 @@ def test_docker_deploy_and_rollback_cycle(docker, tmp_path):
            "MENTORPRO_POSTGRES_CONTAINER": f"{project}-postgres-1", "MENTORPRO_BACKUPS": _posix(tmp_path / "b"),
            "MENTORPRO_BACKUP_SCHEMAS": "writing", "MENTORPRO_PYTHON": sys.executable,
            "MENTORPRO_APP_URL": f"http://127.0.0.1:{app_port}", "MENTORPRO_TUTOR_URL": f"http://127.0.0.1:{tutor_port}",
-           "MENTORPRO_WIFI_ADDR": "", "MENTORPRO_HEALTH_TIMEOUT": "90"}
+           "MENTORPRO_WIFI_ADDR": "", "MENTORPRO_TAILNET_URL": "", "MENTORPRO_HEALTH_TIMEOUT": "90"}
 
     def run(*args, **extra):
         out = subprocess.run([SH, str(SCRIPT), *args], env={**env, **extra}, capture_output=True, text=True,
