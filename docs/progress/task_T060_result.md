@@ -58,3 +58,8 @@
   dependency. The tutor service reads the existing practice tables.
 - Tutor access is unchanged: SSH tunnel to `127.0.0.1:8081`; the house
   Wi-Fi address only after T058 (PR #59) is merged and deployed.
+
+## Release
+
+- PR #63 (CI 42548953882, green) merged into `dev` as `9c96d53` (dev CI
+  42551550335, green). Release authorization `PO-T060-RELEASE-2026-11-08`.
