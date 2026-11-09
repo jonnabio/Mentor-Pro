@@ -1,8 +1,9 @@
 # T059 Result: Matemáticas Bank-Only Acceptance and Generate-on-Shortage Fix
 
 - **Role:** Developer (PO 2026-11-08, critical production fix)
-- **Status:** verified (supervised acceptance 2026-11-08/09; T056-T057
-  verified with it)
+- **Status:** in progress (PO decision 2026-11-09: open until a full
+  supervised session completes both a bank-first and a generation-fallback
+  practice, five saved answers each, with tutor verification)
 
 ## Regression
 
@@ -84,3 +85,7 @@ Read-only queries of production records; no data changed.
 - Observation (not a defect): free-tier whole-session generation
   completed 1 of 3 shortage practices; bank coverage (Phase B) reduces
   reliance on it.
+- PO accepted: bank-first composition, generate-on-shortage, no paid
+  calls, production healthy (smoke 9/9).
+- Open: no generation-fallback practice has five saved answers yet; tutor
+  verification of both completed practices pending.
