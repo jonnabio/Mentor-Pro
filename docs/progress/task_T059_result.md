@@ -1,7 +1,8 @@
 # T059 Result: Matemáticas Bank-Only Acceptance and Generate-on-Shortage Fix
 
 - **Role:** Developer (PO 2026-11-08, critical production fix)
-- **Status:** in progress (fix ready; supervised acceptance pending)
+- **Status:** verified (supervised acceptance 2026-11-08/09; T056-T057
+  verified with it)
 
 ## Regression
 
@@ -61,3 +62,25 @@ questions are held; other subjects keep the generated flow.
 - `DEPLOY OK`, smoke 9/9, `STATUS HEALTHY`, schema `current:0001`, L001
   `current`. Matemáticas `bank_only: true`, `[5]`; other subjects
   `false`, `[5]`; effective `allow_paid` false.
+
+## Supervised Acceptance (2026-11-08/09, `v2026.11.08-3`)
+
+Read-only queries of production records; no data changed.
+
+- Bank practice `cf1b733e...` (whole subject, mixed): composed from the
+  bank immediately (bank 5, generated 0); 5 of 5 answered, 2 correct,
+  results shown. The PO and tutor confirmed the student finished it, saw
+  the results, and that the tutor results are correct (human validation
+  reported by the PO; not invented here).
+- Shortage practice `16160d0e...` (medium): started whole-session
+  generation automatically (bank 0, generated 5, `complete` in about
+  4 min); the student answered 1 and left (cancelled; answer kept).
+- Shortage practices `d284b902...` and `937034df...` (mixed, objective
+  subset): `failed`, `stop_reason: slot_retries_exhausted`, with nothing
+  to answer, as designed. Cause: free provider limits (15 HTTP 429, 5
+  truncated outputs).
+- Paid generation: 0 paid calls, $0, no paid authorizations.
+- Production after acceptance: `STATUS HEALTHY`, smoke 9/9.
+- Observation (not a defect): free-tier whole-session generation
+  completed 1 of 3 shortage practices; bank coverage (Phase B) reduces
+  reliance on it.
