@@ -1830,12 +1830,26 @@
       "id": "T060",
       "name": "Tutor visibility of practice results",
       "objective": "Tutor service shows practice sessions, answers, scores and question-level success rates (read-only, tutor token).",
-      "status": "pending",
+      "status": "done",
       "role": "Developer",
       "files": {
-        "create": [],
-        "modify": []
-      }
+        "create": [
+          "app/practice/tutor_results.py",
+          "tests/app/test_tutor_practice_results.py",
+          "docs/progress/task_T060_result.md"
+        ],
+        "modify": [
+          "app/main.py",
+          "app/tutor_main.py",
+          "app/writing/tutor.py",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "app/static/styles.css",
+          "scripts/dev/practice_e2e.py",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "notes": "PO-T060-2026-11-08 fast track. Read-only; no schema, setting or dependency change. Deploy after PO review."
     },
     {
       "id": "T061",

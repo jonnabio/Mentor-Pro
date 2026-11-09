@@ -46,8 +46,8 @@ def _level_label(record: dict[str, Any]) -> str:
     return f"Nivel {level['ordinal']}: {level['name_es']}"
 
 
-def build_tutor_router(service: WritingService, api_error: type[Exception], token: str,
-                       allowed_hosts: frozenset[str] = LOOPBACK) -> APIRouter:
+def tutor_guard(api_error: type[Exception], token: str, allowed_hosts: frozenset[str] = LOOPBACK) -> Any:
+    """The tutor check shared by every /api/tutor router: an allowed client address and the tutor token."""
     if len(token) < MIN_TOKEN:
         raise ValueError(f"tutor token must have at least {MIN_TOKEN} characters")
 
@@ -56,6 +56,12 @@ def build_tutor_router(service: WritingService, api_error: type[Exception], toke
         if host not in allowed_hosts or not hmac.compare_digest(x_tutor_token.encode(), token.encode()):
             raise api_error(403, "tutor_only", "Acceso solo para el tutor.")
 
+    return tutor_only
+
+
+def build_tutor_router(service: WritingService, api_error: type[Exception], token: str,
+                       allowed_hosts: frozenset[str] = LOOPBACK) -> APIRouter:
+    tutor_only = tutor_guard(api_error, token, allowed_hosts)
     router = APIRouter(prefix="/api/tutor", tags=["tutor"], dependencies=[Depends(tutor_only)])
 
     def load(submission_id: str) -> tuple[Any, dict[str, Any], dict[str, Any]]:

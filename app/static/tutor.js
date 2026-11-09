@@ -52,8 +52,14 @@ async function api(path, options = {}) {
   return body;
 }
 
+const PANELS = ["tutor-login", "tutor-queue", "tutor-detail", "tutor-practice", "tutor-practice-detail"];
+
 function showPanel(name) {
-  for (const id of ["tutor-login", "tutor-queue", "tutor-detail"]) $(id).hidden = id !== `tutor-${name}`;
+  for (const id of PANELS) $(id).hidden = id !== `tutor-${name}`;
+  $("tutor-nav").hidden = name === "login";
+  const practice = name.startsWith("practice");
+  $("tutor-nav-writing").setAttribute("aria-pressed", String(!practice));
+  $("tutor-nav-practice").setAttribute("aria-pressed", String(practice));
   window.scrollTo({ top: 0 });
 }
 
@@ -234,5 +240,117 @@ $("tutor-complete").addEventListener("click", () => {
 $("tutor-dialog-stay").addEventListener("click", () => dialog.close());
 $("tutor-dialog-confirm").addEventListener("click", () => { dialog.close(); save(true); });
 $("tutor-back").addEventListener("click", openQueue);
+
+// ------------------------------------------------------------------ practice results (T060, read-only)
+// History, each answer and per-question accuracy. Only GET requests; nothing here changes stored data.
+
+const PRACTICE_STATE_ES = { completed: "Completada", left: "Abandonada", in_progress: "En curso",
+  not_started: "Sin responder", preparing: "Preparando", failed: "Falló la preparación" };
+const DIFFICULTY_ES = { easy: "Fácil", medium: "Media", hard: "Difícil", mixed: "Mixta" };
+const SOURCE_ES = { bank: "Banco", generated: "Generada" };
+const RESULT_ES = { correct: "Correcta", incorrect: "Incorrecta", unanswered: "Sin responder" };
+const practice = { subjects: {} };
+
+const percent = (rate) => (rate === null || rate === undefined ? "sin respuestas" : `${Math.round(rate * 100)} %`);
+const when = (iso) => new Date(iso).toLocaleString("es-CR", { dateStyle: "medium", timeStyle: "short" });
+const subjectName = (code) => practice.subjects[code] || code;
+
+function practiceQuery() {
+  const params = new URLSearchParams();
+  for (const [key, id] of [["subject", "pf-subject"], ["objective", "pf-objective"], ["from", "pf-from"],
+    ["to", "pf-to"], ["source", "pf-source"]]) {
+    const value = $(id).value.trim();
+    if (value) params.set(key, value);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+function composition(c) {
+  return `Banco ${c.bank} · Generadas ${c.generated}`;
+}
+
+async function openPractice() {
+  showError("");
+  const query = practiceQuery();
+  let history;
+  let analytics;
+  try {
+    [history, analytics] = await Promise.all([api(`/api/tutor/practice/sessions${query}`),
+      api(`/api/tutor/practice/questions${query}`)]);
+  } catch (error) {
+    showError(error.message);
+    return;
+  }
+  showPanel("practice");
+  const select = $("pf-subject");
+  if (select.options.length === 1) {
+    for (const s of history.subjects) select.append(el("option", { value: s.code }, s.name_es));
+  }
+  for (const s of history.subjects) practice.subjects[s.code] = s.name_es;
+  $("practice-list").dataset.query = query; // which filters the list shows (also used by browser tests)
+  $("practice-empty").hidden = history.sessions.length > 0;
+  $("practice-list").replaceChildren(...history.sessions.map((s) => {
+    const objectives = s.objectives.length ? s.objectives.join(", ") : "Toda la materia";
+    const button = el("button", { type: "button", class: "exercise-choice", "data-session": s.session_id },
+      el("span", { class: "level-label" }, `${subjectName(s.subject)} · ${when(s.created_at)}`),
+      el("span", { class: "meta-line" }, `Objetivos: ${objectives} · Dificultad: ${DIFFICULTY_ES[s.difficulty] || s.difficulty}`),
+      el("span", { class: "meta-line" }, `${composition(s.composition)} · Respondidas ${s.answered} de ${s.questions}` +
+        ` · Correctas ${s.correct} · Precisión ${percent(s.accuracy)}`),
+      el("span", { class: `tutor-badge practice-${s.state}` }, PRACTICE_STATE_ES[s.state] || s.state));
+    button.addEventListener("click", () => openPracticeSession(s.session_id));
+    return el("li", {}, button);
+  }));
+  const counts = (x) => `Presentadas ${x.served} · Respondidas ${x.answered} · Correctas ${x.correct}` +
+    ` · Incorrectas ${x.incorrect} · Sin responder ${x.unanswered}`;
+  $("practice-groups-empty").hidden = analytics.groups.length > 0;
+  $("practice-groups").replaceChildren(...analytics.groups.map((g) => el("li", { "data-group": `${g.objective_code}-${g.difficulty}` },
+    el("span", { class: "objective-text" }, `${subjectName(g.subject)} · ${g.objective_code} · ${DIFFICULTY_ES[g.difficulty] || "Sin nivel"}`),
+    el("strong", { class: "feedback-points" }, percent(g.success_rate)),
+    el("span", { class: "meta-line" }, `${g.questions} preguntas · ${counts(g)}`))));
+  $("practice-questions").replaceChildren(...analytics.questions.map((q) => el("li", { "data-source": q.source },
+    el("span", { class: "objective-text" }, q.stem),
+    el("strong", { class: "feedback-points" }, percent(q.success_rate)),
+    el("span", { class: "meta-line" }, `${q.objective_code} · ${DIFFICULTY_ES[q.difficulty] || "Sin nivel"} · ` +
+      `${SOURCE_ES[q.source]} · ${counts(q)}`))));
+}
+
+async function openPracticeSession(id) {
+  showError("");
+  let s;
+  try {
+    s = await api(`/api/tutor/practice/sessions/${encodeURIComponent(id)}`);
+  } catch (error) {
+    showError(error.message);
+    return;
+  }
+  showPanel("practice-detail");
+  $("pd-meta").textContent = `${when(s.created_at)} · ${composition(s.composition)}`;
+  $("pd-title").textContent = `${subjectName(s.subject)} · ${PRACTICE_STATE_ES[s.state] || s.state}`;
+  $("pd-summary").textContent = `Respondidas ${s.answered} de ${s.questions} · Correctas ${s.correct} · ` +
+    `Incorrectas ${s.incorrect} · Sin responder ${s.unanswered} · Precisión ${percent(s.accuracy)}`;
+  $("pd-items").replaceChildren(...s.items.map((q) => {
+    const options = el("ul", { class: "plain-list review-options" }, ...q.options.map((o) => {
+      const tags = [];
+      if (o.label === q.chosen_label) tags.push("Respuesta del estudiante");
+      if (o.label === q.correct_label) tags.push("Correcta");
+      const cls = o.label === q.correct_label ? "is-correct" : (o.label === q.chosen_label ? "is-wrong" : "");
+      return el("li", { class: cls, "data-label": o.label }, `${o.label}. ${o.text}`,
+        ...tags.map((t) => el("span", { class: "option-tag" }, t)));
+    }));
+    const stimulus = q.stimulus && q.stimulus.text ? [el("p", { class: "source-text" }, q.stimulus.text)] : [];
+    return el("li", { "data-slot": String(q.slot), "data-result": q.result },
+      el("p", { class: "meta-line" }, `${q.objective_code} · ${DIFFICULTY_ES[q.difficulty] || "Sin nivel"} · ${SOURCE_ES[q.source]}`),
+      ...stimulus, el("p", { class: "objective-text" }, q.stem), options,
+      el("span", { class: `tutor-badge result-${q.result}` }, RESULT_ES[q.result]),
+      el("p", { class: "muted small" }, `Explicación: ${q.explanation}`));
+  }));
+}
+
+$("tutor-nav-writing").addEventListener("click", openQueue);
+$("tutor-nav-practice").addEventListener("click", openPractice);
+$("practice-filters").addEventListener("submit", (event) => { event.preventDefault(); openPractice(); });
+$("pf-clear").addEventListener("click", () => { $("practice-filters").reset(); openPractice(); });
+$("pd-back").addEventListener("click", openPractice);
 
 if (token()) openQueue();
