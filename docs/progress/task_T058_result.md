@@ -48,3 +48,8 @@ missing `tailscale`; the tool's only Tailscale call is
 `serve status --json`; the tutor binding is loopback only. Token
 acceptance, refusal and read-only practice results stay covered by
 `test_tutor_service.py` and `test_tutor_practice_results.py`.
+
+## Release
+
+- PR #59 merged into `dev` as `804305e` (dev CI 42640072137, green).
+  Authorization `PO-T058-TAILSCALE-2026-11-09`.
