@@ -1,7 +1,7 @@
 """Tutor-only application for the production `tutor` service (T033, ADR-031).
 
 Serves only the tutor page, its static files and /api/tutor/*: no student, practice or development
-routes. Production runs it in its own container, published on the server's 127.0.0.1:8081 and reached by
+routes (T060 adds read-only practice results under /api/tutor/practice). Production runs it in its own container, published on the server's 127.0.0.1:8081 and reached by
 SSH tunnel; the student service never holds the tutor token.
 
 Fails closed at startup: MENTOR_PRO_TUTOR_TOKEN must have at least 32 characters, and
@@ -24,7 +24,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.main import STATIC_DIR, ApiError
+from app.main import STATIC_DIR, SUBJECTS, ApiError
+from app.practice.tutor_results import PracticeResults, build_practice_results_router
 from app.writing.migrations import SchemaMigrationRequired
 from app.writing.routes import WritingService
 from app.writing.tutor import build_tutor_router
@@ -92,6 +93,9 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
             "error": "schema_migration_required", "message_es": "El servicio está en mantenimiento."})
 
     app.include_router(build_tutor_router(service, ApiError, token, hosts))
+    # T060: read-only practice results and Question Bank analytics (GET only, same tutor check).
+    app.include_router(build_practice_results_router(
+        PracticeResults(lambda: database_url or db.database_url()), ApiError, token, hosts, SUBJECTS))
 
     @app.get("/tutor", include_in_schema=False)
     def tutor_page(request: Request) -> FileResponse:

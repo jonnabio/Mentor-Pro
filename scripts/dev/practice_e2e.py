@@ -1311,6 +1311,72 @@ LATEST_SCORES_SQL = """SELECT DISTINCT ON (c.criterion_code) c.criterion_code, c
     ORDER BY c.criterion_code, v.evaluated_at DESC"""
 
 
+def scenario_tutor_practice(tutor: Page, student: Page, report: Report, viewport: str, out: Path, url: str) -> None:
+    """T060: the tutor reads practice history, one practice's answers and per-question accuracy (read-only)."""
+    name = f"{viewport}-tutor-practice"
+    errors: list[str] = []
+    tutor.on("pageerror", lambda exc: errors.append(str(exc)))
+    report.check(student.request.get(BASE + "api/tutor/practice/sessions").status == 403
+                 and student.request.get(BASE + "api/tutor/practice/questions").status == 403,
+                 f"[{name}] practice results refuse requests without the tutor code")
+    before = writing_rows(url, "SELECT (SELECT COUNT(*) FROM practice.session), (SELECT COUNT(*) FROM practice.answer)")
+    tutor.goto(BASE + "tutor")
+    tutor.locator("#tutor-token").fill(TUTOR_TOKEN)
+    tutor.get_by_role("button", name="Entrar").click()
+    expect(tutor.locator("#tutor-nav")).to_be_visible()
+    tutor.get_by_role("button", name="Resultados de práctica").click()
+    expect(tutor.locator("#practice-list .exercise-choice").first).to_be_visible()
+    latest = writing_rows(url, """SELECT s.session_id, COUNT(i.slot), COUNT(a.slot), COUNT(a.slot) FILTER (WHERE a.is_correct),
+                                         COUNT(i.slot) FILTER (WHERE i.source = 'bank')
+                                  FROM practice.session s LEFT JOIN practice.item i USING (session_id)
+                                  LEFT JOIN practice.answer a USING (session_id, slot)
+                                  GROUP BY s.session_id, s.created_at ORDER BY s.created_at DESC LIMIT 1""")[0]
+    sid, items, answered, correct, bank = latest
+    first = tutor.locator("#practice-list .exercise-choice").first
+    text = first.inner_text()
+    report.check(first.get_attribute("data-session") == sid
+                 and f"Respondidas {answered} de {items}" in text and f"Correctas {correct}" in text
+                 and f"Banco {bank} · Generadas {items - bank}" in text,
+                 f"[{name}] latest practice shows composition, answered and correct as stored")
+    report.check(tutor.locator("#practice-questions li").count() > 0 and tutor.locator("#practice-groups li").count() > 0,
+                 f"[{name}] question and objective/difficulty accuracy listed")
+    report.check(no_overflow(tutor), f"[{name}] no horizontal overflow on the results list")
+    tutor.screenshot(path=str(out / f"{name}-history.png"), full_page=True)
+
+    answered_sid = writing_rows(url, "SELECT session_id FROM practice.answer GROUP BY session_id "
+                                     "ORDER BY MAX(answered_at) DESC LIMIT 1")[0][0]
+    tutor.locator(f'#practice-list .exercise-choice[data-session="{answered_sid}"]').click()
+    expect(tutor.locator("#tutor-practice-detail")).to_be_visible()
+    stored = writing_rows(url, "SELECT i.slot, a.chosen_label, i.item->>'answer_key' FROM practice.item i "
+                               "LEFT JOIN practice.answer a USING (session_id, slot) WHERE i.session_id = %s "
+                               "ORDER BY i.slot", answered_sid)
+    shown = tutor.locator("#pd-items > li")
+    ok = shown.count() == len(stored)
+    for index, (slot, chosen, key) in enumerate(stored):
+        row = shown.nth(index)
+        expected = "unanswered" if chosen is None else ("correct" if chosen == key else "incorrect")
+        ok = ok and row.get_attribute("data-result") == expected
+        ok = ok and "Correcta" in row.locator(f'li[data-label="{key}"]').inner_text()
+        if chosen is not None:
+            ok = ok and "Respuesta del estudiante" in row.locator(f'li[data-label="{chosen}"]').inner_text()
+    report.check(ok and "Explicación:" in tutor.locator("#pd-items").inner_text(),
+                 f"[{name}] each question shows the student's answer, the correct one and the explanation")
+    report.check(no_overflow(tutor), f"[{name}] no horizontal overflow on a practice review")
+    tutor.screenshot(path=str(out / f"{name}-detail.png"), full_page=True)
+
+    tutor.get_by_role("button", name="Volver a los resultados").click()
+    tutor.locator("#pf-source").select_option("generated")
+    tutor.get_by_role("button", name="Aplicar filtros").click()
+    expect(tutor.locator("#practice-list")).to_have_attribute("data-query", "?source=generated")
+    texts = tutor.locator("#practice-list .exercise-choice").all_inner_texts()
+    sources = tutor.locator("#practice-questions li").evaluate_all("els => els.map(e => e.dataset.source)")
+    report.check(bool(texts) and all("Generadas 0" not in t for t in texts) and set(sources) <= {"generated"},
+                 f"[{name}] source filter shows only generated practices and questions")
+    after = writing_rows(url, "SELECT (SELECT COUNT(*) FROM practice.session), (SELECT COUNT(*) FROM practice.answer)")
+    report.check(before == after, f"[{name}] reading results changed no practice data")
+    report.check(not errors, f"[{name}] no JavaScript errors {errors}")
+
+
 def scenario_writing_dashboard(page: Page, report: Report, viewport: str, out: Path, url: str) -> None:
     """T027: Producción escrita in "Mi progreso", checked against the test database's evaluation rows."""
     name = f"{viewport}-writing-dashboard"
@@ -1466,6 +1532,10 @@ def run_mock(out: Path, url: str) -> Report:
             tutor_context = browser.new_context(viewport=size, locale="es-CR", is_mobile=viewport == "mobile",
                                                 has_touch=viewport == "mobile")
             scenario_revision(page, tutor_context.new_page(), report, viewport, out, url)
+            tutor_context.close()
+            tutor_context = browser.new_context(viewport=size, locale="es-CR", is_mobile=viewport == "mobile",
+                                                has_touch=viewport == "mobile")
+            scenario_tutor_practice(tutor_context.new_page(), page, report, viewport, out, url)
             tutor_context.close()
             if viewport == "desktop":
                 scenario_drafts(context.new_page(), report, out, url)  # closes its own page
