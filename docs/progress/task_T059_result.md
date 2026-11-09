@@ -1,9 +1,12 @@
 # T059 Result: Matemáticas Bank-Only Acceptance and Generate-on-Shortage Fix
 
 - **Role:** Developer (PO 2026-11-08, critical production fix)
-- **Status:** in progress, open only for generated-practice acceptance.
-  The bank-backed Matemáticas MVP is accepted (PO 2026-11-09); T056 and
-  T057 are verified.
+- **Status:** closed under PO acceptance (2026-11-09), with qualification:
+  - Bank-backed end-to-end acceptance: PASS.
+  - Generation fallback routing: PASS.
+  - Generated-practice end-to-end student completion: NOT VERIFIED.
+  - Free-provider reliability: OPEN operational issue (backlog T064).
+  - Tutor practice-results interface: NOT IMPLEMENTED (backlog T060).
 
 ## Regression
 
