@@ -292,3 +292,23 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 .link-button { border: 0; background: none; padding: 0 0 0 6px; color: var(--accent); font: inherit;
   text-decoration: underline; cursor: pointer; }
 .link-button[hidden] { display: none; }
+
+/* T060: tutor practice results (read-only). */
+.tutor-nav { margin: 0 0 12px; }
+.tutor-nav button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.practice-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px 14px; }
+.practice-filters .field-label { display: flex; flex-direction: column; gap: 4px; margin: 0; }
+.practice-filters input, .practice-filters select { font: inherit; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--bg); color: inherit; min-width: 0; }
+.practice-filters .actions { grid-column: 1 / -1; }
+.tutor-badge.practice-completed, .tutor-badge.result-correct { color: var(--accent); border-color: var(--accent); }
+.tutor-badge.practice-left, .tutor-badge.practice-failed, .tutor-badge.result-incorrect {
+  color: var(--danger); border-color: var(--danger); }
+.tutor-badge.practice-in_progress, .tutor-badge.practice-preparing { color: #7a5300; border-color: #d9a400; }
+.practice-review > li { border-top: 1px solid var(--border); padding: 12px 0; overflow-wrap: anywhere; }
+.review-options li { display: flex; flex-wrap: wrap; gap: 4px 10px; padding: 6px 10px; margin: 4px 0;
+  border: 1px solid var(--border); border-radius: 8px; }
+.review-options li.is-correct { border-color: var(--accent); background: var(--accent-soft); }
+.review-options li.is-wrong { border-color: var(--danger); background: var(--danger-soft); }
+.inline-heading { display: inline; }
+#practice-questions-block summary { cursor: pointer; margin: 16px 0 8px; }
