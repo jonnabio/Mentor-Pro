@@ -1806,6 +1806,26 @@
       }
     },
     {
+      "id": "T058",
+      "name": "Tutor HTTPS access via Tailscale Serve",
+      "objective": "Tutor reachable from tailnet devices over HTTPS via Tailscale Serve (port 8443 -> 127.0.0.1:8081); tutor stays loopback-only; no Wi-Fi HTTP exposure; Funnel off.",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/progress/task_T058_result.md"
+        ],
+        "modify": [
+          "deploy/mentorpro",
+          "tests/app/test_deploy.py",
+          "docs/adr/ADR-031-tutor-access-in-production.md",
+          "docs/runbooks/production-deployment.md",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "notes": "PO-T058-TAILSCALE-2026-11-09. Replaces the plain-HTTP Wi-Fi binding of the first PR #59 revision."
+    },
+    {
       "id": "T059",
       "name": "Matemáticas bank-only acceptance; fix: generate on shortage (RCA-006)",
       "objective": "Bank-first, generate-on-shortage for size-5 bank-only practices (whole-session fallback, complete or failed); supervised student and tutor acceptance.",

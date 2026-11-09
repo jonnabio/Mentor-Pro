@@ -613,7 +613,7 @@ class Production:
                     "MENTORPRO_BACKUP_SCHEMAS": "curriculum practice generation llm writing",
                     "MENTORPRO_PYTHON": sys.executable, "MENTORPRO_REHEARSAL_DIR": _posix(self.rehearsal),
                     "MENTORPRO_APP_URL": f"http://127.0.0.1:{app_port}",
-                    "MENTORPRO_TUTOR_URL": f"http://127.0.0.1:{tutor_port}", "MENTORPRO_WIFI_ADDR": "",
+                    "MENTORPRO_TUTOR_URL": f"http://127.0.0.1:{tutor_port}", "MENTORPRO_WIFI_ADDR": "", "MENTORPRO_TAILNET_URL": "",
                     "MENTORPRO_HEALTH_TIMEOUT": "90"}
         self.compose("up", "-d", "--wait", "postgres")
         gateway = sh("docker", "network", "inspect", f"{self.project}_default", "--format",

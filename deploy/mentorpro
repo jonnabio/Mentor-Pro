@@ -31,6 +31,8 @@
 #   MENTORPRO_APP_URL      http://127.0.0.1:8080
 #   MENTORPRO_TUTOR_URL    http://127.0.0.1:8081
 #   MENTORPRO_WIFI_ADDR    192.168.50.229   (empty: skip the Wi-Fi checks)
+#   MENTORPRO_TAILNET_URL  https://macedonianserver.tailb0ac04.ts.net:8443  (T058; empty: skip the HTTPS checks)
+#   MENTORPRO_TAILSCALE    tailscale  (read only: `serve status --json`; this tool never changes Serve or Funnel)
 #   MENTORPRO_RELEASE_ENV  /opt/mentor-pro/release.env
 #   MENTORPRO_RELEASES     /opt/mentor-pro/RELEASES
 #   MENTORPRO_BACKUPS      /var/backups/mentor-pro
@@ -43,6 +45,8 @@ set -u
 APP_URL=${MENTORPRO_APP_URL:-http://127.0.0.1:8080}
 TUTOR_URL=${MENTORPRO_TUTOR_URL:-http://127.0.0.1:8081}
 WIFI_ADDR=${MENTORPRO_WIFI_ADDR-192.168.50.229}
+TAILNET_URL=${MENTORPRO_TAILNET_URL-https://macedonianserver.tailb0ac04.ts.net:8443}
+TAILSCALE=${MENTORPRO_TAILSCALE:-tailscale}
 RELEASE_ENV=${MENTORPRO_RELEASE_ENV:-/opt/mentor-pro/release.env}
 RELEASES=${MENTORPRO_RELEASES:-/opt/mentor-pro/RELEASES}
 BACKUPS=${MENTORPRO_BACKUPS:-/var/backups/mentor-pro}
@@ -66,6 +70,37 @@ expect() {  # expect <label> <url> <code>
   fi
 }
 
+# T058 (ADR-031): the Tailscale Serve port of TAILNET_URL proxies only to the loopback tutor, no other Serve
+# entry reaches the tutor, and Funnel (public internet) is off everywhere. Read only.
+serve_check() {
+  port=${TAILNET_URL##*:}
+  case "$port" in ''|*[!0-9]*) port=443 ;; esac
+  verdict=$("$TAILSCALE" serve status --json 2>/dev/null | "$PYTHON" -c '
+import json, sys
+port, tutor = sys.argv[1], sys.argv[2]
+try:
+    cfg = json.load(sys.stdin) or {}
+except ValueError:
+    print("unreadable"); sys.exit()
+web = {key.rsplit(":", 1)[-1]: v.get("Handlers", {}) for key, v in (cfg.get("Web") or {}).items()}
+proxies = {(p, path): (h or {}).get("Proxy", "") for p, hs in web.items() for path, h in hs.items()}
+funnel = any((cfg.get("AllowFunnel") or {}).values())
+if funnel:
+    print("funnel on")
+elif web.get(port) != {"/": {"Proxy": tutor}} or not (cfg.get("TCP") or {}).get(port, {}).get("HTTPS"):
+    print("port %s does not serve only %s" % (port, tutor))
+elif any(t.rstrip("/") == tutor and p != port for (p, _), t in proxies.items()):
+    print("tutor also served on another port")
+else:
+    print("ok")
+' "$port" "$TUTOR_URL")
+  if [ "$verdict" = "ok" ]; then
+    passed=$((passed + 1)); echo "PASS Tailscale Serve: port $port only to the loopback tutor, Funnel off"
+  else
+    failed=$((failed + 1)); echo "FAIL Tailscale Serve (${verdict:-not available})"
+  fi
+}
+
 smoke() {
   for path in / /api/subjects /api/dashboard /api/writing/levels; do
     expect "student $path" "$APP_URL$path" 200
@@ -78,6 +113,14 @@ smoke() {
     expect "tutor not published on the Wi-Fi address" "http://$WIFI_ADDR:8081/tutor" 000
   else
     echo "SKIP Wi-Fi checks (MENTORPRO_WIFI_ADDR empty)"
+  fi
+  if [ -n "$TAILNET_URL" ]; then
+    serve_check
+    expect "tutor page over Tailscale HTTPS" "$TAILNET_URL/tutor" 200
+    expect "tutor API over HTTPS refuses without the token" "$TAILNET_URL/api/tutor/queue" 403
+    expect "practice results over HTTPS refuse without the token" "$TAILNET_URL/api/tutor/practice/sessions" 403
+  else
+    echo "SKIP Tailscale HTTPS checks (MENTORPRO_TAILNET_URL empty)"
   fi
   total=$((passed + failed))
   if [ "$failed" -eq 0 ]; then

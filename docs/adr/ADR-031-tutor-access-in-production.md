@@ -131,3 +131,38 @@ student app:
 - The gateway address must be checked if the compose network is ever
   recreated; a wrong address fails closed (403).
 - Tutor review needs SSH access from the parent's computer.
+
+## Amendment T058 (Product Owner, 2026-11-09): Tutor over HTTPS via Tailscale Serve
+
+Authorization `PO-T058-TAILSCALE-2026-11-09`. Supersedes the first T058
+proposal (2026-11-07), which published the tutor on the house Wi-Fi
+address over plain HTTP; that binding was never deployed and is removed.
+
+- **Access:** `https://macedonianserver.tailb0ac04.ts.net:8443/tutor`
+  from a device signed in to the tailnet. Tailscale Serve terminates TLS
+  on port 8443 and proxies to `http://127.0.0.1:8081`. The SSH tunnel
+  keeps working.
+- **Certificate and trust:** a publicly trusted certificate for the
+  tailnet name, issued and renewed by Tailscale; nothing to install on
+  the device. The token never crosses the Wi-Fi in clear text.
+- **Unchanged:** the tutor service stays bound to `127.0.0.1:8081` only;
+  the student app holds no token and has no tutor routes; the token
+  check (32-character minimum, constant time), the allowed-host check
+  (Serve reaches the published port as the bridge gateway), fail-closed
+  start and the read-only practice results (T060).
+- **Not exposed:** Funnel stays off (tailnet only, never the internet);
+  no Wi-Fi, wired, `0.0.0.0` or router binding; no Caddy or other proxy.
+  The existing Serve entry on port 443 (Uptime Kuma) is not changed.
+- **Configuration:** a one-time administrator command (runbook J.1). The
+  deployment tool never changes Serve or Funnel; it only reads
+  `tailscale serve status --json`.
+- **Smoke test** (13 checks): Serve port 8443 proxies only to the
+  loopback tutor, no other Serve entry reaches the tutor, and Funnel is
+  off; the tutor page answers 200 over HTTPS; the tutor API and the
+  practice results refuse without the token (403); the Wi-Fi address
+  still refuses the tutor port (000).
+- **Accepted limitation:** a tutor device needs the Tailscale app signed
+  in to the tailnet; devices without it cannot open the page.
+- **Rejected:** Caddy on the Wi-Fi address (local certificate authority
+  to install on every device, an extra service) and the plain-HTTP Wi-Fi
+  binding (token in clear text, address check ineffective).
