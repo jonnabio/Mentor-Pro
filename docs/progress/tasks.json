@@ -1769,7 +1769,7 @@
       "id": "T056",
       "name": "Matemáticas bank-only release readiness (fast track)",
       "objective": "Read-only compose-check of what the real bank-only composer assembles per difficulty; inventory and size-5 shortages recorded as release evidence for T056–T059.",
-      "status": "done",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [
@@ -1788,7 +1788,7 @@
       "id": "T057",
       "name": "Matemáticas-only bank-only activation",
       "objective": "Per-subject bank-only switch (MENTOR_PRO_BANK_ONLY_SUBJECTS, default off); Matemáticas size 5 only; other subjects keep the generated flow; no live generation for bank-only sessions.",
-      "status": "in_progress",
+      "status": "verified",
       "role": "Developer",
       "files": {
         "create": [

@@ -1,9 +1,9 @@
 # T059 Result: Matemáticas Bank-Only Acceptance and Generate-on-Shortage Fix
 
 - **Role:** Developer (PO 2026-11-08, critical production fix)
-- **Status:** in progress (PO decision 2026-11-09: open until a full
-  supervised session completes both a bank-first and a generation-fallback
-  practice, five saved answers each, with tutor verification)
+- **Status:** in progress, open only for generated-practice acceptance.
+  The bank-backed Matemáticas MVP is accepted (PO 2026-11-09); T056 and
+  T057 are verified.
 
 ## Regression
 
@@ -89,3 +89,19 @@ Read-only queries of production records; no data changed.
   calls, production healthy (smoke 9/9).
 - Open: no generation-fallback practice has five saved answers yet; tutor
   verification of both completed practices pending.
+
+## Bank-Backed MVP Acceptance (2026-11-09)
+
+PO-confirmed supervised session; read-only verification:
+
+- Latest completed Matemáticas practice `cf1b733e...`: `complete`, not
+  cancelled, classified student; composition bank 5, generated 0; 5 of 5
+  answers saved (2 correct, 40 %), last answer 00:28:44 UTC.
+- Results: the student saw the results screen (PO). The learning dashboard
+  includes the answers (Matemáticas 17 answers in total). The tutor
+  interface (`/tutor`) lists writing submissions only and has no practice
+  view; practice results are read on the learning dashboard. Earlier
+  tutor confirmation reported by the PO.
+- Production: `STATUS HEALTHY`.
+- Remaining for T059: a generation-fallback practice with five saved
+  answers and its results.
