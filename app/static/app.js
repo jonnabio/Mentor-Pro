@@ -15,6 +15,9 @@ const state = {
   objectives: [],
   bankOnly: false, // T049: set from /api/subjects
   subjectPractice: {}, // T057: per-subject bank-only switch and sizes
+  configuredCounts: [5], // T063: sizes the server permits for the subject
+  availabilitySeq: 0,    // T063: only the latest availability answer is applied
+  availabilityTimer: null,
   subjectNames: {},
   requestId: null,      // reused if the same submission is retried (server deduplicates)
   session: null,
@@ -190,10 +193,60 @@ function updateState() {
     state.objectives.length > 0 &&
     (mode === "subject_simulation" || (mode === "single_objective" ? count === 1 : count >= 2));
   $("submit").disabled = !ready;
+  scheduleAvailability(ready);
+}
+
+// T063 (RCA-006): offer only the sizes the server can start for this exact choice. Until it answers, only 5
+// is offered (a size-5 shortage is generated, T059); larger sizes appear when the bank composes them.
+function scheduleAvailability(ready) {
+  clearTimeout(state.availabilityTimer);
+  if (!state.bankOnly) return;
+  applyCounts([5].filter((n) => state.configuredCounts.includes(n)), false);
+  if (!ready || state.configuredCounts.every((n) => n === 5)) return;
+  const seq = ++state.availabilitySeq;
+  state.availabilityTimer = setTimeout(() => checkAvailability(seq), 250);
+}
+
+async function checkAvailability(seq) {
+  const payload = {
+    subject: form.elements.subject.value,
+    scope: scope(),
+    objective_codes: scope() === "subject_simulation" ? [] : selectedCodes(),
+    difficulty: form.elements.difficulty.value,
+  };
+  try {
+    const data = await api("/api/practice/availability", { method: "POST", body: JSON.stringify(payload) });
+    if (seq !== state.availabilitySeq) return; // the choice changed meanwhile
+    applyCounts(data.question_counts.map(Number), true);
+  } catch (error) {
+    if (seq === state.availabilitySeq) applyCounts([5], true); // safe default: no larger size on an error
+  }
+}
+
+function applyCounts(counts, checked) {
+  for (const label of form.querySelectorAll('.segmented input[name="question_count"]')) {
+    const offered = counts.includes(Number(label.value));
+    label.parentElement.hidden = !offered;
+    label.disabled = !offered;
+  }
+  const current = form.querySelector('input[name="question_count"]:checked');
+  if (!current || current.disabled) {
+    const fallback = form.querySelector(`input[name="question_count"][value="${counts[0] || 5}"]`);
+    if (fallback) fallback.checked = true;
+  }
+  form.dataset.counts = checked ? counts.join(",") : ""; // set once the server answered (tests wait on it)
+  const larger = state.configuredCounts.some((n) => n > 5);
+  $("count-note").hidden = !(checked && larger && counts.length <= 1);
+  $("count-note").textContent = "Las prácticas más largas aparecerán cuando haya más preguntas revisadas.";
+  if (!larger) {
+    $("count-note").hidden = false;
+    $("count-note").textContent = "Por ahora las prácticas tienen 5 preguntas.";
+  }
 }
 
 form.addEventListener("change", (event) => {
   state.requestId = null; // a changed configuration is a new request
+  if (event.target.name === "question_count") return; // T063: choosing an offered size needs no new check
   if (event.target.name === "subject") $("dashboard-choice").hidden = true;
   if (event.target.name === "scope") renderObjectives();
   else updateState();
@@ -242,16 +295,10 @@ form.addEventListener("submit", async (event) => {
 // off keeps the 5-question generated flow.
 function setBankOnly(practice) {
   const enabled = Boolean(practice && practice.bank_only);
-  const counts = enabled ? practice.question_counts.map(Number) : [5];
   state.bankOnly = enabled;
-  for (const label of form.querySelectorAll("label.bank-only")) {
-    const input = label.querySelector("input");
-    const offered = counts.includes(Number(input.value));
-    label.hidden = !offered;
-    input.disabled = !offered;
-    if (!offered && input.checked) form.querySelector('input[name="question_count"][value="5"]').checked = true;
-  }
-  $("count-note").hidden = counts.length > 1;
+  state.configuredCounts = enabled ? practice.question_counts.map(Number) : [5];
+  state.availabilitySeq += 1; // drop answers for the previous subject
+  applyCounts([5], false);    // larger sizes only after the availability check for the current choice
 }
 
 // Shortage (409): one tap starts the largest practice the bank can fill now.

@@ -79,6 +79,8 @@ class BankComposer:
         by_code = {o["workbook_code"]: o for o in self.objectives}
         low, high = level_bounds(count) if self.difficulty == "mixed" else (count, count)
         slots = [(row, by_code[row["workbook_code"]]) for row in plan for _ in range(row["questions"])]
+        if not self._enough_stock(plan, by_code, low):
+            return None  # T063: a cheap count proves the shortage before any search
         levels: Counter[str] = Counter()
         chosen: list[dict[str, Any]] = []  # candidate rows, in slot order
         failed: set[frozenset[str]] = set()
@@ -132,6 +134,33 @@ class BankComposer:
                               "item": c["item"], "source": "bank", "source_request_id": c["request_id"]})
             allocation.append({**row, "evidences_covered": len({s["evidence_id"] for s in rows}), "slots": rows})
         return allocation, picks
+
+    def _enough_stock(self, plan: list[dict[str, Any]], by_code: dict[str, Any], low: int) -> bool:
+        """Necessary conditions only: each objective holds as many distinct questions as its slots, and each
+        required level holds its minimum share across the practice. False means no search can succeed."""
+        per_level: Counter[str] = Counter()
+        for row in plan:
+            if not row["questions"]:
+                continue
+            rows = self._candidates(by_code[row["workbook_code"]])
+            if len({c["item"]["item_id"] for c in rows}) < row["questions"]:
+                return False
+            for c in {c["item"]["item_id"]: c for c in rows}.values():
+                per_level[c["difficulty"]] += 1
+        return all(per_level[level] >= low for level in self.levels)
+
+    def available_sizes(self, sizes: tuple[int, ...]) -> list[int]:
+        """T063: the permitted sizes the bank composes now, checked by the real composer in ascending order.
+
+        Checking stops at the first size that does not compose, so a size is offered only when every smaller
+        one is (never more questions than the bank genuinely holds; at worst a size is offered late).
+        """
+        ready = []
+        for size in sorted(sizes):
+            if self.compose(size) is None:
+                break
+            ready.append(size)
+        return ready
 
     def compose_or_shortage(self, count: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """A complete practice of `count`; raises Shortage with the largest smaller permitted size that fits."""

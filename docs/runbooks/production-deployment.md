@@ -548,3 +548,38 @@ Generated questions reach practices only after `review-record` reports
 `review_status: passed`. On `failed`, stop and investigate. The review file
 holds question text; delete it after recording. Standard output holds
 counts and identifiers only.
+
+### L.1 Inventory and replenishment (T061, T062, ADR-036)
+
+Candidate generation within the free limits is authorized by
+PO-QUESTION-BANK-PHASE-B-2026-11-09. Approval stays with the tutor.
+
+```bash
+rep() { docker exec mentor-pro-app-1 python -m app.practice.replenish "$@"; }
+rep inventory                                   # eligible, pending review, quarantined, rejected per subject
+rep assess                                      # snapshot for the tutor page; opens/closes requests; no LLM
+rep run --subject matematicas --max-calls 20    # free models only, shared daily budget; resumable
+rep requests --subject matematicas              # pending requests (add --all for closed ones)
+seed() { docker exec mentor-pro-app-1 python -m app.practice.seed_bank "$@"; }
+seed item-review-sample --subject matematicas --out /tmp/review.json   # copy out, give to the tutor
+# the tutor fills verdict (approved | quarantined) and reason; copy the file back in, then:
+seed item-review-record --subject matematicas --decisions /tmp/review.json
+```
+
+**Gates:**
+
+- Stop on exit 1 or 4.
+- A `run` stop on `daily_budget`, `provider_rate_limited` or `run_call_limit`
+  leaves the requests open; rerun on a later day.
+- Never record a verdict on the tutor's behalf.
+- Delete review files after recording.
+
+The policy settings are optional, in `/etc/mentor-pro/app.env`:
+`MENTOR_PRO_REPLENISH_MIN_ANSWERED`, `MENTOR_PRO_REPLENISH_MASTERY`,
+`MENTOR_PRO_REPLENISH_LOW_INVENTORY` and `MENTOR_PRO_REPLENISH_MAX_BATCH`.
+The rate-limit cooldown is `OPENROUTER_RATE_LIMIT_COOLDOWN_S`.
+
+**Quiz sizes (T063):** permit them per subject, for example
+`MENTOR_PRO_BANK_ONLY_SUBJECTS=matematicas:5,10,15,20,25,30`. The student
+UI still offers only the sizes the bank composes for each choice, so
+permitting a size that the inventory cannot serve yet is safe.

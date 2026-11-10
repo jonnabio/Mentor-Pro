@@ -192,15 +192,19 @@ guards:
     guarded_files:
       - app/practice/routes.py
       - app/practice/jobs.py
+      - app/practice/bank_allocation.py
+      - app/static/app.js
 
     invariants:
       - "A size-5 bank-only request the bank cannot fill starts generation of the whole practice"
       - "A generate-on-shortage practice is complete or failed, never partial"
       - "A complete bank practice makes no LLM call"
       - "Quarantined or unreviewed questions never count as bank inventory"
+      - "The UI offers a size only after the server reports it composes for the exact choice (T063)"
 
     tests:
       - tests/app/test_bank_only_practice.py
+      - tests/app/test_quiz_sizes.py
 
     standard_rule: "RCA-006 Lessons Learned (activation gates cover every UI option)"
 

@@ -8,6 +8,11 @@ against the approval ceiling and the daily USD budget. Without a grant an exhaus
 result says whether paid generation could be requested (`paid_available`).
 Every HTTP attempt reserves budget through a `BudgetGate` before it is sent
 (ADR-012). Every attempt — including budget-blocked ones — is recorded.
+T064: a free model still rate limited after its retries is cooled down process-wide
+(`app.llm.cooldown`) and skipped meanwhile; when every candidate is cooling the result
+is `rate_limited` with no request sent. A truncated generation is retried once on the
+same model with a larger output limit when the caller opts in (question generation;
+writing keeps its single bounded request), through the same budget gate.
 """
 
 from __future__ import annotations
@@ -17,7 +22,9 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from app.llm.budget import BudgetGate
+from app.llm.cooldown import COOLDOWN, ModelCooldown
 from app.llm.client import Attempt, AuthenticationError, OpenRouterClient, PaymentRequiredError, TransientError
+from app.llm.settings import GENERATION_MAX_TOKENS_MAX
 from app.llm.usage import UsageContext, to_record
 
 AUTO_FREE_LIMIT = 3  # discovered free models tried when none are configured
@@ -30,7 +37,8 @@ class Store(Protocol):
 
 @dataclass
 class RouteResult:
-    status: str  # ok | exhausted | budget_blocked | auth_error | discovery_error | payment_required
+    # ok | exhausted | budget_blocked | auth_error | discovery_error | payment_required | rate_limited (T064)
+    status: str
     content: str | None = None
     final: Attempt | None = None
     tier: str | None = None
@@ -83,7 +91,8 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
           avoid: frozenset[str] = frozenset(), practice_set_id: str | None = None,
           gate: BudgetGate | None = None, exclude: frozenset[str] = frozenset(),
           models: tuple[str, ...] | None = None, paid: Any = None, subject: str | None = None,
-          objective_code: str | None = None) -> RouteResult:
+          objective_code: str | None = None, cooldown: ModelCooldown = COOLDOWN,
+          truncation_retry: bool = False) -> RouteResult:
     """Route one request. Models in `avoid` are tried last (e.g. the generator, for a blind solve); models in
     `exclude`, or a variant of them, are never called (T029: an independent review must not fall back to the
     generator). `models` replaces the free list with an explicit ordered one (T031: writing reviewers).
@@ -111,12 +120,12 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
         free = [m for m in free if m not in settings.generation_excluded_models]
     free = [m for m in free if not any(same_model(m, x) for x in exclude)]
     free = [m for m in free if m not in avoid] + [m for m in free if m in avoid]
-    plan = [(m, "free") for m in free]
+    plan: list[tuple[str, str, int | None]] = [(m, "free", max_tokens) for m in free]
     paid_possible = bool(settings.allow_paid and settings.paid_model
                          and not any(same_model(settings.paid_model, x) for x in exclude))
     if paid is not None and paid_possible and paid.model == settings.paid_model and not paid.stopped:
-        plan.append((settings.paid_model, "paid"))
-    result.candidates = [m for m, _ in plan]
+        plan.append((settings.paid_model, "paid", max_tokens))
+    result.candidates = [m for m, _, _ in plan]
     if not plan:
         result.paid_available = paid_possible and paid is None
         result.message = "no qualified free model available" + (
@@ -127,9 +136,16 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
         return result
 
     gate = gate or BudgetGate(store, settings)
-    call_max_tokens = max_tokens or settings.max_tokens
-    for index, (model, tier) in enumerate(plan):
+    cooling: list[str] = []
+    tried = 0
+    escalated = False
+    for index, (model, tier, tokens) in enumerate(plan):  # the plan may grow by one truncation retry
         is_fallback = index > 0
+        call_max_tokens = tokens or settings.max_tokens
+        if tier == "free" and cooldown.remaining(model) > 0:
+            cooling.append(model)   # T064: recently rate limited; no request is sent
+            continue
+        tried += 1
         reserved = [0]
         holds: list[float] = []  # paid only: worst-case USD reserved for each sent attempt, in order
 
@@ -149,7 +165,7 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
             return True
 
         try:
-            attempts = client.chat(model, messages, max_tokens=max_tokens, before_attempt=reserve,
+            attempts = client.chat(model, messages, max_tokens=tokens, before_attempt=reserve,
                                    extra_body=reasoning_body(client, model, purpose))
         except (AuthenticationError, PaymentRequiredError) as exc:
             sent = list(exc.attempts)   # every request of this call was sent: record each one
@@ -197,7 +213,20 @@ def route(client: OpenRouterClient, store: Store, messages: list[dict[str, str]]
         if final.status == "ok" and final.content:
             result.status, result.content, result.final, result.tier = "ok", final.content, final, tier
             return result
+        if final.status == "rate_limited" and tier == "free":
+            cooldown.start(model, max(final.retry_after_s or 0.0, settings.rate_limit_cooldown_s))
+        if (truncation_retry and final.error_kind == "truncated" and tier == "free" and not escalated
+                and call_max_tokens < GENERATION_MAX_TOKENS_MAX):
+            # T064: one retry of the same model with a larger output limit; other models keep their order.
+            escalated = True
+            plan.insert(index + 1, (model, tier, min(GENERATION_MAX_TOKENS_MAX, call_max_tokens * 2)))
+    if cooling and not tried:
+        result.status = "rate_limited"
+        result.message = f"every free model is rate limited (cooling down: {', '.join(cooling)})"
+        return result
     result.message = result.message or "all candidate models failed"
+    if cooling:
+        result.message += f" (rate limited, skipped: {', '.join(cooling)})"
     if paid is None and paid_possible:
         result.paid_available = True
         result.message += "; paid generation available with adult approval"

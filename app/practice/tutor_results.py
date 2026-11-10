@@ -148,6 +148,31 @@ class PracticeResults:
             SESSION_SQL.format(where=f"s.session_id = %s AND {STUDENT_ONLY}"), [session_id])
         return [{**self._session_view(r), "_allocation": r["allocation"]} for r in rows]
 
+    def bank_overview(self) -> dict[str, Any]:
+        """Latest inventory snapshot per subject (taken by `replenish assess`) and the replenishment requests:
+        every pending one and the 50 most recently closed. Counts and codes only, no question text."""
+        snapshots = self._rows(
+            """SELECT DISTINCT ON (subject) subject, baseline_version, taken_at, policy, inventory
+               FROM generation.inventory_snapshot ORDER BY subject, taken_at DESC""", [])
+        keys = ("eligible", "pending_review", "quarantined", "rejected", "served", "answered", "correct")
+        subjects = []
+        for snap in snapshots:
+            cells = snap["inventory"]
+            subjects.append({"subject": snap["subject"], "taken_at": snap["taken_at"].isoformat(),
+                             "policy": snap["policy"],
+                             "totals": {**{k: sum(c[k] for c in cells) for k in keys}, "cells": len(cells),
+                                        "covered_cells": sum(1 for c in cells if c["eligible"])},
+                             "cells": cells})
+        fields = """replenishment_id, subject, objective_code, difficulty, trigger, evidence, status, close_reason,
+                    candidates, calls, last_stop, created_at, updated_at"""
+        pending = self._rows(f"""SELECT {fields} FROM generation.replenishment_request
+                                 WHERE status IN ('open', 'candidates_generated') ORDER BY created_at""", [])
+        closed = self._rows(f"""SELECT {fields} FROM generation.replenishment_request WHERE status = 'closed'
+                                ORDER BY updated_at DESC LIMIT 50""", [])
+        for row in pending + closed:
+            row["created_at"], row["updated_at"] = row["created_at"].isoformat(), row["updated_at"].isoformat()
+        return {"subjects": subjects, "pending": pending, "closed": closed}
+
     def questions(self, subject: str | None = None, objective: str | None = None, date_from: date | None = None,
                   date_to: date | None = None, source: str | None = None) -> dict[str, Any]:
         """Per question: times served, answered, correct, incorrect, unanswered and success rate."""
@@ -227,5 +252,10 @@ def build_practice_results_router(results: PracticeResults, api_error: type[Exce
     @router.get("/questions")
     def questions(f: dict[str, Any] = Depends(filters)) -> dict[str, Any]:
         return results.questions(**f)
+
+    @router.get("/bank")
+    def bank() -> dict[str, Any]:
+        """T061/T062: the latest inventory snapshot per subject and the replenishment requests (read-only)."""
+        return results.bank_overview()
 
     return router

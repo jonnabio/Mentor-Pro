@@ -99,3 +99,12 @@ fail on exact cells while the bank holds suitable questions.
 - A bank-only request for a size the subject does not offer is refused
   with 422 `invalid_question_count`; nothing is created. Composition rules
   D1-D4 and the no-generation guarantee are unchanged.
+
+## Amendment T063 (2026-11-09): Sizes Offered Only When They Start
+
+- `POST /api/practice/availability` reports, for the student's current
+  choice, the permitted sizes the composer fills now (plus 5, which a
+  shortage generates). The UI offers only those; see
+  [ADR-036](ADR-036-question-bank-phase-b.md). Composition rules D1-D5, the
+  409 refusal and the no-generation guarantee for sizes above 5 are
+  unchanged.

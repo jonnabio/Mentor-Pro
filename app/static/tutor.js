@@ -283,6 +283,7 @@ async function openPractice() {
     return;
   }
   showPanel("practice");
+  api("/api/tutor/practice/bank").then(renderBank).catch(() => { $("bank-empty").hidden = false; });
   const select = $("pf-subject");
   if (select.options.length === 1) {
     for (const s of history.subjects) select.append(el("option", { value: s.code }, s.name_es));
@@ -313,6 +314,37 @@ async function openPractice() {
     el("strong", { class: "feedback-points" }, percent(q.success_rate)),
     el("span", { class: "meta-line" }, `${q.objective_code} · ${DIFFICULTY_ES[q.difficulty] || "Sin nivel"} · ` +
       `${SOURCE_ES[q.source]} · ${counts(q)}`))));
+}
+
+const TRIGGER_ES = {
+  coverage: "Sin preguntas disponibles",
+  low_inventory: "Pocas preguntas disponibles",
+  performance: "Alta precisión con suficientes respuestas",
+};
+const REQUEST_STATUS_ES = { open: "Por generar", candidates_generated: "Generadas, esperan su revisión" };
+
+function renderBank(bank) {
+  $("bank-empty").hidden = bank.subjects.length > 0;
+  $("bank-subjects").replaceChildren(...bank.subjects.map((s) => {
+    const t = s.totals;
+    const cells = el("ul", { class: "plain-list" }, ...s.cells.filter((c) => c.eligible || c.pending_review ||
+      c.served).map((c) => el("li", { class: "meta-line", "data-cell": `${c.objective_code}-${c.difficulty}` },
+      `${c.objective_code} · ${DIFFICULTY_ES[c.difficulty]}: disponibles ${c.eligible} · por revisar ` +
+      `${c.pending_review} · en cuarentena ${c.quarantined} · respondidas ${c.answered} · precisión ${percent(c.accuracy)}`)));
+    return el("li", { "data-bank-subject": s.subject },
+      el("span", { class: "objective-text" }, subjectName(s.subject)),
+      el("strong", { class: "feedback-points" }, String(t.eligible)),
+      el("span", { class: "meta-line" }, `Disponibles ${t.eligible} · Por revisar ${t.pending_review} · ` +
+        `En cuarentena ${t.quarantined} · Rechazadas por validación ${t.rejected} · ` +
+        `Celdas cubiertas ${t.covered_cells} de ${t.cells} · Medido ${when(s.taken_at)}`), cells);
+  }));
+  $("bank-pending-empty").hidden = bank.pending.length > 0;
+  $("bank-pending").replaceChildren(...bank.pending.map((r) => el("li", { "data-request": r.replenishment_id },
+    el("span", { class: "objective-text" }, `${subjectName(r.subject)} · ${r.objective_code} · ${DIFFICULTY_ES[r.difficulty]}`),
+    el("span", { class: "tutor-badge" }, REQUEST_STATUS_ES[r.status] || r.status),
+    el("span", { class: "meta-line" }, `Motivo: ${TRIGGER_ES[r.trigger] || r.trigger}` +
+      (r.evidence.answered ? ` (${r.evidence.answered} respuestas, precisión ${percent(r.evidence.accuracy)})` : "") +
+      ` · Preguntas generadas ${r.candidates}`))));
 }
 
 async function openPracticeSession(id) {
