@@ -39,3 +39,12 @@ def synthetic_client(tmp_path_factory):
     with TestClient(create_app(target.url, target.schema, SYNTHETIC)) as client:
         yield client
     drop_target(target)
+
+
+@pytest.fixture(autouse=True)
+def _reset_model_cooldown():
+    """T064: the rate-limit cooldown is process-wide; no test inherits another test's cooled models."""
+    from app.llm.cooldown import COOLDOWN
+    COOLDOWN.clear()
+    yield
+    COOLDOWN.clear()

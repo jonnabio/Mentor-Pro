@@ -34,6 +34,7 @@ STOP_ES = {
     "daily_budget": "Se alcanzó el límite diario de generación de preguntas.",
     "set_call_limit": "Se alcanzó el límite de solicitudes para esta práctica.",
     "llm_unavailable": "El servicio de generación de preguntas no respondió.",
+    "provider_rate_limited": "El servicio de generación de preguntas está saturado. Intente de nuevo más tarde.",
     "slot_retries_exhausted": "Algunas preguntas no superaron la revisión de calidad.",
     "interrupted": "La generación se interrumpió porque el servidor se reinició.",
     "internal_error": "Ocurrió un error inesperado al generar la práctica.",
@@ -52,6 +53,14 @@ class SessionRequest(BaseModel):
     client_request_id: str = Field(pattern=r"^[A-Za-z0-9-]{8,64}$")
     # Anonymous per-tab token (sessionStorage); only its hash is stored, to prefer unseen bank questions.
     browser_token: str | None = Field(default=None, pattern=r"^[A-Za-z0-9-]{16,64}$")
+
+
+class AvailabilityRequest(BaseModel):
+    """T063: a student's current choice, before any practice exists (read-only)."""
+    subject: Literal["espanol", "matematicas", "ciencias", "estudios_sociales"]
+    scope: PracticeScope
+    objective_codes: list[str] = Field(default_factory=list, max_length=100)
+    difficulty: Literal["easy", "medium", "hard", "mixed"]
 
 
 def shortage_message(requested: int, largest: int) -> str:
@@ -169,6 +178,28 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
             "questions": [question_view(r) for r in rows],
             "summary": summary(session, rows),
         }
+
+    @router.post("/availability")
+    def availability(request: AvailabilityRequest, conn: psycopg.Connection = Depends(catalog_dependency)) -> dict:
+        """T063 (RCA-006): the sizes this exact choice can start now. Bank sizes come from the real composer;
+        5 stays offered because a size-5 shortage generates the practice (T059). Nothing is created or called."""
+        sizes = (bank_only_enabled or {}).get(request.subject)
+        if sizes is None:
+            return {"bank_only": False, "question_counts": [5], "bank_counts": []}
+        if request.scope is not PracticeScope.SUBJECT_SIMULATION and not request.objective_codes:
+            return {"bank_only": True, "question_counts": [5] if 5 in sizes else [], "bank_counts": []}
+        try:
+            selection = select_objectives(conn, baseline, request.scope, request.subject,
+                                          request.objective_codes or None)
+        except SelectionError as exc:
+            raise api_error(422, "invalid_selection", selection_message(request.scope, str(exc))) from exc
+        _, _, bank = service.get()
+        with bank.connect() as db:
+            composer = BankComposer(bank, conn, baseline, request.subject, selection.objectives,
+                                    request.difficulty, db)
+            ready = composer.available_sizes(sizes)
+        counts = sorted(set(ready) | ({5} & set(sizes)))
+        return {"bank_only": True, "question_counts": counts, "bank_counts": ready}
 
     @router.post("/sessions", status_code=202)
     def create_session(request: SessionRequest, conn: psycopg.Connection = Depends(catalog_dependency)) -> dict:

@@ -297,6 +297,8 @@ def _generate(lock: SeedLock, catalog: psycopg.Connection, batch: dict[str, Any]
                     extra["paid_option"] = option
             if grant is not None and grant.stopped and grant.stopped != "authorization_ceiling":
                 return generated, calls, f"paid_{grant.stopped}"
+            if result.stop_reason == "provider_rate_limited":  # T064: stop the run, do not burn later cells
+                return generated, calls, "provider_rate_limited"
             if result.stop_reason in BUDGET_STOPS:  # the set call limit is this run's remaining max_calls
                 return generated, calls, ("run_call_limit" if result.stop_reason == "set_call_limit"
                                           else result.stop_reason)

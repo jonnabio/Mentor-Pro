@@ -1875,45 +1875,87 @@
       "id": "T061",
       "name": "Performance-based bank replenishment",
       "objective": "Identify bank cells to replenish from answer statistics and inventory gaps; free generation only, human review unchanged.",
-      "status": "pending",
+      "status": "in_progress",
       "role": "Developer",
       "files": {
-        "create": [],
-        "modify": []
-      }
+        "create": [
+          "tests/app/test_replenishment.py",
+          "docs/progress/task_T061_result.md"
+        ],
+        "modify": [
+          "app/practice/tutor_results.py",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "scripts/dev/practice_e2e.py"
+        ]
+      },
+      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Implemented and tested; production pending."
     },
     {
       "id": "T062",
       "name": "Approved inventory expansion and more subjects",
       "objective": "Fill single-objective and per-level Matemáticas cells; prepare bank-only for other subjects behind the per-subject switch.",
-      "status": "pending",
+      "status": "in_progress",
       "role": "Developer",
       "files": {
-        "create": [],
-        "modify": []
-      }
+        "create": [
+          "app/practice/replenishment.py",
+          "app/practice/replenish.py",
+          "docs/progress/task_T062_result.md"
+        ],
+        "modify": [
+          "docs/runbooks/production-deployment.md"
+        ]
+      },
+      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Implemented and tested; production pending."
     },
     {
       "id": "T063",
       "name": "Larger configurable bank-only quizzes (5-30)",
       "objective": "Offer sizes above 5 per subject when inventory allows; activation check covers every UI option (RCA-006).",
-      "status": "pending",
+      "status": "in_progress",
       "role": "Developer",
       "files": {
-        "create": [],
-        "modify": []
-      }
+        "create": [
+          "tests/app/test_quiz_sizes.py",
+          "docs/progress/task_T063_result.md"
+        ],
+        "modify": [
+          "app/practice/routes.py",
+          "app/practice/bank_allocation.py",
+          "app/static/app.js",
+          "scripts/dev/practice_e2e.py",
+          "docs/adr/ADR-035-bank-only-configurable-practice.md",
+          "docs/rca/regression-guards.yaml"
+        ]
+      },
+      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Implemented and tested; production pending."
     },
     {
       "id": "T064",
       "name": "Free-generation reliability",
       "objective": "Back-off on HTTP 429 and handling of truncated outputs for whole-session generation; generated-practice student completion still to be observed.",
-      "status": "pending",
+      "status": "in_progress",
       "role": "Developer",
       "files": {
-        "create": [],
-        "modify": []
-      }
+        "create": [
+          "app/llm/cooldown.py",
+          "tests/app/test_generation_reliability.py",
+          "docs/adr/ADR-036-question-bank-phase-b.md",
+          "docs/progress/task_T064_result.md"
+        ],
+        "modify": [
+          "app/llm/client.py",
+          "app/llm/router.py",
+          "app/llm/settings.py",
+          "app/generation/practice_set.py",
+          "app/practice/seeding.py",
+          "app/practice/routes.py",
+          "tests/app/test_openrouter.py",
+          "tests/app/conftest.py"
+        ]
+      },
+      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Implemented and tested; production pending."
     }
   ]
 }

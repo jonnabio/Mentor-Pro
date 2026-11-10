@@ -145,6 +145,18 @@
         <p class="muted small">"Sin responder" cuenta preguntas presentadas que el estudiante no contestó; no son incorrectas.</p>
         <ul id="practice-questions" class="plain-list feedback-scores"></ul>
       </details>
+      <!-- T061/T062: inventory and replenishment status (read-only; review verdicts are recorded by the tutor
+           with `seed_bank item-review-record`, never here). -->
+      <details id="bank-block">
+        <summary><h3 class="inline-heading">Banco de preguntas y reposición</h3></summary>
+        <p class="muted small">Disponibles: preguntas que las prácticas pueden usar. Por revisar: preguntas nuevas
+          que esperan su aprobación y no se muestran al estudiante. Toda la materia, todas las prácticas.</p>
+        <p id="bank-empty" class="muted" hidden>Todavía no hay un inventario medido.</p>
+        <ul id="bank-subjects" class="plain-list feedback-scores"></ul>
+        <h4>Reposición pendiente</h4>
+        <p id="bank-pending-empty" class="muted" hidden>No hay reposiciones pendientes.</p>
+        <ul id="bank-pending" class="plain-list feedback-scores"></ul>
+      </details>
     </section>
 
     <section id="tutor-practice-detail" class="card" hidden>

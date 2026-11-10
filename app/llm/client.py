@@ -69,6 +69,14 @@ def failure_category(http_status: int | None, error_kind: str | None = None,
         http_status, "request_rejected" if http_status and http_status >= 400 else None)
 
 
+def retry_after_seconds(value: str | None) -> float | None:
+    """Retry-After in seconds (delta form only; an HTTP date or garbage is ignored)."""
+    try:
+        return max(0.0, float(value)) if value else None
+    except ValueError:
+        return None
+
+
 def _json(response: httpx.Response) -> Any:
     try:
         return response.json()
@@ -119,6 +127,7 @@ class Attempt:
     error_kind: str | None = None
     reasoning_tokens: int | None = None
     failure_category: str | None = None
+    retry_after_s: float | None = None   # T064: the provider's Retry-After on a 429/5xx, in seconds
 
     def __post_init__(self) -> None:
         if self.failure_category is None and self.status != "ok":
@@ -258,9 +267,11 @@ class OpenRouterClient:
                 raise exc
             if response.status_code in RETRY_STATUSES:
                 status = "rate_limited" if response.status_code == 429 else "error"
+                wait = retry_after_seconds(response.headers.get("Retry-After"))
                 attempts.append(Attempt(model, number, status, latency, response.status_code,
-                                        error_kind=f"http_{response.status_code}"))
-                if number <= self.settings.max_retries:
+                                        error_kind=f"http_{response.status_code}", retry_after_s=wait))
+                # T064: a wait longer than the maximum back-off is not slept through; the router cools the model.
+                if number <= self.settings.max_retries and (wait is None or wait <= MAX_BACKOFF_S):
                     self._backoff(number, response.headers.get("Retry-After"))
                     continue
                 return attempts

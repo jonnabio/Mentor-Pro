@@ -33,11 +33,13 @@ from playwright.sync_api import Page, expect, sync_playwright
 from psycopg.types.json import Jsonb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from app.allocation import QUESTION_COUNTS  # noqa: E402
 from app.generation.practice_set import PracticeSetResult, SlotResult  # noqa: E402
 from app.generation.store import GenerationStore  # noqa: E402
 from app.generation.validation import CHECKER_VERSION  # noqa: E402
 from app.main import BASELINE_VERSION, create_app  # noqa: E402
 from app.practice.bank import QuestionBank  # noqa: E402
+from app.practice import replenishment  # noqa: E402
 from app.practice.mastery import RECOMMENDATIONS_ES  # noqa: E402
 from app.writing.store import WritingStore  # noqa: E402
 from curriculum import db, importer  # noqa: E402
@@ -1372,6 +1374,19 @@ def scenario_tutor_practice(tutor: Page, student: Page, report: Report, viewport
     sources = tutor.locator("#practice-questions li").evaluate_all("els => els.map(e => e.dataset.source)")
     report.check(bool(texts) and all("Generadas 0" not in t for t in texts) and set(sources) <= {"generated"},
                  f"[{name}] source filter shows only generated practices and questions")
+    # T061/T062: inventory and replenishment status from the latest snapshot (taken in run_mock), read-only.
+    tutor.locator("#bank-block summary").click()
+    expect(tutor.locator('#bank-subjects [data-bank-subject="matematicas"]')).to_be_visible()
+    eligible = writing_rows(url, "SELECT (SELECT SUM((c->>'eligible')::int) FROM jsonb_array_elements(inventory) c) "
+                                 "FROM generation.inventory_snapshot WHERE subject = 'matematicas' "
+                                 "ORDER BY taken_at DESC LIMIT 1")[0][0]
+    shown = tutor.locator('#bank-subjects [data-bank-subject="matematicas"] .feedback-points').inner_text()
+    pending_rows = writing_rows(url, "SELECT COUNT(*) FROM generation.replenishment_request "
+                                     "WHERE status IN ('open', 'candidates_generated')")[0][0]
+    report.check(shown == str(eligible) and tutor.locator("#bank-pending li").count() == pending_rows,
+                 f"[{name}] bank inventory ({eligible} available) and {pending_rows} pending replenishments as stored")
+    report.check(no_overflow(tutor), f"[{name}] no horizontal overflow on the bank inventory")
+    tutor.screenshot(path=str(out / f"{name}-bank.png"), full_page=True)
     after = writing_rows(url, "SELECT (SELECT COUNT(*) FROM practice.session), (SELECT COUNT(*) FROM practice.answer)")
     report.check(before == after, f"[{name}] reading results changed no practice data")
     report.check(not errors, f"[{name}] no JavaScript errors {errors}")
@@ -1497,6 +1512,8 @@ def run_mock(out: Path, url: str) -> Report:
     runner = ScriptedRunner()
     report = Report()
     prepare_database(url, seed_bank=True)
+    with db.connect(url, read_only=True) as catalog:   # T061: a snapshot for the tutor's bank view
+        replenishment.assess(url, catalog, BASELINE_VERSION, "matematicas", replenishment.Policy())
     with serve(create_app(url, practice_runner=runner, tutor_token=TUTOR_TOKEN)), sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome", headless=True)
         for viewport, size in (("desktop", DESKTOP), ("mobile", MOBILE)):
@@ -1542,6 +1559,7 @@ def run_mock(out: Path, url: str) -> Report:
             report.check(not errors, f"[{viewport}] no JavaScript errors {errors}")
             context.close()
         browser.close()
+    run_quiz_sizes(out, url, runner, report)
     return report
 
 
@@ -1559,7 +1577,7 @@ def run_practice(page: Page, report: Report, name: str, out: Path) -> dict:
         report.check(False, f"[{name}] generation failed: {page.locator('#progress-error').inner_text()}")
         return {"elapsed": elapsed, "info": info}
     total = int(page.locator("#quiz-position").inner_text().split(" de ")[1])
-    counts = answer_all(page, report, name, ["A", "B", "C", "D", "A"][:total], None, out)
+    counts = answer_all(page, report, name, [("A", "B", "C", "D", "A")[i % 5] for i in range(total)], None, out)
     report.check(counts["correct"] + counts["incorrect"] == total,
                  f"[{name}] answered {total}: {counts['correct']} correct, {counts['incorrect']} incorrect, "
                  f"result {page.locator('#result-percentage').inner_text()}")
@@ -1616,6 +1634,49 @@ def run_live(out: Path, url: str) -> Report:
         report.check(not errors, f"[live] no JavaScript errors {errors}")
         browser.close()
     return report
+
+
+def visible_counts(page: Page) -> list[int]:
+    return page.locator('input[name="question_count"]').evaluate_all(
+        "els => els.filter(e => !e.disabled && !e.parentElement.hidden).map(e => Number(e.value))")
+
+
+def run_quiz_sizes(out: Path, url: str, runner: ScriptedRunner, report: Report) -> None:
+    """T063 (RCA-006): with every size permitted, the UI offers only sizes the bank composes for the choice."""
+    with serve(create_app(url, practice_runner=runner, bank_only={"matematicas": QUESTION_COUNTS})),             sync_playwright() as p:
+        browser = p.chromium.launch(channel="chrome", headless=True)
+        for viewport, size in (("desktop", DESKTOP), ("mobile", MOBILE)):
+            context = browser.new_context(viewport=size, locale="es-CR", is_mobile=viewport == "mobile",
+                                          has_touch=viewport == "mobile")
+            page = context.new_page()
+            errors: list[str] = []
+            page.on("pageerror", lambda exc: errors.append(str(exc)))
+            name = f"{viewport}-sizes"
+            configure(page, "matematicas", list(BANK_OBJECTIVES), difficulty="Intermedia")
+            expect(page.locator("#practice-form")).not_to_have_attribute("data-counts", "")
+            offered = visible_counts(page)
+            api = page.evaluate("""async (codes) => (await (await fetch('/api/practice/availability', {method: 'POST',
+                headers: {'Content-Type': 'application/json'}, body: JSON.stringify({subject: 'matematicas',
+                scope: 'selected_objectives', objective_codes: codes, difficulty: 'medium'})})).json())""",
+                                list(BANK_OBJECTIVES))
+            report.check(offered == api["question_counts"] and offered[0] == 5,
+                         f"[{name}] sizes offered for a stocked choice match the server: {offered}")
+            largest = max(offered)
+            page.locator(f'input[name="question_count"][value="{largest}"]').check(force=True)
+            before = runner.calls
+            result = run_practice(page, report, f"{name}-{largest}", out)
+            report.check(result["info"]["composition"] == {"bank": largest, "generated": 0}
+                         and runner.calls == before, f"[{name}] the largest offered size ({largest}) starts at once")
+            leave_practice(page, runner, report, name, "menu", None)
+            configure(page, "matematicas", list(BANK_OBJECTIVES), difficulty="Difícil")  # no hard stock
+            expect(page.locator("#practice-form")).not_to_have_attribute("data-counts", "")
+            report.check(visible_counts(page) == [5] and page.locator("#count-note").is_visible(),
+                         f"[{name}] an unstocked level offers only 5 (generated) and says why")
+            report.check(no_overflow(page), f"[{name}] no horizontal overflow")
+            page.screenshot(path=str(out / f"{name}.png"), full_page=True)
+            report.check(not errors, f"[{name}] no JavaScript errors {errors}")
+            context.close()
+        browser.close()
 
 
 def scenario_bank_only(page: Page, runner: ScriptedRunner, report: Report, out: Path) -> None:
