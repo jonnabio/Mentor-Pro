@@ -425,15 +425,18 @@ def test_truncation_and_empty_replies_are_detected(body, status, kind):
 
 
 def test_truncated_generation_falls_back_and_is_recorded():
-    fake = FakeOpenRouter({"acme/big:free": [(200, reply(finish="length", tokens_out=6000), {})]})
+    # T064: one retry of the same model with twice the output limit, then the fallback model.
+    fake = FakeOpenRouter({"acme/big:free": [(200, reply(finish="length", tokens_out=6000), {}),
+                                             (200, reply(finish="length", tokens_out=12000), {})]})
     client, _ = make(fake)
     store = MemoryUsageStore()
-    result = route(client, store, MSG, "generation", max_tokens=6000)
+    result = route(client, store, MSG, "generation", max_tokens=6000, truncation_retry=True)
     assert result.status == "ok" and result.final.model_requested == "acme/small:free"
     first = store.records[0]
     assert (first["status"], first["error_kind"], first["tokens_out"]) == ("invalid_output", "truncated", 6000)
     assert [json.loads(r.content)["max_tokens"] for r in fake.requests
-            if r.url.path.endswith("/chat/completions")] == [6000, 6000]
+            if r.url.path.endswith("/chat/completions")] == [6000, 12000, 6000]
+    assert [r["status"] for r in store.records] == ["invalid_output", "invalid_output", "ok"]
 
 
 # ---------------------------------------------------------------- routing by purpose and reasoning control (T012)

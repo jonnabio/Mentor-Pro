@@ -1,8 +1,7 @@
 # T058 Result: Tutor HTTPS Access via Tailscale Serve
 
 - **Role:** Developer (PO authorization PO-T058-TAILSCALE-2026-11-09)
-- **Status:** in progress (repository change ready; Serve configuration,
-  release and deployment pending)
+- **Status:** verified (deployed 2026-11-09 as v2026.11.09-2)
 
 ## Decision
 
@@ -48,3 +47,26 @@ missing `tailscale`; the tool's only Tailscale call is
 `serve status --json`; the tutor binding is loopback only. Token
 acceptance, refusal and read-only practice results stay covered by
 `test_tutor_service.py` and `test_tutor_practice_results.py`.
+
+## Release
+
+- PR #59 merged into `dev` as `804305e` (dev CI 42640072137, green).
+  Authorization `PO-T058-TAILSCALE-2026-11-09`.
+- Release PR #65 merged into `main` as `6a25ee1` (run 42643333120, green);
+  tag `v2026.11.09-2`, image
+  `sha256:0cede5a3da3ea6346e5a763044cc77ba78efa631eb52fd5ba9d6404f91f5de9c`.
+- Administrator configured `tailscale serve --bg --https=8443
+  http://127.0.0.1:8081` and installed the updated deploy tool. Serve
+  after: `:443 -> 127.0.0.1:3001` unchanged, `:8443 -> 127.0.0.1:8081`,
+  both tailnet only, Funnel off.
+- Backup `mentor_pro_2026-11-09_233217.dump` verified; preflight
+  compatible; `DEPLOY OK`, smoke 13/13, `STATUS HEALTHY`. Window
+  `T058-2026-11-09`.
+
+## Acceptance (production, 2026-11-09)
+
+- Tutor page over HTTPS: 200. Correct code: queue, practice sessions and
+  questions 200 (15 sessions). Wrong or missing code: 403. POST: 405.
+- Tutor on the Wi-Fi address port 8081: 000 (not reachable).
+- Uptime Kuma on its existing URL: 302 (unchanged).
+- No production data, setting or student record changed.

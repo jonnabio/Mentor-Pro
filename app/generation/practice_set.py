@@ -191,6 +191,11 @@ def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store
                 with lock:
                     stop[0] = stop[0] or ("set_call_limit" if gate.set_limit_hit else "daily_budget")
                 return
+            if outcome.status == "unavailable" and any(r.startswith("generation rate_limited") for r in outcome.reasons):
+                # T064: every free model is cooling down after rate limits; retrying now would only repeat it.
+                with lock:
+                    stop[0] = stop[0] or "provider_rate_limited"
+                return
             # Other unavailable outcomes (model errors, truncation) count as a failed request and are retried.
 
     with ThreadPoolExecutor(max_workers=limits.concurrency, thread_name_prefix="slot") as pool:

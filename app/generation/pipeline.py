@@ -146,7 +146,7 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
         gen = route(client, store, messages, purpose="generation",
                     max_tokens=client.settings.generation_max_tokens, request_id=request_id,
                     practice_set_id=practice_set_id, gate=gate,
-                    models=client.settings.question_generation_models or None, **labels)
+                    models=client.settings.question_generation_models or None, truncation_retry=True, **labels)
         outcome.usage += gen.records
         if gen.status != "ok":
             outcome.status = "unavailable"
