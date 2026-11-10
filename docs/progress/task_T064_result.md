@@ -56,3 +56,8 @@ same-model retry.
   separate cooldowns, and a restart clears them.
 - The daily request budget still bounds everything. A truncation retry
   costs one extra call.
+
+## Release
+
+- PR #66 merged into `dev` as `f207de4` (dev CI 42750606976, green).
+  Authorization `PO-PHASE-B-PROD-2026-11-09`.

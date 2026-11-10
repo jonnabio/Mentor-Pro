@@ -47,3 +47,8 @@ Generation fills only the fixed 100-cell plan per subject (ADR-034). Once a
 subject's plan is full, a performance-triggered request closes as
 `no_planned_gap`. Generating beyond the plan, for example a second batch,
 needs a PO decision.
+
+## Release
+
+- PR #66 merged into `dev` as `f207de4` (dev CI 42750606976, green).
+  Authorization `PO-PHASE-B-PROD-2026-11-09`.

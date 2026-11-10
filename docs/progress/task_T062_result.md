@@ -32,3 +32,8 @@ Accepted questions overall:
 | M | 9 | 19 | 3 |
 | E | 10 | 11 | 1 |
 | C | 2 | 2 | 1 |
+
+## Release
+
+- PR #66 merged into `dev` as `f207de4` (dev CI 42750606976, green).
+  Authorization `PO-PHASE-B-PROD-2026-11-09`.
