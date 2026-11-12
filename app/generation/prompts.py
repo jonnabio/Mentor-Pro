@@ -12,7 +12,8 @@ import json
 from app.generation.grounding import GroundingBundle
 
 GENERATION_PROMPT_ID = "item-generation"
-GENERATION_PROMPT_VERSION = "1.3.0"  # 1.3.0: show announced data, units in options (L01-L03)
+GENERATION_PROMPT_VERSION = "1.4.0"  # 1.4.0 (T065): per-subject difficulty criteria, grounded support_terms
+# 1.3.0: show announced data, units in options (L01-L03)
 SOLVE_PROMPT_VERSION = "1.0.0"
 RUBRIC_PROMPT_VERSION = "1.1.0"  # 1.1.0: clarity covers missing data/units and inconsistency
 
@@ -22,6 +23,40 @@ DIFFICULTY_RULES = {
     "easy": "Fácil: un paso, información explícita, contexto familiar.",
     "medium": "Intermedia: dos pasos o una inferencia a partir del contexto.",
     "hard": "Difícil: razonamiento de varios pasos; seleccionar información relevante de irrelevante.",
+}
+
+# T065: what makes an item of each difficulty in each subject, for the generator only. The independent rubric
+# keeps judging against DIFFICULTY_RULES; these criteria do not change what passes, they make the generator
+# meet it. Production showed "hard" requests answered with one-step recognition items (rubric 0-1).
+SUBJECT_DIFFICULTY = {
+    "matematicas": {
+        "easy": "un solo cálculo o comparación directa con los números dados (p. ej. ¿cuál fracción es mayor?).",
+        "medium": "dos pasos: obtener un dato del contexto o de una tabla y luego calcular o comparar.",
+        "hard": ("al menos tres pasos encadenados: combinar dos o más condiciones, trabajar hacia atrás, o "
+                 "descartar datos irrelevantes que aparecen en el estímulo. NO es difícil: una sola conversión, "
+                 "leer un valor o comparar números dados, aunque sean grandes."),
+    },
+    "espanol": {
+        "easy": "la respuesta está escrita literalmente en una oración del texto.",
+        "medium": "hay que relacionar dos partes del texto o reconocer la idea principal de un párrafo.",
+        "hard": ("inferencia que integra todo el texto (propósito, conclusión, relación causa-efecto implícita); "
+                 "los distractores son afirmaciones parcialmente ciertas del mismo texto. NO es difícil: preguntar "
+                 "el orden o la estructura cuando el texto la marca con 'primero', 'luego', 'finalmente'."),
+    },
+    "ciencias": {
+        "easy": "reconocer una definición o un hecho de los CONCEPTOS.",
+        "medium": "aplicar un concepto a una situación descrita en el estímulo.",
+        "hard": ("analizar una situación nueva que relaciona dos o más conceptos, o predecir o explicar una "
+                 "consecuencia; los distractores son concepciones erróneas que mezclan términos correctos. NO es "
+                 "difícil: reconocer una definición o el orden de una lista."),
+    },
+    "estudios_sociales": {
+        "easy": "reconocer una definición, un lugar o un hecho de los CONCEPTOS.",
+        "medium": "aplicar un concepto a una situación de la comunidad descrita en el estímulo.",
+        "hard": ("analizar una situación nueva, comparar alternativas o inferir una consecuencia usando dos o más "
+                 "conceptos; las opciones incorrectas son plausibles para quien conoce solo una parte. NO es "
+                 "difícil: reconocer una definición o ubicar un lugar."),
+    },
 }
 
 SUBJECT_RULES = {
@@ -48,6 +83,12 @@ SUBJECT_RULES = {
         "aparezcan textualmente en los CONCEPTOS o la EVIDENCIA y en la opción correcta o la explicación."
     ),
 }
+# T065: production rejections listed terms the curriculum never states ("sistema circulatorio") or never used.
+GROUNDING_RULE = (
+    "Cada término de support_terms se copia de los CONCEPTOS o la EVIDENCIA y se usa en la opción correcta o "
+    "en la explicación; no liste términos que no use. La opción correcta y la explicación no dependen de "
+    "nombres o datos que no estén en los CONCEPTOS o la EVIDENCIA."
+)
 
 OUTPUT_SHAPE = {
     "stimulus": {"type": "none | text | table", "text": "contexto o texto (si aplica)"},
@@ -91,7 +132,10 @@ def generation_messages(bundle: GroundingBundle, difficulty: str, avoid_stems: l
         "Escriba UN ítem que evalúe la EVIDENCIA indicada, con el verbo de la evidencia.",
         "Forma actual: plantee una situación en un contexto cercano al estudiante costarricense "
         "(escuela, comunidad, feria, naturaleza) cuando sea apropiado.",
-        f"Dificultad: {DIFFICULTY_RULES[difficulty]}",
+        f"Dificultad: {DIFFICULTY_RULES[difficulty]} En {SUBJECT_ES[bundle.subject]} significa: "
+        f"{SUBJECT_DIFFICULTY[bundle.subject][difficulty]} Si la evidencia es de reconocimiento, logre la "
+        "dificultad con la situación (datos, pasos, condiciones), no con vocabulario más difícil. Antes de "
+        "responder, verifique que el ítem cumple esta dificultad.",
         "Exactamente cuatro opciones A, B, C y D; una sola correcta; distractores plausibles basados en errores comunes.",
         "Las cuatro opciones deben tener longitud y nivel de detalle similares; la correcta no puede ser notablemente más larga.",
         "Prohibido: 'todas las anteriores', 'ninguna de las anteriores', 'a y b'.",
@@ -102,6 +146,8 @@ def generation_messages(bundle: GroundingBundle, difficulty: str, avoid_stems: l
         "La explicación no debe agregar datos que no estén en el contenido curricular.",
         SUBJECT_RULES[bundle.subject],
     ]
+    if bundle.subject in ("ciencias", "estudios_sociales"):
+        rules.append(GROUNDING_RULE)
     if avoid_stems:
         rules.append("No repita estas preguntas: " + " | ".join(avoid_stems[:5]))
     if revision_notes:

@@ -28,7 +28,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from cr_math import AmbiguousNumberError, evaluate, parse_quantity  # noqa: E402
 
-CHECKER_VERSION = "1.6.0"  # 1.6.0: a proof must establish what the stem asks (M04 property and select rules)
+CHECKER_VERSION = "1.7.0"  # 1.7.0: F01 reads coordinated modifiers ("tejidos muscular y epitelial") (T065)
+# 1.6.0: a proof must establish what the stem asks (M04 property and select rules)
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "question-engine" / "question-item.schema.json"
 
 SUBJECT_CODES = {"espanol": "ESP", "matematicas": "MAT", "ciencias": "CIE", "estudios_sociales": "EST"}
@@ -401,6 +402,26 @@ def check_reading(item: dict[str, Any]) -> list[Check]:
     return checks
 
 
+_COORDINATED = re.compile(r"(?=\b(\w+) ((?:\w+, )*\w+,? (?:y|e|o|u) \w+)\b)")
+_SLASHED = re.compile(r"(?=\b(\w+) (\w+(?:/\w+)+)\b)")
+
+
+def coordinated_phrases(text: str) -> list[str]:
+    """T065: the phrases a coordinated list of single-word modifiers stands for, in normalized text.
+
+    "tejidos muscular, nervioso y epitelial" -> "tejido muscular", "tejidos nervioso", ...;
+    "inmunidad innata y adquirida" -> "inmunidad adquirida"; "hemisferio norte/occidental" ->
+    "hemisferio occidental". Only head + one listed word: nothing the text does not distribute is added.
+    """
+    out: list[str] = []
+    for pattern, split in ((_COORDINATED, r",? (?:y|e|o|u) |, "), (_SLASHED, r"/")):
+        for match in pattern.finditer(text):
+            head, members = match.group(1), re.split(split, match.group(2))
+            heads = {head, head[:-1]} if head.endswith("s") and len(head) > 3 else {head}
+            out += [f"{h} {m}" for h in sorted(heads) for m in members if m]
+    return out
+
+
 def check_facts(item: dict[str, Any], records: dict[str, dict[str, Any]], facts: list[str]) -> list[Check]:
     terms = item.get("subject_checks", {}).get("facts", {}).get("support_terms", [])
     if not terms:
@@ -411,6 +432,7 @@ def check_facts(item: dict[str, Any], records: dict[str, dict[str, Any]], facts:
         + [normalize(item.get("stimulus", {}).get("text", ""))]
         + [normalize(f) for f in facts]
     )
+    corpus = " | ".join([corpus, *coordinated_phrases(corpus)])
     unsupported = [t for t in terms if normalize(t) not in corpus]
     not_in_key = [t for t in terms if normalize(t) not in key_text and normalize(t) not in normalize(item.get("explanation", ""))]
     checks = [_check("F01", "fail", f"support terms not in sources/stimulus/facts: {unsupported}") if unsupported

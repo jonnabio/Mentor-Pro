@@ -1,153 +1,110 @@
-# Active Context: Session Handoff 2026-11-06
+# Active Context: Session Handoff 2026-11-12
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-06 (T055 released and deployed as
-  `v2026.11.05-2`, closed by the PO; T054 M09 question quarantined
-  `level` by the tutor; session end)
+- **Last Updated:** 2026-11-12 (Phase B activated in production; T065
+  generation-quality fix merged into `dev` via PR #68; not released)
 - **Active Role:** Developer
 - **Mode:** EXECUTION
-- **Earlier history:** T006–T050, deployment stages 6.1–6.3, ADR-030 to
-  ADR-033: see `docs/progress/task_T0xx_result.md`, `docs/planning/`,
+- **Earlier history:** T006-T055, deployment stages 6.1-6.3, ADR-030 to
+  ADR-035: see `docs/progress/task_T0xx_result.md`, `docs/planning/`,
   release records in `docs/progress/` and this file's Git history.
 
 ## Current Objective
 
-Matemáticas question bank population and activation (fast track). Goal:
-five-question bank-only Matemáticas practice (ADR-035).
+PO-QUESTION-BANK-COMPLETION-2026-11-11 (CRITICAL): make bank-only quiz
+sizes 10-30 operational. First milestone: a genuine 10-question
+Matemáticas practice. Increments: A generation quality (done, unreleased),
+B inventory via free runs plus tutor review, C sizes 10-30, D
+replenishment verified end to end.
 
 ## Handoff Summary
 
 ### Completed
 
-- **T051–T054** (earlier this session window): targeted seeding
-  (`v2026.11.04-1`), T052 pilot stopped, T053 explicit generation model
-  list (`v2026.11.05-1`), T054 live fallback pilot (1 M09 question).
-  See [T053 record](../progress/2026-11-05-production-release.md),
-  [T054 result](../progress/task_T054_result.md).
-- **T055** paid generation only with adult approval, read-only credit
-  checks, cost tracking, explicit `llm` migration L001 (ADR-009
-  amendment T055). [T055 result](../progress/task_T055_result.md).
-  - PR #53 (head `500c74b`, CI 42114069387) → `dev` `07d7238` (CI
-    42117635772). Release PR #54 (CI 42119143155) → `main` `c865c2b`
-    (CI 42120588276, Tag and Release green).
-  - Tag `v2026.11.05-2`, digest
-    `sha256:77d409027ded28ab12727b71ea0e763c8fd9489008a5edae53c49efdb341d110`,
-    manifest sha256 `1e7f3319…d29f` (identical on the server), writing
-    schema `0001..0001`.
-  - Deployment `PO-T055-2026-11-05` (window `T055-2026-11-05`):
-    preflight `DEPLOY COMPATIBLE`; backup
-    `mentor_pro_2026-11-05_223031.dump` (31 tables, 984 rows, sha256
-    `5ea6c54c…4549`) `VERIFY OK`.
-  - L001 from the released digest (one-shot `--rm` container on
-    `mentor-pro_default`, `DATABASE_URL` and `PGPASSWORD` passed
-    through): `base` → dry run (249 usage rows, digest `79a561d8…`) →
-    applied once → `current`; 249 rows, same digest; 0 authorizations.
-    The first status attempt failed on a missing password and changed
-    nothing.
-  - `DEPLOY OK`, `STATUS HEALTHY`, smoke 9/9; cost report works; `paid
-    list` empty; `paid estimate` refused ("paid generation is
-    disabled").
-  - PO decision: **T055 CLOSED** (2026-11-05).
-- **T054 M09 review** (`PO-T054-M09-REVIEW-2026-11-06`): the tutor
-  confirmed `quarantined` / `level` for `req-74baf4b32a7144eb` (cell 41,
-  E1, medium; mathematically correct, but the table gives the
-  definitions, so it is closer to easy). Recorded once with
-  `item-review-record --reviewer tutor` (`recorded 1, quarantined 1`).
-  Cell 41 is a gap again; batch still `open`/`pending`; `STATUS
-  HEALTHY`, smoke 9/9.
+- **Phase B release** `v2026.11.10-1` (T061-T064: reliability, sizes,
+  inventory, replenishment): PR #66 merged as `f207de4`, release PR #67
+  as `74eaaea`; deployed, `STATUS HEALTHY`, smoke 13/13.
+- **Phase B activation** (no code): the administrator set
+  `MENTOR_PRO_BANK_ONLY_SUBJECTS=matematicas:5,10,15,20,25,30` and
+  force-recreated the app; loaded config verified
+  (`{'matematicas': (5, 10, 15, 20, 25, 30)}`). Bounded free runs, review
+  files prepared, tutor API verified (403 without token, 200 with it),
+  low-yield diagnosis. Evidence:
+  [Phase B activation](../progress/2026-11-10-phase-b-activation.md).
+- **T065 Increment A** (generation quality): generation prompt 1.4.0
+  (`SUBJECT_DIFFICULTY`, `GROUNDING_RULE`), `item_checker.py` 1.7.0
+  (`coordinated_phrases` for F01). Rubric, thresholds, solve, duplicate
+  checks, limits and paid settings unchanged. Evidence: grounding replay
+  32/42 -> 38/42 (the 4 left are genuine); live benchmark accepted 2/12 ->
+  7/12, calls per accepted 24.0 -> 7.7, difficulty pass 2/14 -> 7/14.
+  [T065 result](../progress/task_T065_result.md). Tools:
+  `scripts/dev/replay_grounding.py`,
+  `scripts/dev/benchmark_generation_quality.py`.
+  - Branch `fix/T065-generation-quality`, PR #68 into `dev` (CI
+    43161957071 green; full ACE gate pass), merged into `dev` at
+    session end on the user's instruction.
+- `tasks.json`: T061-T064 `done`, T065 `in_progress`.
 
 ### Current State
 
-- **Production** (macedonianserver): `v2026.11.05-2`
-  (`77d40902…d110`) for app and tutor, `postgres:17.6`; writing schema
-  `current 0001`; `llm` migration L001 `current`; 9 dumps (latest
-  `mentor_pro_2026-11-05_223031.dump`).
-  - `OPENROUTER_QUESTION_GENERATION_MODELS=nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free`.
-  - `MENTOR_PRO_BANK_ONLY_ENABLED` absent (off); `/api/subjects`
-    `bank_only: false`, sizes `[5]`.
-  - Paid generation off: `OPENROUTER_ALLOW_PAID`, `OPENROUTER_PAID_MODEL`,
-    `OPENROUTER_PAID_MAX_USD_PER_OPERATION` and
-    `OPENROUTER_MANAGEMENT_KEY` absent. Daily limits 0 USD, 200 requests.
-  - Rollback target: `v2026.11.05-1` (`c1e6ba1a…e112`), same writing
-    schema, compatible with the migrated `llm` schema.
-- **Bank:** batch `bb-matematicas-cd792836` `open`/`pending`; 6/100
-  cells filled (6 adopted), 1 deactivated (the quarantined M09 item),
-  0 generated, 0 held. M09 0/5. Eligible Matemáticas inventory last
-  recorded as 12 (not re-counted after the quarantine; the item was
-  never servable, so it should be unchanged). Review file
-  `~/mentor-pro-review/T054-M09-2026-11-05.json` holds the verdict
-  (private).
-- **Repository:** `main` `c865c2b`; `dev` synced with `main` by the
-  session-end handoff PR (this file).
-- **Tracker:** T053 `verified`; T054, T055 `done` (T055 closed by the
-  PO); T052 `pending` (superseded by T054); T034, T035 pending.
+- **Production:** `v2026.11.10-1` (digest `a07867c8…3aef`), `STATUS
+  HEALTHY`, smoke 13/13. T065 is **not deployed**. Latest backup
+  `mentor_pro_2026-11-11_035231.dump` (sha256 `c22243c8…7b3a`) `VERIFY
+  OK`. Paid generation off.
+- **Availability:** every subject offers size 5 only. Matemáticas mixed
+  composes 5 from the bank; easy/medium/hard fall back to generation.
+- **Inventory (eligible / pending tutor / quarantined):** Matemáticas
+  30/5/1, Estudios Sociales 14/3/0, Español 8/0/0, Ciencias 5/3/0.
+- **Size gaps (mixed, whole subject):** Matemáticas size 10 lacks one
+  approved question each in M07, M12, M20 (15/20/25/30 lack 7/10/13/18).
+  Español size 5 short 3, size 10 short 6 objectives; Ciencias size 5
+  short 4, size 10 short 8; Estudios Sociales size 5 short 3, size 10
+  short 6.
+- **Repository:** `main` `74eaaea`; `dev` contains PR #68 plus this
+  handoff; no `dev` -> `main` release yet.
 - **Locks:** none (no seeding advisory lock, no lane claim, no paid
   operation `in_use`).
 
 ### Next Steps
 
-1. Record the T055 deployment evidence and closure in
-   `docs/progress/task_T055_result.md` and `tasks.json` (status
-   `verified`) inside the next functional PR, as the PO asked (not a
-   docs-only PR).
-2. With separate PO authorization, run targeted free seeding: M09
-   (cell 41 and others), M05, M14, M18 and a `hard` cell, so size-5
-   bank-only practice can be composed. Export each new question for
-   individual tutor review.
-3. Re-count the eligible Matemáticas inventory (read-only) at the start
-   of that work.
-4. Enabling paid approval in production (`OPENROUTER_ALLOW_PAID`,
-   `OPENROUTER_PAID_MODEL`, `OPENROUTER_PAID_MAX_USD_PER_OPERATION`,
-   optional management key) remains a separate administrator step under
-   PO authorization.
-5. Maintenance candidates: T035 (tutor exit 78 for short tokens), T034
-   (deterministic practice-set test), CI on PRs into `dev`. Stage 6.3
-   close: ADR-030 criterion 8 (restart part not yet shown).
+1. Get PO approval for the release of T065, then open the `dev` -> `main`
+   release PR (`--match-head-commit`), verify tag and GitHub Release.
+2. Deploy: manifest download and sha256 compare, preflight, backup,
+   verify-backup, deploy, status, smoke.
+3. Targeted free runs: `seed_bank run --subject matematicas --objective
+   M07|M12|M20 --max-calls ...` within daily limits, then the other
+   subjects' gaps (`replenish run` orders alphabetically, so target
+   objectives explicitly).
+4. Export review files including the 11 existing pending questions;
+   record only authentic tutor verdicts (`item-review-record --reviewer
+   tutor`); delete the review files after recording.
+5. Recount inventory, check `POST /api/practice/availability` for
+   Matemáticas size 10; verify replenishment end to end; record merge
+   SHAs, CI and deployment in `task_T065_result.md` and `tasks.json`.
 
 ### Blockers/Issues
 
-- **Bank-only blocker:** size 5 needs servable questions for M01, M05,
-  M09, M14, M18 and a `hard` question. M05, M09, M14, M18 have none.
-- **Provider capacity (T054):** Gemma 4 26B free returned HTTP 429 on
-  all 6 requests; Nemotron 3 Ultra truncated 2 of 3 generations at 4,000
-  tokens. An accepted question cost up to 5 calls; cell 41 has 6 failed
-  attempts.
-- **Generator difficulty calibration:** the M09 `medium` item was really
-  `easy` (definitions supplied in the stimulus). Expect more `level`
-  quarantines until prompts are tightened.
-- **Pending PO decision:** the sudo rule covers every `mentorpro`
-  command, including `migrate`, `rollback`, `maintenance`, `rehearse`
-  and `adopt-legacy`. Recommended (2026-11-01, not applied): allow
-  passwordless only `status`, `smoke`, `backup`, `verify-backup *`,
-  `preflight *` and `deploy *`. Administrator change (`visudo -f`, then
-  `visudo -c` and `sudo -n -l`).
-- **Root-owned tool copy:** when a release changes `deploy/`, the
-  administrator must re-run the three `sudo install` commands before
-  deploying.
-- **T046 limit:** the link works only on the house Wi-Fi (or with 8080
-  tunnelled too). In local development it points at production.
-- Never run a pre-T036 image on the migrated database. Recovery after a
-  failed migration is the G3 restore, a PO decision. The protected dump
-  is `mentor_pro_2026-10-31_170927.dump`.
-- `migrate rollback` (L001) refuses once any authorization or new-column
-  data exists; recovery is then from the backup, by PO decision.
-- T035, T034 pending.
-- CI skips 102 tests (baseline workbook not in Git); a green run is not
-  a full release gate.
-- Production practice generation takes about 5 minutes and may return
-  `partial` until the bank fills. No L5 writing exercises.
-- No login on the app; the tutor boundary is a shared token plus the
-  gateway address (ADR-024, ADR-031).
-- A real reboot with Wi-Fi publication (`ip_nonlocal_bind`) is untested.
-- The GHCR image is public, by decision.
-- The student's first name appears in pushed commit `42adbe7`;
-  rewriting it needs approval.
-- Remote branch `origin/copilot/clean-repository` remains.
-- Framework markdown lint debt (`docs/TODO-markdown-lint.md`).
-- Older items (T017 quarantine review, RCA-003, draft limits,
-  keyword-based checks, local `trust` auth, Edge automation): see this
-  file's Git history at 2026-10-30.
+- **PO release approval** for T065 (merged into `dev`, unreleased).
+- **Tutor review:** size 10 opens only after M07, M12, M20 questions are
+  approved by the tutor; 11 questions already pending.
+- Hard Ciencias/Estudios Sociales items under prompt 1.4.0 are often
+  rejected for near-identical options (C04, correct rejection); possible
+  follow-up prompt work.
+- Replenishment prioritisation is alphabetical by objective; possible
+  code follow-up (PO decision).
+- Pending PO decision: narrow the `mentorpro` sudo rule (see Git history
+  2026-11-06 for the recommendation).
+- Root-owned tool copy: when a release changes `deploy/`, the
+  administrator re-runs the three `sudo install` commands.
+- Environment changes need the administrator force-recreate:
+  `sudo docker compose -p mentor-pro -f
+  /usr/local/lib/mentor-pro/compose.yml --env-file
+  /opt/mentor-pro/release.env up -d --no-deps --force-recreate app`
+  (`deploy` on an unchanged digest does not reload env).
+- Older items (T034, T035, CI skips 102 tests, student name in commit
+  `42adbe7`, `origin/copilot/clean-repository`, markdown lint debt): see
+  this file's Git history at 2026-11-06.
 
 ### Notes
 
@@ -184,7 +141,9 @@ five-question bank-only Matemáticas practice (ADR-035).
     `ssh -N -L 8081:127.0.0.1:8081 jonnabio@100.64.84.15`, then open
     `http://127.0.0.1:8081/tutor`.
 - **Gate:** `bash .ace/scripts/verify.sh` (`VERIFY_RESULT=pass gate=all`,
-  4–12 min). Run pytest with `.venv/Scripts/python.exe`. On Windows, edit
+  4–12 min). Run pytest with `.venv/Scripts/python.exe`
+  (run `tests/app` and `tests/ace` separately; their conftests clash).
+  On Windows, edit
   accented text with the Edit tool, not heredocs.
 - **Records:** merge SHAs and CI go in the next substantive docs update,
   not in a docs-only PR. Skip `scripts/pubs/check_lane.py` (another
