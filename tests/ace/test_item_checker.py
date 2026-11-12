@@ -182,6 +182,38 @@ def test_reviewed_facts_can_ground_terms(item_by_subject, records_by_id, validat
     assert "F01" not in failing_ids(grounded)
 
 
+C01_FACTS = ["Células especializadas; tejidos muscular, nervioso, epitelial y sanguíneo.",
+             "Inmunidad innata y adquirida (natural o inducida): diferencias generales y ejemplos.",
+             "Localización: América Central; hemisferio norte/occidental."]
+
+
+@pytest.mark.parametrize("term", ["tejido muscular", "tejido epitelial", "tejidos sanguíneo",
+                                  "inmunidad adquirida", "hemisferio occidental", "hemisferio norte"])
+def test_t065_coordinated_curriculum_terms_are_grounded(item_by_subject, records_by_id, validator, term):
+    """T065: a term the curriculum states through a coordinated list counts as grounded (F01 pass)."""
+    item = item_by_subject["estudios_sociales"]
+    item["subject_checks"]["facts"]["support_terms"] = [term]
+    item["explanation"] += f" ({term})"
+    assert "F01" not in failing_ids(run(item, records_by_id, validator, facts=C01_FACTS))
+
+
+@pytest.mark.parametrize("term", ["sistema circulatorio", "tejido óseo", "muscular nervioso", "istmo centroamericano",
+                                  "inmunidad celular"])
+def test_t065_terms_the_curriculum_does_not_state_still_fail(item_by_subject, records_by_id, validator, term):
+    """T065: the expansion adds only head + listed word; unsupported content still fails F01."""
+    item = item_by_subject["estudios_sociales"]
+    item["subject_checks"]["facts"]["support_terms"] = [term]
+    item["explanation"] += f" ({term})"
+    assert "F01" in failing_ids(run(item, records_by_id, validator, facts=C01_FACTS))
+
+
+def test_t065_coordinated_phrases_expand_only_listed_modifiers():
+    text = item_checker.normalize("tejidos muscular, nervioso, epitelial y sanguíneo; hemisferio norte/occidental")
+    phrases = set(item_checker.coordinated_phrases(text))
+    assert {"tejido muscular", "tejido sanguineo", "hemisferio occidental"} <= phrases
+    assert not any("nervioso epitelial" in p or "muscular nervioso" in p for p in phrases)
+
+
 # ---------------------------------------------------------------- duplicates
 
 def test_exact_duplicate_in_bank_fails(item_by_subject, records_by_id, validator):

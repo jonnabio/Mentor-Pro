@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-11-05",
+  "updated": "2026-11-11",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -1875,7 +1875,7 @@
       "id": "T061",
       "name": "Performance-based bank replenishment",
       "objective": "Identify bank cells to replenish from answer statistics and inventory gaps; free generation only, human review unchanged.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1889,13 +1889,13 @@
           "scripts/dev/practice_e2e.py"
         ]
       },
-      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Implemented and tested; production pending."
+      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Released as v2026.11.10-1 (PR #66 as f207de4, release PR #67 as 74eaaea) and deployed 2026-11-10 under PO-PHASE-B-PROD-2026-11-09 (STATUS HEALTHY, smoke 13/13); sizes setting activated 2026-11-11 (docs/progress/2026-11-10-phase-b-activation.md). Inventory-constrained: see T065."
     },
     {
       "id": "T062",
       "name": "Approved inventory expansion and more subjects",
       "objective": "Fill single-objective and per-level Matemáticas cells; prepare bank-only for other subjects behind the per-subject switch.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1907,13 +1907,13 @@
           "docs/runbooks/production-deployment.md"
         ]
       },
-      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Implemented and tested; production pending."
+      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Released as v2026.11.10-1 (PR #66 as f207de4, release PR #67 as 74eaaea) and deployed 2026-11-10 under PO-PHASE-B-PROD-2026-11-09 (STATUS HEALTHY, smoke 13/13); sizes setting activated 2026-11-11 (docs/progress/2026-11-10-phase-b-activation.md). Inventory-constrained: see T065."
     },
     {
       "id": "T063",
       "name": "Larger configurable bank-only quizzes (5-30)",
       "objective": "Offer sizes above 5 per subject when inventory allows; activation check covers every UI option (RCA-006).",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1929,13 +1929,13 @@
           "docs/rca/regression-guards.yaml"
         ]
       },
-      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Implemented and tested; production pending."
+      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Released as v2026.11.10-1 (PR #66 as f207de4, release PR #67 as 74eaaea) and deployed 2026-11-10 under PO-PHASE-B-PROD-2026-11-09 (STATUS HEALTHY, smoke 13/13); sizes setting activated 2026-11-11 (docs/progress/2026-11-10-phase-b-activation.md). Inventory-constrained: see T065."
     },
     {
       "id": "T064",
       "name": "Free-generation reliability",
       "objective": "Back-off on HTTP 429 and handling of truncated outputs for whole-session generation; generated-practice student completion still to be observed.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -1955,7 +1955,30 @@
           "tests/app/conftest.py"
         ]
       },
-      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Implemented and tested; production pending."
+      "notes": "PO-QUESTION-BANK-PHASE-B-2026-11-09; ADR-036. Released as v2026.11.10-1 (PR #66 as f207de4, release PR #67 as 74eaaea) and deployed 2026-11-10 under PO-PHASE-B-PROD-2026-11-09 (STATUS HEALTHY, smoke 13/13); sizes setting activated 2026-11-11 (docs/progress/2026-11-10-phase-b-activation.md). Inventory-constrained: see T065."
+    },
+    {
+      "id": "T065",
+      "name": "Generation quality: difficulty calibration and grounding check",
+      "objective": "Raise accepted candidates per call without weakening validation: subject-specific difficulty criteria for the generator (rubric unchanged) and F01 reading coordinated curriculum terms; measured before/after.",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "scripts/dev/replay_grounding.py",
+          "scripts/dev/benchmark_generation_quality.py",
+          "docs/progress/task_T065_result.md",
+          "docs/progress/2026-11-10-phase-b-activation.md"
+        ],
+        "modify": [
+          "app/generation/prompts.py",
+          ".ace/skills/question-quality-review/scripts/item_checker.py",
+          "tests/app/test_generation.py",
+          "tests/ace/test_item_checker.py",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "notes": "PO-QUESTION-BANK-COMPLETION-2026-11-11. Generation prompt 1.4.0, checker 1.7.0; rubric prompt 1.1.0 unchanged."
     }
   ]
 }

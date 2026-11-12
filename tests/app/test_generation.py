@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import threading
 
@@ -134,6 +135,32 @@ def test_prompt_contains_curriculum_and_no_student_data(catalog_conn):
     user = messages[1]["content"]
     assert "Lee números  mayores que 100 000." in user and "<curriculo>" in user
     assert "Intermedia" in user and "expression" in user
+
+
+def test_t065_every_subject_and_difficulty_has_generation_criteria():
+    assert set(prompts.SUBJECT_DIFFICULTY) == set(prompts.SUBJECT_ES)
+    for criteria in prompts.SUBJECT_DIFFICULTY.values():
+        assert set(criteria) == set(prompts.DIFFICULTY_RULES)
+        assert "NO es difícil" in criteria["hard"]  # the observed failure: one-step items requested as hard
+
+
+@pytest.mark.parametrize("subject", ["matematicas", "espanol", "ciencias", "estudios_sociales"])
+def test_t065_generation_prompt_states_subject_difficulty(catalog_conn, subject):
+    base = bundle(catalog_conn, *(("espanol", "EL01") if subject == "espanol" else ("matematicas", "M01")))
+    grounded = dataclasses.replace(base, subject=subject)
+    user = prompts.generation_messages(grounded, "hard")[1]["content"]
+    assert prompts.SUBJECT_DIFFICULTY[subject]["hard"] in user
+    assert prompts.SUBJECT_DIFFICULTY[subject]["easy"] not in user
+    assert (prompts.GROUNDING_RULE in user) == (subject in ("ciencias", "estudios_sociales"))
+
+
+def test_t065_rubric_judges_against_the_unchanged_definition(catalog_conn):
+    """Independent difficulty validation is unchanged: the rubric never sees the generator's criteria."""
+    item = {"stimulus": {"type": "none"}, "stem": "¿?", "options": [], "answer_key": "A", "explanation": ""}
+    user = prompts.rubric_messages(bundle(catalog_conn), item, "hard")[1]["content"]
+    assert prompts.DIFFICULTY_RULES["hard"] in user
+    assert not any(c["hard"] in user for c in prompts.SUBJECT_DIFFICULTY.values())
+    assert prompts.RUBRIC_PROMPT_VERSION == "1.1.0"
 
 
 # ---------------------------------------------------------------- parsing
