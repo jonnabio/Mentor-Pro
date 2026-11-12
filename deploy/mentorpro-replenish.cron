@@ -1,0 +1,8 @@
+# Mentor Pro scheduled replenishment (T066). User crontab of the deploy user (docker group); no root needed.
+# Install: crontab -l | cat - deploy/mentorpro-replenish.cron | crontab -   (once; check with crontab -l)
+# Remove:  crontab -l | grep -v mentorpro-replenish | crontab -
+# The tick does nothing until MENTOR_PRO_REPLENISH_SCHEDULE=on in the app environment; pause at any time with
+# `docker exec mentor-pro-app-1 python -m app.practice.replenish pause --reason ...`.
+# Every 3 hours at :17, at most MENTOR_PRO_REPLENISH_TICK_CALLS free calls per tick (default 10, so <= 80/day),
+# inside the shared daily budget. One line per tick in the log; details in generation.replenish_tick.
+17 */3 * * * docker exec mentor-pro-app-1 python -m app.practice.replenish tick 2>&1 | head -1 | sed "s/^/$(date -u +\%FT\%TZ) /" >> $HOME/mentor-pro-review/runs/replenish-tick.log # mentorpro-replenish

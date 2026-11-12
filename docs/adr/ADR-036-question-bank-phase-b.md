@@ -149,9 +149,40 @@ preguntas y reposición".
 - Two additive tables are created `IF NOT EXISTS`. There is no versioned
   migration, and no existing row changes.
 
+## Amendment 2026-11-12: Scheduled Replenishment (T066)
+
+Authorization PO-QBANK-CONTINUATION-2026-11-12. T061 needed an
+administrator to start every `replenish run`. A host timer now runs
+`python -m app.practice.replenish tick` in the app container every three
+hours (`deploy/mentorpro-replenish.cron`, user crontab, no root).
+
+- **Off by default.** A tick does nothing unless
+  `MENTOR_PRO_REPLENISH_SCHEDULE=on`. `replenish pause --reason` and
+  `resume` act through the database, without a restart.
+- **Bounded.** At most `MENTOR_PRO_REPLENISH_TICK_CALLS` calls per tick
+  (default 10, at most 50), inside the shared daily budget; a budget or
+  provider stop ends the tick.
+- **One at a time.** A global non-blocking advisory lock: a second tick is
+  recorded as `skipped: busy`. Subject runs keep their own seeding lock.
+- **Coverage across subjects.** Subjects rotate: each tick starts after the
+  subject where the previous one ended.
+- **Unchanged guarantees.** Each subject pass is `replenishment.run`: one
+  pending request per cell, candidates awaiting review are never generated
+  again, planned gap cells only, free models only. Nothing records a
+  verdict.
+- **Observable.** Every tick is a row in `generation.replenish_tick`
+  (status `ok`, `skipped`, `failed` or `abandoned`, calls, per-subject
+  detail, error). `replenish schedule-status` shows the switch, the pause
+  and the count of consecutive failures; a failed tick exits 5.
+
+Why not a thread in the web app or a new compose service: a thread would
+spend LLM calls inside the student process, and a compose service needs a
+change to the root-owned deployment tool. A cron line calling the existing
+CLI adds no new process type.
+
 ## Related
 
 - Reports: `docs/progress/task_T061_result.md`, `task_T062_result.md`,
-  `task_T063_result.md`, `task_T064_result.md`
+  `task_T063_result.md`, `task_T064_result.md`, `task_T066_result.md`
 - [RCA-006](../rca/RCA-006-bank-only-shortage-dead-end.md) (every offered
   option must start)

@@ -583,3 +583,23 @@ The rate-limit cooldown is `OPENROUTER_RATE_LIMIT_COOLDOWN_S`.
 `MENTOR_PRO_BANK_ONLY_SUBJECTS=matematicas:5,10,15,20,25,30`. The student
 UI still offers only the sizes the bank composes for each choice, so
 permitting a size that the inventory cannot serve yet is safe.
+
+## M. Scheduled replenishment (T066, ADR-036 amendment)
+
+`A="docker exec mentor-pro-app-1 python -m app.practice.replenish"`.
+
+| Step | Command | Expected |
+| --- | --- | --- |
+| Install the timer (once) | `crontab -l \| cat - deploy/mentorpro-replenish.cron \| crontab -` | `crontab -l` shows the `mentorpro-replenish` line |
+| Enable (administrator) | add `MENTOR_PRO_REPLENISH_SCHEDULE=on` to `/etc/mentor-pro/app.env`, then the force-recreate command | `$A schedule-status` shows `"enabled": true` |
+| Status | `$A schedule-status` | recent ticks, `consecutive_failures` |
+| Pause / resume | `$A pause --reason <text>` / `$A resume` | next tick `skipped: paused` |
+| One tick by hand | `$A tick` | `TICK OK`, `TICK SKIPPED` or `TICK FAILED` (exit 5) |
+
+- The log is `~/mentor-pro-review/runs/replenish-tick.log`, one line per
+  tick. Two or more `consecutive_failures`: pause, then read the `error`
+  in `schedule-status`.
+- Candidates stay held until the tutor reviews them (section L). Pause
+  when the review backlog grows; a tick generates nothing for a cell whose
+  candidates still await review.
+- Paid generation is never used by a tick.
