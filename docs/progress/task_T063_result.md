@@ -34,3 +34,8 @@
   - The largest offered size (15 on the E2E bank) starts at once.
   - An unstocked level offers only 5.
   - No overflow and no JavaScript errors.
+
+## Release
+
+- PR #66 merged into `dev` as `f207de4` (dev CI 42750606976, green).
+  Authorization `PO-PHASE-B-PROD-2026-11-09`.
