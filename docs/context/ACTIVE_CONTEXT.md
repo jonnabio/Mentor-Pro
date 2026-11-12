@@ -141,7 +141,9 @@ replenishment verified end to end.
     `ssh -N -L 8081:127.0.0.1:8081 jonnabio@100.64.84.15`, then open
     `http://127.0.0.1:8081/tutor`.
 - **Gate:** `bash .ace/scripts/verify.sh` (`VERIFY_RESULT=pass gate=all`,
-  4–12 min). Run pytest with `.venv/Scripts/python.exe` (run `tests/app` and `tests/ace` separately; their conftests clash). On Windows, edit
+  4–12 min). Run pytest with `.venv/Scripts/python.exe`
+  (run `tests/app` and `tests/ace` separately; their conftests clash).
+  On Windows, edit
   accented text with the Edit tool, not heredocs.
 - **Records:** merge SHAs and CI go in the next substantive docs update,
   not in a docs-only PR. Skip `scripts/pubs/check_lane.py` (another
