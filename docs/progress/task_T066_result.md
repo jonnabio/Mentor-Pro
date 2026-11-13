@@ -78,3 +78,43 @@ reason is misleading in the tutor view. Follow-up candidate.
 3. Administrator adds `MENTOR_PRO_REPLENISH_SCHEDULE=on` to
    `/etc/mentor-pro/app.env` and force-recreates the app.
 4. Verify the first tick in `schedule-status` and the log.
+
+## Tutor Review PO-QBANK-REVIEW-20-2026-11-12
+
+Targeted free generation for 15 gap objectives (149 calls) produced 20
+candidates; M08, M15, EL05 and C16 produced none. The tutor reviewed
+all 20; each verdict was recorded once (`item-review-record --reviewer
+tutor`), 9 approved and 11 quarantined. The review schema stores the
+reason code only; the tutor's explanations are kept here.
+
+| Request | Objective | Verdict | Code | Tutor reason |
+| --- | --- | --- | --- | --- |
+| `req-e07cdca09b3f4faa` | M06 medium | approved | | |
+| `req-ddf0888559fb4de3` | M11 easy | approved | | |
+| `req-10c4d5e77b4144da` | EL07 medium | approved | | |
+| `req-edb10af3c21949d2` | EL07 hard | approved | | |
+| `req-408a2e676e1f4bba` | C08 medium | approved | | |
+| `req-75717ae8cdba43e4` | C12 easy | approved | | |
+| `req-272f773275f149a6` | ES06 hard | approved | | |
+| `req-65c9daa5baed4a10` | ES06 medium | approved | | |
+| `req-a8b7242764bd4bc9` | ES18 easy | approved | | |
+| `req-9925955af01246a1` | M11 hard | quarantined | `other` | Asks for an approximate area although the exact area is directly calculable. |
+| `req-51357afcbb374967` | M21 hard | quarantined | `off_curriculum` | Tests compound outcome counting, not recognising chance. |
+| `req-cb718ca19ce24143` | EL04 easy | quarantined | `other` | The passage supplies the answer verbatim. |
+| `req-1615d3d11a91416b` | EL04 medium | quarantined | `ambiguous` | Several consequences; "inmediata" does not single out the key. |
+| `req-2e7e508364d845cd` | C04 easy | quarantined | `other` | The key repeats the question wording; excessively cued. |
+| `req-1e10d7acd9f7482c` | C08 hard | quarantined | `other` | Guaria morada is nectarless and pollinated by orchid bees, not honeybees. |
+| `req-a5a61444392244c9` | ES06 easy | quarantined | `other` | Misleading oak-forest ecology and Valle Central association. |
+| `req-3ce3e99a85ec4923` | ES18 medium | quarantined | `other` | Near-duplicate of `req-a8b7242764bd4bc9`. |
+| `req-268ae6f6bf6d4b7a` | ES18 hard | quarantined | `level` | Weak distractors for hard difficulty. |
+| `req-3bdf87e3e1f1439a` | ES24 medium | quarantined | `ambiguous` | More than one option names a relevant Liberal Reform; imprecise wording. |
+| `req-ad4be33c895b41a9` | ES24 hard | quarantined | `other` | Attributes state secularisation to the 1871 Constitution, conflating later reforms. |
+
+After recording (real composer, `compose-check` and `POST
+/api/practice/availability`; pending review 0 in every subject):
+
+- Eligible: Matemáticas 42, Estudios Sociales 20, Español 10, Ciencias 10.
+- Matemáticas mixed `[5, 10]` from the bank; size 15 still lacks M08,
+  M15, M21.
+- Size 5 from the bank still lacks Español EL04, EL05; Ciencias C04,
+  C16; Estudios Sociales ES24. These subjects keep generated size 5.
