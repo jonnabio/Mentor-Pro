@@ -1,7 +1,7 @@
 # T065 Result: Generation Quality (Difficulty and Grounding)
 
 - **Role:** Developer (PO authorization PO-QUESTION-BANK-COMPLETION-2026-11-11)
-- **Status:** implemented and tested; release pending PO review
+- **Status:** done, verified in production (release `v2026.11.12-1`)
 
 ## Root Causes (production records, 2026-11-11)
 
@@ -105,3 +105,33 @@ Whole-subject mixed simulation, the composer's own allocation:
 Matemáticas 15/20/25/30 lack 7/10/13/18 questions. The pending M02/M03
 candidates do not unlock size 10; targeted runs (`seed_bank run
 --objective M07|M12|M20`) after release are the shortest path.
+
+## Release and Production Verification (2026-11-12)
+
+- Implementation PR #68 (head `8aada80`, CI 43161957071 green) merged into
+  `dev` as `ecfc6ef`; `dev` CI 43235704859 green.
+- Release PR #69 approved by the PO (PO-QBANK-FINAL-2026-11-12), merged
+  with `--match-head-commit` as `4245869`; `main` CI 43249020382 green
+  (Python Tests, Release Identity, Validate and Publish Docker Image, Tag
+  and Release).
+- Release `v2026.11.12-1`, digest `sha256:04e01d50…f3e8`; manifest sha256
+  `cec91911…16b3` identical on the server.
+- Deploy 2026-11-12T15:44:39Z: `PREFLIGHT OK` (no migration), backup
+  `mentor_pro_2026-11-12_154415.dump` (sha256 `cec2a5ee…eb7b`) `VERIFY
+  OK`, `DEPLOY OK`, smoke 13/13, `STATUS HEALTHY`; window
+  `T065-RELEASE-2026-11-12`. Running container: generation prompt 1.4.0,
+  checker 1.7.0; paid generation off.
+
+### Acceptance
+
+Accepted candidates per call rise without weakening validation:
+
+- Production targeted runs (M07, M12, M20; 12 calls each): 8 candidates
+  from 36 calls (0.22 per call; 0.10 per call on 2026-11-11 with 1.3.0).
+- Tutor review (QBANK-FINAL): 5 approved, 3 quarantined (an avoidable
+  inconsistency in the context, a reflection beyond primary level, an
+  artificial statistic whose key equals the mode). The checker passed all
+  three; only the human review caught them, as designed.
+- Matemáticas whole-subject mixed size 10 composes from the bank (10
+  distinct questions, M01-M20, 4 easy, 3 medium, 3 hard) and the student
+  availability API offers `[5, 10]`.
