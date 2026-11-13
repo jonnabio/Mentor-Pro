@@ -1,8 +1,8 @@
 # T066 Result: Scheduled Replenishment
 
 - **Role:** Developer (PO authorization PO-QBANK-CONTINUATION-2026-11-12)
-- **Status:** implemented and tested; PO review of the PR required before
-  release and activation
+- **Status:** released and deployed (`v2026.11.13-1`); activation awaits
+  the administrator (`MENTOR_PRO_REPLENISH_SCHEDULE=on`)
 - **Decision:** [ADR-036 amendment](../adr/ADR-036-question-bank-phase-b.md)
 
 ## Problem
@@ -85,6 +85,29 @@ reason is misleading in the tutor view. Follow-up candidate.
 3. Administrator adds `MENTOR_PRO_REPLENISH_SCHEDULE=on` to
    `/etc/mentor-pro/app.env` and force-recreates the app.
 4. Verify the first tick in `schedule-status` and the log.
+
+## Release PO-T066-PROD-2026-11-13
+
+- PR #70 (head `4bd1dcb`, PO-reviewed; wrapper correction after review)
+  merged into `dev` as `9cedc5c`; `dev` CI 43488568358 green.
+- Release PR #71 merged into `main` as `ccdf122`; `main` CI 43491602850
+  green (Python Tests, Release Identity, Validate and Publish Docker
+  Image, Tag and Release). `dev` synced to `main`.
+- `v2026.11.13-1`, image digest `sha256:064b9131…23fe`, manifest sha256
+  `2c554b81…ca21` (download and server copy identical).
+- Preflight `DEPLOY COMPATIBLE` (schema 0001..0001, live 0001). Backup
+  `mentor_pro_2026-11-13_193249.dump` (sha256 `092def74…7f56`) `VERIFY
+  OK`. Deploy window `T066-RELEASE-2026-11-13`: `DEPLOY OK`, smoke 13/13,
+  `STATUS HEALTHY`.
+- Wrapper installed (`~/mentor-pro-review/bin`, mode 700); cron line
+  installed once (`crontab -l` shows one `mentorpro-replenish` line; cron
+  active). `--check`: `CHECK_OK`, log directory 700, log 600.
+- Default off: `schedule-status` `"enabled": false`; a wrapper tick logged
+  `RESULT=SKIPPED ... reason=disabled calls=0`, `llm.usage_record`
+  unchanged (697 rows before and after). Paid stays off.
+- Pause and resume through the database, no restart.
+- Busy-lock skip and a bounded enabled tick are verified after the
+  administrator enables the schedule.
 
 ## Tutor Review PO-QBANK-REVIEW-20-2026-11-12
 
