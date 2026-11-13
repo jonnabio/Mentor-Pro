@@ -590,14 +590,19 @@ permitting a size that the inventory cannot serve yet is safe.
 
 | Step | Command | Expected |
 | --- | --- | --- |
+| Install the wrapper (once) | `install -m 700 -D deploy/mentorpro-replenish-tick.sh ~/mentor-pro-review/bin/mentorpro-replenish-tick.sh` | file present, mode 700 |
+| Check before activation | `~/mentor-pro-review/bin/mentorpro-replenish-tick.sh --check` | `CHECK_OK`, exit 0 (creates the log directory, mode 700) |
 | Install the timer (once) | `crontab -l \| cat - deploy/mentorpro-replenish.cron \| crontab -` | `crontab -l` shows the `mentorpro-replenish` line |
 | Enable (administrator) | add `MENTOR_PRO_REPLENISH_SCHEDULE=on` to `/etc/mentor-pro/app.env`, then the force-recreate command | `$A schedule-status` shows `"enabled": true` |
 | Status | `$A schedule-status` | recent ticks, `consecutive_failures` |
 | Pause / resume | `$A pause --reason <text>` / `$A resume` | next tick `skipped: paused` |
 | One tick by hand | `$A tick` | `TICK OK`, `TICK SKIPPED` or `TICK FAILED` (exit 5) |
 
-- The log is `~/mentor-pro-review/runs/replenish-tick.log`, one line per
-  tick. Two or more `consecutive_failures`: pause, then read the `error`
+- The log is `~/mentor-pro-review/runs/replenish-tick.log` (mode 600), one
+  `RESULT=` line per tick: `OK` and `SKIPPED` (exit 0) are normal;
+  `TICK_FAILED` (5), `ERROR` (tick exit code), `CONTAINER_MISSING` (20),
+  `DOCKER_ERROR` (21) and `LOG_ERROR` (22, to cron mail) need attention.
+  Failures append up to 20 indented output lines; secrets are redacted. Two or more `consecutive_failures`: pause, then read the `error`
   in `schedule-status`.
 - Candidates stay held until the tutor reviews them (section L). Pause
   when the review backlog grows; a tick generates nothing for a cell whose

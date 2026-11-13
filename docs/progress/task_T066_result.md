@@ -32,8 +32,15 @@ tracker, not an operational workflow.
 - `replenish tick | schedule-status | pause --reason | resume`; a failed
   tick exits 5.
 - `deploy/mentorpro-replenish.cron`: user crontab line, every 3 hours,
-  one log line per tick. No change to the root-owned deployment tool or
-  `compose.yml` (settings arrive through `env_file`).
+  calling `deploy/mentorpro-replenish-tick.sh` (PO review correction):
+  keeps the real exit status of `replenish tick`; logs one classified
+  `RESULT=` line (`OK`, `SKIPPED`, `TICK_FAILED` 5, `ERROR` rc,
+  `CONTAINER_MISSING` 20, `DOCKER_ERROR` 21, `LOG_ERROR` 22); on failure
+  appends at most 20 output lines; redacts key/token/password values,
+  bearer tokens and URL credentials; creates the log directory (700, log
+  600); `--check` verifies directory and container before activation.
+  Tests: `tests/app/test_replenish_tick_wrapper.py` (12, fake `docker`).
+  No change to the root-owned deployment tool or `compose.yml`.
 - Runbook section M.
 
 ## Guarantees Kept
@@ -74,7 +81,7 @@ reason is misleading in the tutor view. Follow-up candidate.
 ## Activation (after PO review and release)
 
 1. Release and deploy through the normal workflow.
-2. Install the cron line (runbook M).
+2. Install the wrapper, run `--check`, install the cron line (runbook M).
 3. Administrator adds `MENTOR_PRO_REPLENISH_SCHEDULE=on` to
    `/etc/mentor-pro/app.env` and force-recreates the app.
 4. Verify the first tick in `schedule-status` and the log.
