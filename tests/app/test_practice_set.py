@@ -339,3 +339,32 @@ def test_output_keeps_allocation_order_when_completion_order_differs(catalog_con
     completion = [r["slot"] for r in store.rows]
     assert completion != sorted(completion)  # completion order really differed
     assert all(s.item["curriculum_ref"]["evidencia_id"] == s.evidence_id for s in result.slots)
+
+
+@pytest.mark.parametrize("cap", [3, 4, 5, 7])
+def test_whole_attempt_guard_never_leaves_a_question_unchecked(catalog_conn, cap):
+    """T067 (seeding): with attempt_calls set, no attempt starts that the cap cannot finish."""
+    result, _, usage, _ = run_set(catalog_conn, FakeLlm([math_item(i) for i in range(5)]),
+                                  SetLimits(max_calls_per_set=cap, concurrency=1, attempt_calls=3))
+    sent = [r for r in usage.records if r["status"] != "budget_blocked"]
+    assert len(sent) <= cap
+    assert not [r for r in usage.records if r["status"] == "budget_blocked"]   # nothing generated then blocked
+    assert result.stop_reason == "set_call_limit"
+    by_request = {}
+    for r in sent:
+        by_request.setdefault(r["request_id"], []).append(r["purpose"])
+    assert all("review" in purposes for purposes in by_request.values())       # every generated item reviewed
+
+
+def test_whole_attempt_guard_is_off_by_default(catalog_conn):
+    assert SetLimits().attempt_calls == 0
+
+
+def test_without_the_guard_a_cap_can_strand_a_generated_question(catalog_conn):
+    """The defect T067 fixes: the cap blocks the checks of a question already generated."""
+    stranded = []
+    for cap in (3, 4, 5, 7):
+        _, _, usage, _ = run_set(catalog_conn, FakeLlm([math_item(i) for i in range(5)]),
+                                 SetLimits(max_calls_per_set=cap, concurrency=1))
+        stranded.append(any(r["status"] == "budget_blocked" for r in usage.records))
+    assert any(stranded)

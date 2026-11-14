@@ -36,7 +36,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from app.practice import seeding
+from app.practice import coverage, seeding
 from app.practice.bank import QuestionBank
 from app.practice.tutor_results import PracticeResults
 from curriculum.catalog import PracticeScope, select_objectives
@@ -90,6 +90,7 @@ class Policy:
     mastery_threshold: float = 0.80
     low_inventory: int = 3
     max_batch: int = 100
+    objective_calls: int = 5  # T067: calls one objective may spend per pass, so a low-yield cell cannot take all
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> Policy:
@@ -99,6 +100,7 @@ class Policy:
                 mastery_threshold=float(env.get("MENTOR_PRO_REPLENISH_MASTERY", cls.mastery_threshold)),
                 low_inventory=int(env.get("MENTOR_PRO_REPLENISH_LOW_INVENTORY", cls.low_inventory)),
                 max_batch=int(env.get("MENTOR_PRO_REPLENISH_MAX_BATCH", cls.max_batch)),
+                objective_calls=int(env.get("MENTOR_PRO_REPLENISH_OBJECTIVE_CALLS", cls.objective_calls)),
             )
         except ValueError as exc:
             raise PolicyError(f"invalid replenishment setting: {exc}") from None
@@ -114,6 +116,8 @@ class Policy:
             raise PolicyError("MENTOR_PRO_REPLENISH_LOW_INVENTORY must be zero or positive")
         if not 1 <= self.max_batch <= 100:
             raise PolicyError("MENTOR_PRO_REPLENISH_MAX_BATCH must be 1..100")
+        if not 1 <= self.objective_calls <= 50:
+            raise PolicyError("MENTOR_PRO_REPLENISH_OBJECTIVE_CALLS must be 1..50")
 
 
 def ensure_schema(url: str) -> None:
@@ -268,14 +272,63 @@ def requests(url: str, baseline: str, subject: str | None = None, pending_only: 
             return []
 
 
+# ---------------------------------------------------------------- yield and priority (T067)
+
+
+def yields(url: str, baseline: str, codes: list[str], days: int = 14) -> dict[tuple[str, str], dict[str, Any]]:
+    """Seeder generation outcomes per objective and difficulty over `days` (counts and reason codes only).
+
+    content_attempts are accepted or rejected attempts (the question was judged); unavailable attempts failed
+    for infrastructure (no model, rubric or solve available) and say nothing about the cell.
+    """
+    out: dict[tuple[str, str], dict[str, Any]] = {}
+    with _connect(url) as conn:
+        conn.read_only = True
+        rows = conn.execute(
+            """SELECT objective_code, difficulty, status, calls, reasons FROM generation.question_attempt
+               WHERE baseline_version = %s AND objective_code = ANY(%s) AND practice_set_id LIKE 'seed-%%'
+                 AND created_at >= now() - make_interval(days => %s)""", (baseline, codes, days)).fetchall()
+    for r in rows:
+        y = out.setdefault((r["objective_code"], r["difficulty"]), {
+            "attempts": 0, "accepted": 0, "rejected": 0, "unavailable": 0, "content_attempts": 0, "calls": 0,
+            "reasons": Counter()})
+        y["attempts"] += 1
+        y[r["status"]] += 1
+        y["content_attempts"] += r["status"] in ("accepted", "rejected")
+        y["calls"] += r["calls"]
+        for reason in r["reasons"] or []:
+            y["reasons"][_reason_code(str(reason))] += 1
+    return out
+
+
+def _reason_code(reason: str) -> str:
+    """A stable short code for a rejection reason: 'rubric 1 for [...]' -> 'rubric:difficulty_match', etc."""
+    if reason.startswith("rubric ") and "[" in reason:
+        return "rubric:" + ",".join(p.strip(" '") for p in reason[reason.index("[") + 1:reason.rindex("]")].split(","))
+    head = reason.split(":")[0].strip()
+    return head[:40]
+
+
+def priority(url: str, catalog: psycopg.Connection, baseline: str, subject: str) -> dict[str, Any]:
+    """Composer coverage report plus the objective order generation follows (read-only)."""
+    objectives = select_objectives(catalog, baseline, PracticeScope.SUBJECT_SIMULATION, subject).objectives
+    codes = [o["workbook_code"] for o in objectives]
+    cov = coverage.report(QuestionBank(url), catalog, baseline, subject, objectives)
+    found = yields(url, baseline, codes)
+    return {"coverage": cov, "order": coverage.priorities(cov, codes, found), "yields": found}
+
+
 # ---------------------------------------------------------------- generation
 
 
 def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_factory: Callable[[], tuple],
         policy: Policy, max_calls: int, seed_run: Callable[..., dict[str, Any]] = seeding.run) -> dict[str, Any]:
-    """Assess, then generate candidates for open requests, objective by objective, until `policy.max_batch`
-    candidates or `max_calls` calls. Free models only (no paid opener is ever passed). Each objective is
-    generated once per run even when several of its difficulties are open."""
+    """Assess, then generate candidates for open requests until `policy.max_batch` candidates or `max_calls`.
+
+    T067: objectives are taken in the composer's priority order (`coverage.priorities`: the smallest practice
+    size that does not compose first), each with at most `policy.objective_calls` calls per pass and its
+    planned gap cells tried in the preferred level order. A second pass gives leftover calls to objectives the
+    per-objective cap stopped before any candidate. Free models only (no paid opener is ever passed)."""
     if max_calls < 0:
         raise seeding.SeedError("max_calls must be zero or positive")
     assessed = assess(url, catalog, baseline, subject, policy)
@@ -283,16 +336,30 @@ def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_
     by_objective: dict[str, list[dict[str, Any]]] = {}
     for r in sorted(open_rows, key=lambda r: (TRIGGERS.index(r["trigger"]), r["objective_code"], r["difficulty"])):
         by_objective.setdefault(r["objective_code"], []).append(r)
+    ranked = priority(url, catalog, baseline, subject)["order"] if by_objective else {}
+    plan: dict[str, dict[str, Any]] = {}
+    for code, rows in by_objective.items():
+        p = dict(ranked.get(code, {"tier": 5, "tier_name": "depth", "size": None, "levels": [], "low_yield": False}))
+        if all(r["trigger"] == "performance" for r in rows):
+            p.update(tier=6, tier_name="performance")
+        plan[code] = p
+    order = sorted(by_objective, key=lambda c: (plan[c]["tier"], plan[c].get("low_yield", False), c))
     generated = calls = 0
     stop = None
-    runs = []
-    for objective, rows in by_objective.items():
+    runs: list[dict[str, Any]] = []
+    queue, retry = list(order), []
+    first_pass = True
+    while queue:
+        objective = queue.pop(0)
+        rows = by_objective[objective]
         remaining = max_calls - calls
         if remaining <= 0 or generated >= policy.max_batch:
             stop = "run_call_limit" if remaining <= 0 else "max_batch"
             break
+        cap = min(remaining, policy.objective_calls) if first_pass else remaining
         try:
-            out = seed_run(url, catalog, baseline, subject, llm_factory, max_calls=remaining, objective=objective)
+            out = seed_run(url, catalog, baseline, subject, llm_factory, max_calls=cap, objective=objective,
+                           prefer=tuple(plan[objective]["levels"]) or None)
         except seeding.SeedError as exc:
             if "has no planned cell" not in str(exc):
                 raise
@@ -300,7 +367,10 @@ def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_
         result = out["run"]
         generated += result["generated"]
         calls += result["calls"]
-        runs.append({"objective_code": objective, **{k: result.get(k) for k in ("generated", "calls", "stop_reason")}})
+        runs.append({"objective_code": objective, "pass": 1 if first_pass else 2,
+                     **{k: plan[objective].get(k) for k in ("tier", "tier_name", "size", "levels")},
+                     **{k: result.get(k) for k in ("generated", "calls", "stop_reason")}})
+        capped = result.get("stop_reason") == "run_call_limit" and cap < remaining
         with _connect(url) as conn:
             for r in rows:
                 if result["generated"]:
@@ -318,9 +388,14 @@ def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_
                     conn.execute("UPDATE generation.replenishment_request SET calls = calls + %s, last_stop = %s, "
                                  "updated_at = now() WHERE replenishment_id = %s",
                                  (result["calls"], result.get("stop_reason"), r["replenishment_id"]))
-        if result.get("stop_reason") in ("daily_budget", "provider_rate_limited", "run_call_limit"):
+        if result.get("stop_reason") in ("daily_budget", "provider_rate_limited") or \
+                (result.get("stop_reason") == "run_call_limit" and not capped):
             stop = result["stop_reason"]
             break
+        if capped and not result["generated"]:
+            retry.append(objective)          # stopped by the per-objective cap only: may use leftover calls
+        if not queue and first_pass and retry:
+            queue, retry, first_pass = retry, [], False
     return {"subject": subject, "assessed": assessed["totals"], "opened": len(assessed["opened"]),
             "generated": generated, "calls": calls, "stop_reason": stop, "runs": runs,
             "pending": requests(url, baseline, subject, pending_only=True)}

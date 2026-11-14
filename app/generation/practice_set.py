@@ -42,6 +42,7 @@ class SetLimits:
     max_questions: int = 5
     max_requests_per_slot: int = 3
     max_calls_per_set: int = 80
+    attempt_calls: int = 0  # T067: calls a whole attempt needs before one starts (0 = no check; seeding sets it)
     concurrency: int = 2
 
     @classmethod
@@ -151,6 +152,7 @@ def generate_set(conn: psycopg.Connection, client: OpenRouterClient, usage_store
     bundles = {s.slot: build_grounding(conn, baseline, subject, s.objective_code, s.evidence_ordinal) for s in slots}
 
     gate = BudgetGate(usage_store, client.settings, max_calls=limits.max_calls_per_set)
+    gate.attempt_calls = limits.attempt_calls
     lock = threading.Lock()
     committed: list[dict[str, Any]] = list(seed_items or [])
     outcomes: dict[int, list[GenerationOutcome]] = {s.slot: [] for s in slots}

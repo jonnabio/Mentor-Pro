@@ -180,6 +180,34 @@ spend LLM calls inside the student process, and a compose service needs a
 change to the root-owned deployment tool. A cron line calling the existing
 CLI adds no new process type.
 
+## Amendment: Coverage-Driven Priority (T067, 2026-11-14)
+
+PO-QBANK-COMPLETION-2026-11-14. Ticks spent calls on whichever open
+request came first alphabetically, and one objective could take a whole
+tick. Now:
+
+- **The composer decides.** `coverage.report` asks `BankComposer` which
+  sizes 5-30 compose and what each missing size lacks (objective and
+  level counts). Objectives are generated in tiers: the smallest mixed size
+  that does not compose; objectives with no eligible question; single-level
+  size 5; larger sizes; depth; performance last.
+- **Bounded shares.** An objective spends at most
+  `MENTOR_PRO_REPLENISH_OBJECTIVE_CALLS` (default 5, 1-50) per pass; a
+  subject at most `max(objective calls, ceil(tick / subjects))` of a tick.
+  Leftover calls go to the next subject.
+- **Levels.** Unblocking prefers easy, medium, hard (hard is rejected for
+  difficulty most often); depth builds the scarcest level; a level with
+  three judged attempts and none accepted in 14 days goes last.
+- **Whole attempts.** Seeding starts a generation attempt only when the
+  call cap covers generation, solve and review (3 calls). Before, the cap
+  blocked the checks of an already generated question, which was then
+  discarded as `rubric unavailable`. Live practice sets are unchanged
+  (`SetLimits.attempt_calls` 0).
+
+Unchanged: the fixed 100-cell plan and its cells (the order only decides
+which planned gap cells are tried first), validation, free models only,
+one pending request per cell, no automatic verdict.
+
 ## Related
 
 - Reports: `docs/progress/task_T061_result.md`, `task_T062_result.md`,

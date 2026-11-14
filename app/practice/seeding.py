@@ -42,6 +42,7 @@ SAMPLE_SIZE = 10
 FAIL_QUARANTINES = 3  # this many quarantined sample questions fail the batch review
 REASONS = ("wrong_key", "ambiguous", "off_curriculum", "level", "other")
 BUDGET_STOPS = ("daily_budget", "set_call_limit")
+ATTEMPT_CALLS = 3  # T067: generation, independent solve and review: an attempt starts only when all three fit
 
 
 class SeedError(RuntimeError):
@@ -208,10 +209,12 @@ def _set_fill_status(lock: SeedLock, batch: dict[str, Any]) -> str:
 def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_factory: Callable[[], tuple],
         target: int = DEFAULT_TARGET, max_calls: int = 20, limits: SetLimits | None = None,
         objective: str | None = None, paid_opener: Callable[..., Any] | None = None,
-        paid_questions: int | None = None) -> dict[str, Any]:
+        paid_questions: int | None = None, prefer: tuple[str, ...] | list[str] | None = None) -> dict[str, Any]:
     """One resumable seeding run (adopt, then generate gaps). Raises SeedBusy or LockLost; returns a report.
 
     `objective` (T051) generates only that objective's planned gap cells; adoption still covers the whole plan.
+    `prefer` (T067) orders those gap cells by difficulty (listed levels first, in that order); it only reorders
+    planned gap cells, never adds one.
     `paid_opener(client, usage_store)` (T055) claims an adult's approved paid authorization for this exact run
     and returns its PaidGrant; at most `paid_questions` cells are generated then. Without it the run is free-only
     and reports `paid_option` when free generation failed.
@@ -232,6 +235,9 @@ def run(url: str, catalog: psycopg.Connection, baseline: str, subject: str, llm_
         generated, calls, stop = 0, 0, None
         gaps = [c for c in batch["plan"] if c["cell"] not in _active(links(url, batch["batch_id"]))
                 and objective in (None, c["objective_code"])]
+        if prefer:
+            rank = {level: i for i, level in enumerate(prefer)}
+            gaps = sorted(gaps, key=lambda c: rank.get(c["difficulty"], len(rank)))  # stable: plan order within
         if paid_opener is not None:
             gaps = gaps[:paid_questions or 1]
         extra: dict[str, Any] = {}
@@ -281,7 +287,8 @@ def _generate(lock: SeedLock, catalog: psycopg.Connection, batch: dict[str, Any]
             allocation = [{"workbook_code": cell["objective_code"], "questions": 1, "slots": [
                 {"slot": cell["cell"], "evidence_id": cell["evidence_id"],
                  "evidence_ordinal": cell["evidence_ordinal"], "difficulty": cell["difficulty"]}]}]
-            limits = replace(base, max_questions=1, max_calls_per_set=remaining, concurrency=1)
+            limits = replace(base, max_questions=1, max_calls_per_set=remaining, concurrency=1,
+                             attempt_calls=ATTEMPT_CALLS)
             result = generate_set(catalog, client, usage_store, generation_store, batch["baseline_version"],
                                   batch["subject"], allocation, limits, practice_set_id=run_id,
                                   seed_items=same_objective, paid=grant)

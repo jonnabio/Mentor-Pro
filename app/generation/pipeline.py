@@ -141,6 +141,13 @@ def generate_one(client: OpenRouterClient, store: Store, bundle: GroundingBundle
     attempts: list[dict[str, Any]] = []  # every attempt's verdict and reasons, kept in validation
 
     for number in range(1, MAX_GENERATION_ATTEMPTS + 1):
+        if gate is not None and not gate.covers_attempt():
+            # T067: the per-set cap cannot pay for generation, solve and review; an unchecked question would
+            # only waste its generation call. A later attempt keeps the earlier outcome.
+            if number == 1:
+                outcome.status = "unavailable"
+                outcome.reasons = ["generation budget_blocked: set call limit reached before a complete attempt"]
+            break
         messages = prompts.generation_messages(bundle, difficulty, revision_notes=notes, avoid_stems=avoid_stems)
         # T053: an explicit ordered list (primary, then fallbacks on provider failure) when configured.
         gen = route(client, store, messages, purpose="generation",
