@@ -1,8 +1,8 @@
 # T066 Result: Scheduled Replenishment
 
 - **Role:** Developer (PO authorization PO-QBANK-CONTINUATION-2026-11-12)
-- **Status:** released and deployed (`v2026.11.13-1`); activation awaits
-  the administrator (`MENTOR_PRO_REPLENISH_SCHEDULE=on`)
+- **Status:** done: released (`v2026.11.13-1`) and activated
+  2026-11-14 by the administrator
 - **Decision:** [ADR-036 amendment](../adr/ADR-036-question-bank-phase-b.md)
 
 ## Problem
@@ -106,8 +106,17 @@ reason is misleading in the tutor view. Follow-up candidate.
   `RESULT=SKIPPED ... reason=disabled calls=0`, `llm.usage_record`
   unchanged (697 rows before and after). Paid stays off.
 - Pause and resume through the database, no restart.
-- Busy-lock skip and a bounded enabled tick are verified after the
-  administrator enables the schedule.
+- 2026-11-14: the administrator set `MENTOR_PRO_REPLENISH_SCHEDULE=on`
+  and force-recreated the app; `STATUS HEALTHY`, `"enabled": true`.
+  Five cron ticks before activation logged `SKIPPED reason=disabled`.
+- With the schedule lock held by another session, a tick logged
+  `RESULT=SKIPPED ... reason=busy calls=0`; no model call.
+- First enabled tick `tick-39d20217e660`: `RESULT=OK`,
+  `tick_call_limit`, 10 calls (all `free`; no paid row today), 1
+  Español candidate held for review (pending 1), nothing approved
+  (Matemáticas eligible unchanged at 42). Calls recorded in
+  `llm.usage_record`, the table the shared daily budget reads. Rotation
+  advanced (`next_index` 1), `consecutive_failures` 0.
 
 ## Tutor Review PO-QBANK-REVIEW-20-2026-11-12
 

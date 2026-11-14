@@ -1984,7 +1984,7 @@
       "id": "T066",
       "name": "Scheduled replenishment",
       "objective": "Run bounded, free-only replenishment automatically: off by default, pause/resume, one tick at a time, subject rotation, recorded ticks and failure count; reuses replenishment.run (dedup, seeding lock, daily budget).",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
