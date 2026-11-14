@@ -142,8 +142,10 @@ def tick(url: str, catalog: psycopg.Connection, baseline: str, llm_factory: Call
                 reason = "tick_call_limit"
                 break
             next_index = (start + offset + 1) % len(subjects)
+            # T067: a subject's share of the tick, so one subject cannot take every call; leftovers go on.
+            share = max(policy.objective_calls, -(-settings.tick_calls // len(subjects)))
             try:
-                out = run(url, catalog, baseline, subject, llm_factory, policy, remaining)
+                out = run(url, catalog, baseline, subject, llm_factory, policy, min(remaining, share))
             except seeding.SeedBusy:
                 detail.append({"subject": subject, "skipped": "subject_busy"})
                 continue
@@ -155,7 +157,10 @@ def tick(url: str, catalog: psycopg.Connection, baseline: str, llm_factory: Call
             generated += out["generated"]
             detail.append({"subject": subject, "opened": out["opened"], "generated": out["generated"],
                            "calls": out["calls"], "stop_reason": out["stop_reason"],
-                           "pending": len(out["pending"])})
+                           "pending": len(out["pending"]),
+                           "objectives": [{k: r.get(k) for k in ("objective_code", "tier_name", "levels",
+                                                                  "generated", "calls", "stop_reason")}
+                                          for r in out.get("runs", [])]})
             if out["stop_reason"] in BUDGET_STOPS:
                 reason = out["stop_reason"]
                 break

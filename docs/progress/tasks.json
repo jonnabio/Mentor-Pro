@@ -2001,6 +2001,35 @@
         ]
       },
       "notes": "PO-QBANK-CONTINUATION-2026-11-12; ADR-036 amendment. PO review of the PR required before release."
+    },
+    {
+      "id": "T067",
+      "name": "Coverage-driven generation priority",
+      "objective": "Spend free generation calls on what the real composer lacks: smallest unavailable quiz size first, missing objectives, single-level coverage, larger sizes, then depth; per-objective and per-subject call shares; no attempt started that the call cap cannot finish; yield and rejection codes per objective.",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/coverage.py",
+          "tests/app/test_coverage_priority.py",
+          "docs/progress/task_T067_result.md"
+        ],
+        "modify": [
+          "app/practice/replenishment.py",
+          "app/practice/replenish_schedule.py",
+          "app/practice/replenish.py",
+          "app/practice/seeding.py",
+          "app/generation/pipeline.py",
+          "app/generation/practice_set.py",
+          "app/llm/budget.py",
+          "tests/app/test_practice_set.py",
+          "tests/app/test_replenish_schedule.py",
+          "docs/adr/ADR-036-question-bank-phase-b.md",
+          "docs/runbooks/production-deployment.md",
+          "docs/progress/tasks.json"
+        ]
+      },
+      "notes": "PO-QBANK-COMPLETION-2026-11-14. PO review of the PR required before release."
     }
   ]
 }

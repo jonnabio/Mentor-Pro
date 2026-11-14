@@ -608,3 +608,9 @@ permitting a size that the inventory cannot serve yet is safe.
   when the review backlog grows; a tick generates nothing for a cell whose
   candidates still await review.
 - Paid generation is never used by a tick.
+- T067: `$A coverage [--subject S]` shows, from the real composer, which
+  sizes compose, what each missing size lacks and the generation order;
+  `$A yield [--subject S] [--days N]` shows seeder attempts, accepted,
+  rejected, unavailable and rejection codes per objective and difficulty.
+  `MENTOR_PRO_REPLENISH_OBJECTIVE_CALLS` (default 5) caps one objective
+  per pass.
