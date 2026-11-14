@@ -2006,7 +2006,7 @@
       "id": "T067",
       "name": "Coverage-driven generation priority",
       "objective": "Spend free generation calls on what the real composer lacks: smallest unavailable quiz size first, missing objectives, single-level coverage, larger sizes, then depth; per-objective and per-subject call shares; no attempt started that the call cap cannot finish; yield and rejection codes per objective.",
-      "status": "in_progress",
+      "status": "merged_dev",
       "role": "Developer",
       "files": {
         "create": [
@@ -2030,6 +2030,28 @@
         ]
       },
       "notes": "PO-QBANK-COMPLETION-2026-11-14. PO review of the PR required before release."
+    },
+    {
+      "id": "T068",
+      "name": "Tutor question review dashboard",
+      "objective": "Review pending generated questions in the secure tutor page through the existing individual review: filters, full question with the key highlighted, grounding, approve or quarantine with a required reason and an optional comment, navigation, progress and live counts; verdicts recorded exactly once.",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/tutor_review.py",
+          "tests/app/test_tutor_review.py",
+          "docs/progress/task_T068_result.md"
+        ],
+        "modify": [
+          "app/tutor_main.py",
+          "app/practice/seeding.py",
+          "app/practice/bank.py",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "app/static/styles.css"
+        ]
+      }
     }
   ]
 }

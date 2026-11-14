@@ -36,6 +36,7 @@
     <nav id="tutor-nav" class="tutor-nav actions" aria-label="Secciones del tutor" hidden>
       <button type="button" id="tutor-nav-writing" class="secondary" aria-pressed="true">Producción escrita</button>
       <button type="button" id="tutor-nav-practice" class="secondary" aria-pressed="false">Resultados de práctica</button>
+      <button type="button" id="tutor-nav-review" class="secondary" aria-pressed="false">Revisión de preguntas</button>
     </nav>
 
     <section id="tutor-queue" class="card" hidden>
@@ -145,8 +146,8 @@
         <p class="muted small">"Sin responder" cuenta preguntas presentadas que el estudiante no contestó; no son incorrectas.</p>
         <ul id="practice-questions" class="plain-list feedback-scores"></ul>
       </details>
-      <!-- T061/T062: inventory and replenishment status (read-only; review verdicts are recorded by the tutor
-           with `seed_bank item-review-record`, never here). -->
+      <!-- T061/T062: inventory and replenishment status (read-only; review verdicts are recorded in
+           "Revisión de preguntas", T068, never here). -->
       <details id="bank-block">
         <summary><h3 class="inline-heading">Banco de preguntas y reposición</h3></summary>
         <p class="muted small">Disponibles: preguntas que las prácticas pueden usar. Por revisar: preguntas nuevas
@@ -157,6 +158,54 @@
         <p id="bank-pending-empty" class="muted" hidden>No hay reposiciones pendientes.</p>
         <ul id="bank-pending" class="plain-list feedback-scores"></ul>
       </details>
+    </section>
+
+    <!-- T068: question review. Verdicts use the existing individual review; nothing is approved without the tutor. -->
+    <section id="tutor-review" class="card" hidden>
+      <h2>Revisión de preguntas</h2>
+      <p class="muted small">Las preguntas por revisar no se muestran al estudiante hasta que las aprobés.</p>
+      <ul id="review-counts" class="plain-list feedback-scores"></ul>
+      <form id="review-filters" class="practice-filters">
+        <label class="field-label" for="rf-subject">Materia
+          <select id="rf-subject"><option value="">Todas</option></select></label>
+        <label class="field-label" for="rf-objective">Objetivo (código)
+          <input id="rf-objective" type="text" maxlength="20" placeholder="Ej. EL04" autocomplete="off"></label>
+        <label class="field-label" for="rf-difficulty">Dificultad
+          <select id="rf-difficulty"><option value="">Todas</option><option value="easy">Fácil</option>
+            <option value="medium">Media</option><option value="hard">Difícil</option></select></label>
+        <label class="field-label" for="rf-batch">Lote
+          <select id="rf-batch"><option value="">Todos</option></select></label>
+        <div class="actions">
+          <button type="submit" class="primary">Aplicar filtros</button>
+          <button type="button" id="rf-clear" class="secondary">Quitar filtros</button>
+        </div>
+      </form>
+      <p id="review-empty" class="muted" hidden>No hay preguntas por revisar con estos filtros.</p>
+      <div id="review-item" hidden>
+        <p id="review-progress" class="choice-notice" aria-live="polite"></p>
+        <p id="review-meta" class="muted small"></p>
+        <p id="review-objective"></p>
+        <p id="review-evidence" class="muted small"></p>
+        <p id="review-stimulus" class="source-text" hidden></p>
+        <p id="review-stem" class="submitted-text"></p>
+        <ol id="review-options" class="plain-list review-options"></ol>
+        <h3>Explicación</h3>
+        <p id="review-explanation"></p>
+        <fieldset class="tutor-criterion">
+          <legend>Decisión</legend>
+          <label class="tutor-option"><input type="radio" name="review-verdict" value="approved"> Aprobar</label>
+          <label class="tutor-option"><input type="radio" name="review-verdict" value="quarantined"> Cuarentena</label>
+          <label class="field-label" for="review-reason">Motivo de la cuarentena</label>
+          <select id="review-reason" disabled><option value="">Elegí un motivo</option></select>
+          <label class="field-label" for="review-comment">Comentario (opcional)</label>
+          <textarea id="review-comment" rows="2" maxlength="1000"></textarea>
+        </fieldset>
+        <p id="review-saved" class="muted small" aria-live="polite"></p>
+        <div class="actions">
+          <button type="button" id="review-submit" class="primary">Registrar decisión</button>
+          <button type="button" id="review-skip" class="secondary">Siguiente pregunta</button>
+        </div>
+      </div>
     </section>
 
     <section id="tutor-practice-detail" class="card" hidden>

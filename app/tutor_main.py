@@ -24,12 +24,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.main import STATIC_DIR, SUBJECTS, ApiError
+from app.main import BASELINE_VERSION, STATIC_DIR, SUBJECTS, ApiError
 from app.practice.tutor_results import PracticeResults, build_practice_results_router
+from app.practice.tutor_review import ReviewQueue, build_review_router
 from app.writing.migrations import SchemaMigrationRequired
 from app.writing.routes import WritingService
 from app.writing.tutor import build_tutor_router
-from curriculum import db
+from curriculum import catalog, db
 
 MIN_SERVICE_TOKEN = 32
 PORT = 8000
@@ -96,6 +97,10 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
     # T060: read-only practice results and Question Bank analytics (GET only, same tutor check).
     app.include_router(build_practice_results_router(
         PracticeResults(lambda: database_url or db.database_url()), ApiError, token, hosts, SUBJECTS))
+    # T068: question review (pending queue and verdicts) through the existing individual review; tutor only.
+    app.include_router(build_review_router(
+        ReviewQueue(lambda: database_url or db.database_url(), BASELINE_VERSION, SUBJECTS, catalog.open_catalog),
+        ApiError, token, hosts))
 
     @app.get("/tutor", include_in_schema=False)
     def tutor_page(request: Request) -> FileResponse:

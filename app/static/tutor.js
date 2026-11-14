@@ -52,14 +52,16 @@ async function api(path, options = {}) {
   return body;
 }
 
-const PANELS = ["tutor-login", "tutor-queue", "tutor-detail", "tutor-practice", "tutor-practice-detail"];
+const PANELS = ["tutor-login", "tutor-queue", "tutor-detail", "tutor-practice", "tutor-practice-detail",
+  "tutor-review"];
 
 function showPanel(name) {
   for (const id of PANELS) $(id).hidden = id !== `tutor-${name}`;
   $("tutor-nav").hidden = name === "login";
   const practice = name.startsWith("practice");
-  $("tutor-nav-writing").setAttribute("aria-pressed", String(!practice));
+  $("tutor-nav-writing").setAttribute("aria-pressed", String(!practice && name !== "review"));
   $("tutor-nav-practice").setAttribute("aria-pressed", String(practice));
+  $("tutor-nav-review").setAttribute("aria-pressed", String(name === "review"));
   window.scrollTo({ top: 0 });
 }
 
@@ -384,5 +386,121 @@ $("tutor-nav-practice").addEventListener("click", openPractice);
 $("practice-filters").addEventListener("submit", (event) => { event.preventDefault(); openPractice(); });
 $("pf-clear").addEventListener("click", () => { $("practice-filters").reset(); openPractice(); });
 $("pd-back").addEventListener("click", openPractice);
+
+// ---------------------------------------------------------------- T068 question review
+// Verdicts go through the existing individual review (one per question, recorded once). The tutor decides;
+// the page never preselects a verdict and never approves anything by itself.
+const review = { questions: [], index: 0, busy: false, reasons: [] };
+const REASON_ES = { wrong_key: "Clave incorrecta", ambiguous: "Ambigua", off_curriculum: "Fuera del programa",
+  level: "Nivel o dificultad inadecuados", other: "Otro" };
+
+function reviewQuery() {
+  const params = new URLSearchParams();
+  for (const [key, id] of [["subject", "rf-subject"], ["objective", "rf-objective"], ["difficulty", "rf-difficulty"],
+    ["batch", "rf-batch"]]) {
+    const value = $(id).value.trim();
+    if (value) params.set(key, value);
+  }
+  const query = params.toString();
+  return query ? `?${query}` : "";
+}
+
+function renderReviewCounts(counts) {
+  $("review-counts").replaceChildren(...counts.map((c) => el("li", { "data-subject": c.subject },
+    `${c.name_es}: por revisar ${c.pending} · aprobadas ${c.approved} · en cuarentena ${c.quarantined}`)));
+  for (const c of counts) practice.subjects[c.subject] = c.name_es;
+  const select = $("rf-subject");
+  if (select.options.length === 1) for (const c of counts) select.append(el("option", { value: c.subject }, c.name_es));
+}
+
+async function openReview() {
+  showError("");
+  const data = await api(`/api/tutor/review/queue${reviewQuery()}`)
+    .catch((error) => { showError(error.message); return null; });
+  if (!data) return;
+  showPanel("review");
+  review.questions = data.questions;
+  review.index = 0;
+  review.reasons = data.reasons;
+  renderReviewCounts(data.counts);
+  const reason = $("review-reason");
+  if (reason.options.length === 1) for (const r of data.reasons) reason.append(el("option", { value: r }, REASON_ES[r] || r));
+  const batch = $("rf-batch");
+  const known = new Set([...batch.options].map((o) => o.value));
+  for (const q of data.questions) {
+    if (!known.has(q.batch_id)) { batch.append(el("option", { value: q.batch_id }, q.batch_id)); known.add(q.batch_id); }
+  }
+  $("review-saved").textContent = "";
+  showReviewItem();
+}
+
+function showReviewItem() {
+  const q = review.questions[review.index];
+  $("review-empty").hidden = Boolean(q);
+  $("review-item").hidden = !q;
+  if (!q) return;
+  $("review-item").dataset.request = q.request_id;
+  $("review-progress").textContent = `Pregunta ${review.index + 1} de ${review.questions.length}`;
+  $("review-meta").textContent = `${subjectName(q.subject)} · ${q.objective_code} · ` +
+    `${DIFFICULTY_ES[q.difficulty] || q.difficulty} · Lote ${q.batch_id} · Solicitud ${q.request_id}`;
+  $("review-objective").textContent = `Objetivo ${q.objective_code}: ${q.objective_es}`;
+  $("review-evidence").textContent = q.evidencia_es ? `Evidencia: ${q.evidencia_es}` : "";
+  $("review-stimulus").textContent = q.stimulus || "";
+  $("review-stimulus").hidden = !q.stimulus;
+  $("review-stem").textContent = q.stem;
+  $("review-options").replaceChildren(...q.options.map((o) => {
+    const key = o.label === q.answer_key;
+    return el("li", { class: key ? "review-key" : "", "data-label": o.label },
+      `${o.label}. ${o.text}${key ? " ✓ Respuesta propuesta" : ""}`);
+  }));
+  $("review-explanation").textContent = q.explanation || "Sin explicación.";
+  for (const input of document.querySelectorAll('input[name="review-verdict"]')) input.checked = false;
+  $("review-reason").value = "";
+  $("review-reason").disabled = true;
+  $("review-comment").value = "";
+  $("review-submit").disabled = false;
+}
+
+async function submitReview() {
+  const q = review.questions[review.index];
+  const chosen = document.querySelector('input[name="review-verdict"]:checked');
+  if (!q || review.busy) return;
+  if (!chosen) { showError("Elegí aprobar o cuarentena."); return; }
+  const verdict = chosen.value;
+  const reason = verdict === "quarantined" ? $("review-reason").value : "";
+  if (verdict === "quarantined" && !reason) { showError("Elegí el motivo de la cuarentena."); return; }
+  showError("");
+  review.busy = true;
+  $("review-submit").disabled = true; // no second submission while one is in flight
+  try {
+    const out = await api("/api/tutor/review/decisions", { method: "POST", body: JSON.stringify({
+      request_id: q.request_id, verdict, reason, comment: $("review-comment").value.trim() }) });
+    renderReviewCounts(out.counts);
+    $("review-saved").textContent = verdict === "approved" ? `Aprobada: ${q.request_id}`
+      : `En cuarentena (${REASON_ES[reason] || reason}): ${q.request_id}`;
+    review.questions.splice(review.index, 1);
+    if (review.index >= review.questions.length) review.index = 0;
+    showReviewItem();
+  } catch (error) {
+    showError(error.message);
+    $("review-submit").disabled = false;
+  } finally {
+    review.busy = false;
+  }
+}
+
+for (const input of document.querySelectorAll('input[name="review-verdict"]')) {
+  input.addEventListener("change", () => { $("review-reason").disabled = input.value !== "quarantined" || !input.checked; });
+}
+$("tutor-nav-review").addEventListener("click", openReview);
+$("review-filters").addEventListener("submit", (event) => { event.preventDefault(); openReview(); });
+$("rf-clear").addEventListener("click", () => { $("review-filters").reset(); openReview(); });
+$("review-submit").addEventListener("click", submitReview);
+$("review-skip").addEventListener("click", () => {
+  if (!review.questions.length) return;
+  review.index = (review.index + 1) % review.questions.length;
+  $("review-saved").textContent = "";
+  showReviewItem();
+});
 
 if (token()) openQueue();
