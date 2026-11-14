@@ -1,8 +1,8 @@
 # T066 Result: Scheduled Replenishment
 
 - **Role:** Developer (PO authorization PO-QBANK-CONTINUATION-2026-11-12)
-- **Status:** done: released (`v2026.11.13-1`) and activated
-  2026-11-14 by the administrator
+- **Status:** done: released (`v2026.11.13-1`), activated 2026-11-14,
+  production acceptance verified (PO-T066-ACTIVATION-2026-11-14)
 - **Decision:** [ADR-036 amendment](../adr/ADR-036-question-bank-phase-b.md)
 
 ## Problem
@@ -117,6 +117,22 @@ reason is misleading in the tutor view. Follow-up candidate.
   (Matemáticas eligible unchanged at 42). Calls recorded in
   `llm.usage_record`, the table the shared daily budget reads. Rotation
   advanced (`next_index` 1), `consecutive_failures` 0.
+
+## Production Acceptance PO-T066-ACTIVATION-2026-11-14
+
+Read-only checks at 13:25 UTC; no further generation (the single
+authorized real tick is `tick-39d20217e660`):
+
+- Container: `MENTOR_PRO_REPLENISH_SCHEDULE=on`, `OPENROUTER_ALLOW_PAID=false`.
+- `schedule-status`: `enabled` true, `paused` false, `tick_calls` 10,
+  `next_index` 1, `consecutive_failures` 0.
+- Tick records: 1 `ok` (10 calls, 1 generated), 1 `skipped busy`, 7
+  `skipped disabled`; the wrapper log matches. Model calls today: 10, all
+  `free`.
+- Pending tutor review: Español 1, others 0. Eligible unchanged:
+  Matemáticas 42, Estudios Sociales 20, Español 10, Ciencias 10.
+- One cron line, cron active; next tick 15:17 UTC, then every 3 hours.
+- `SMOKE PASS (13/13)`, `STATUS HEALTHY`, `v2026.11.13-1`.
 
 ## Tutor Review PO-QBANK-REVIEW-20-2026-11-12
 
