@@ -178,6 +178,45 @@ def test_the_tutor_service_serves_the_review_routes():
     assert {"/api/tutor/review/queue", "/api/tutor/review/decisions"} <= paths
 
 
+def has_comment_column(url):  # noqa: F811
+    with psycopg.connect(url) as conn:
+        return conn.execute("SELECT 1 FROM information_schema.columns WHERE table_schema = 'generation' "
+                            "AND table_name = 'bank_item_review' AND column_name = 'comment'").fetchone() is not None
+
+
+def test_tutor_startup_adds_the_comment_column_to_the_previous_schema(pending, url):  # noqa: F811
+    """PO-T068-CORRECTIVE: production predates the `comment` column and the tutor service may be the first to touch
+    the bank after the release. Its startup alone must apply the Question Bank schema, idempotently, keeping the
+    verdicts already recorded."""
+    from fastapi.testclient import TestClient
+
+    from app.tutor_main import create_tutor_app
+
+    app, batch_id = pending
+    first, second = [q["request_id"] for q in call(app, "/api/tutor/review/queue").json()["questions"]]
+    seeding.item_review_record(url, batch_id, [{"request_id": first, "verdict": "quarantined",
+                                                "reason": "ambiguous"}], "tutor")  # a verdict recorded before T068
+    with psycopg.connect(url, autocommit=True) as conn:  # the previous schema (v2026.11.13-1): no comment column
+        conn.execute("ALTER TABLE generation.bank_item_review DROP COLUMN comment")
+    try:
+        assert not has_comment_column(url)
+        for _ in range(2):  # two starts: the initialisation is idempotent
+            with TestClient(create_tutor_app(url, "tutor-service-token-0123456789abcdef", "172.19.0.1")):
+                pass
+            assert has_comment_column(url)
+        [(verdict, reason, reviewer, comment, _)] = reviews(url, first)  # the earlier verdict is preserved
+        assert (verdict, reason, reviewer, comment) == ("quarantined", "ambiguous", "tutor", None)
+
+        ok = call(app, "/api/tutor/review/decisions", "POST",
+                  {"request_id": second, "verdict": "approved", "comment": "Clara."})
+        assert ok.status_code == 200
+        [(verdict, reason, reviewer, comment, _)] = reviews(url, second)
+        assert (verdict, reason, reviewer, comment) == ("approved", "approved", "tutor", "Clara.")
+    finally:
+        with psycopg.connect(url, autocommit=True) as conn:  # leave the shared test schema current
+            conn.execute("ALTER TABLE generation.bank_item_review ADD COLUMN IF NOT EXISTS comment TEXT")
+
+
 # ---------------------------------------------------------------- browser (opt-in)
 
 

@@ -22,6 +22,7 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
 from app.practice import seeding
+from app.practice.bank import QuestionBank
 from app.writing.tutor import LOOPBACK, tutor_guard
 
 REVIEWER = "tutor"
@@ -47,6 +48,16 @@ class ReviewQueue:
     def __init__(self, url: Callable[[], str], baseline: str, subjects: tuple[tuple[str, str], ...],
                  open_catalog: Callable[[str], psycopg.Connection]):
         self.url, self.baseline, self.subjects, self.open_catalog = url, baseline, subjects, open_catalog
+        self._schema_ready = False
+
+    def ensure_schema(self) -> None:
+        """Apply the existing Question Bank schema (the idempotent `QuestionBank` initialisation, which adds the
+        T068 `comment` column) once per process. The tutor service calls it at startup, so recording a review never
+        depends on student practice or scheduled generation having initialised the bank first; every queue
+        operation calls it too, covering a database that was unreachable at startup."""
+        if not self._schema_ready:
+            QuestionBank(self.url())
+            self._schema_ready = True
 
     def _batches(self) -> dict[str, dict[str, Any]]:
         out = {}
@@ -58,6 +69,7 @@ class ReviewQueue:
 
     def pending(self, subject: str | None = None, objective: str | None = None, difficulty: str | None = None,
                 batch: str | None = None) -> list[dict[str, Any]]:
+        self.ensure_schema()
         url, rows = self.url(), []
         catalog = self.open_catalog(url)
         try:
@@ -73,6 +85,7 @@ class ReviewQueue:
         return rows
 
     def counts(self) -> list[dict[str, Any]]:
+        self.ensure_schema()
         with psycopg.connect(self.url(), row_factory=dict_row) as conn:
             done = {r["subject"]: r for r in conn.execute(COUNTS_SQL, (self.baseline,))}
         waiting: dict[str, int] = {}
@@ -84,6 +97,7 @@ class ReviewQueue:
 
     def decide(self, d: Decision) -> dict[str, Any]:
         """One verdict through the existing individual review; the batch is the current batch holding it."""
+        self.ensure_schema()
         batch_id = next((b["batch_id"] for b in self._batches().values()
                          if any(r["request_id"] == d.request_id for r in seeding.links(self.url(), b["batch_id"]))),
                         None)
