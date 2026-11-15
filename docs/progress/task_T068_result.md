@@ -66,6 +66,56 @@
   - the counts update;
   - a stale-tab resubmission is refused (409).
 
+## Corrective changes (PO-T068-CORRECTIVE-2026-11-14)
+
+The PO's pre-release review found two gaps at `030714c`.
+
+### Tutor schema initialization
+
+- **Gap:** the `comment` column is added by the Question Bank schema
+  (`QuestionBank` initialization, `bank.SCHEMA_SQL`). The tutor service never
+  built a `QuestionBank`, so in production the column depended on a student
+  practice request or a replenishment run happening first. A tutor verdict
+  saved before either would fail on the missing column. The API tests missed
+  this because their fixture seeds through generation, which applies the
+  schema.
+- **Fix:** `ReviewQueue.ensure_schema()` reuses the existing `QuestionBank`
+  initialization; there is no new schema or migration. The tutor app calls it
+  at startup, after the writing schema check. An unreachable database at
+  startup is left to the first request, as `check_schema` already does, and
+  every queue operation calls it again until it succeeds. The statements are
+  `CREATE TABLE IF NOT EXISTS` and `ADD COLUMN IF NOT EXISTS`, so they are
+  idempotent and leave existing rows unchanged.
+- **Regression test:**
+  `test_tutor_startup_adds_the_comment_column_to_the_previous_schema`.
+  1. Records a verdict without a comment.
+  2. Drops the column to reproduce the `v2026.11.13-1` schema.
+  3. Starts the tutor app twice.
+  4. Checks the column exists, the earlier verdict is unchanged with a NULL
+     comment, and a new verdict with a comment is recorded.
+
+  With the fix removed, the test fails: the column is still missing after
+  startup.
+
+### Browser test execution
+
+- **Gap:** the browser test is opt-in (`MENTOR_PRO_BROWSER=1`). Neither CI nor
+  the ACE gate set the flag, so both skipped it. The earlier browser result
+  above came from a manual run only.
+- **Explicit run** (`MENTOR_PRO_BROWSER=1`, `tests/app/test_tutor_review.py`):
+  9 executed, 9 passed, 0 failed, 0 skipped. This includes
+  `test_review_in_the_browser`.
+- **CI:** the `Python Tests` job now installs Chromium and runs
+  `test_review_in_the_browser` with the flag set, against the CI test
+  database with synthetic data only. A JUnit check fails the step when the
+  test is skipped or not collected. A failing test also fails the step.
+  Locally, the check returned exit 1 for a skipped run and exit 0 for an
+  executed one.
+- **ACE gate:** unchanged and reported separately. It does not run browser
+  tests. `bash .ace/scripts/verify.sh` returned `VERIFY_RESULT=pass gate=all`
+  with 1172 passed and 10 skipped, the skips being the opt-in browser and
+  Docker tests. The lint gate also passed.
+
 ## T067 merge record
 
 PR #72 merged into `dev` as `8aeaad9` (CI run 43614514102). Not yet
