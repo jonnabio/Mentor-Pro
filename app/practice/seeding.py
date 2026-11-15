@@ -42,11 +42,17 @@ SAMPLE_SIZE = 10
 FAIL_QUARANTINES = 3  # this many quarantined sample questions fail the batch review
 REASONS = ("wrong_key", "ambiguous", "off_curriculum", "level", "other")
 BUDGET_STOPS = ("daily_budget", "set_call_limit")
+COMMENT_MAX = 1000  # T068: the tutor's optional comment on a verdict
+REVIEW_LOCK = (4047, 1)  # T068: serializes individual verdicts ((4047, 0) is the replenish tick)
 ATTEMPT_CALLS = 3  # T067: generation, independent solve and review: an attempt starts only when all three fit
 
 
 class SeedError(RuntimeError):
     """A refused operation; nothing was changed by the refused step."""
+
+
+class NotAwaiting(SeedError):
+    """T068: the question is unknown here or already has a verdict (a repeated or late submission)."""
 
 
 class SeedBusy(SeedError):
@@ -492,10 +498,10 @@ def review_export(url: str, catalog: psycopg.Connection, batch_id: str) -> dict[
 
 
 def _record_verdict(conn: psycopg.Connection, request_id: str, batch_id: str | None, verdict: str, reason: str,
-                    reviewer: str) -> None:
+                    reviewer: str, comment: str | None = None) -> None:
     conn.execute(
-        """INSERT INTO generation.bank_item_review (request_id, batch_id, verdict, reason, reviewer)
-           VALUES (%s, %s, %s, %s, %s)""", (request_id, batch_id, verdict, reason, reviewer))
+        """INSERT INTO generation.bank_item_review (request_id, batch_id, verdict, reason, reviewer, comment)
+           VALUES (%s, %s, %s, %s, %s, %s)""", (request_id, batch_id, verdict, reason, reviewer, comment or None))
     if verdict == "quarantined":
         conn.execute(
             """UPDATE generation.bank_batch_item SET active = false, deactivated_at = now()
@@ -629,13 +635,23 @@ def item_review_record(url: str, batch_id: str, decisions: list[dict[str, str]],
     checked = []
     for d in decisions:
         if d.get("request_id") not in awaiting:
-            raise SeedError(f"{d.get('request_id')} is not awaiting individual review in this batch")
+            raise NotAwaiting(f"{d.get('request_id')} is not awaiting individual review in this batch")
         checked.append((d["request_id"], *_check(d.get("verdict", ""), d.get("reason", ""))))
     if len({c[0] for c in checked}) != len(checked):
         raise SeedError("a question appears twice in the decisions")
+    comments = {d["request_id"]: (d.get("comment") or "").strip() or None for d in decisions}
+    if any(c and len(c) > COMMENT_MAX for c in comments.values()):
+        raise SeedError(f"a comment is longer than {COMMENT_MAX} characters")
     with _connect(url) as conn, conn.transaction():
+        # T068 exactly once: serialize verdicts and re-check inside the transaction, so two simultaneous
+        # submissions of one question (double click, two tabs) record one verdict and refuse the other.
+        conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", REVIEW_LOCK)
+        done = conn.execute("SELECT request_id FROM generation.bank_item_review WHERE request_id = ANY(%s) LIMIT 1",
+                            ([c[0] for c in checked],)).fetchone()
+        if done is not None:
+            raise NotAwaiting(f"{done['request_id']} is not awaiting individual review in this batch")
         for request_id, verdict, reason in checked:
-            _record_verdict(conn, request_id, batch_id, verdict, reason, reviewer)
+            _record_verdict(conn, request_id, batch_id, verdict, reason, reviewer, comments[request_id])
     return {"batch_id": batch_id, "recorded": len(checked),
             "approved": sum(1 for c in checked if c[1] == "approved"),
             "quarantined": sum(1 for c in checked if c[1] == "quarantined"),
