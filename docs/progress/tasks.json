@@ -2006,7 +2006,7 @@
       "id": "T067",
       "name": "Coverage-driven generation priority",
       "objective": "Spend free generation calls on what the real composer lacks: smallest unavailable quiz size first, missing objectives, single-level coverage, larger sizes, then depth; per-objective and per-subject call shares; no attempt started that the call cap cannot finish; yield and rejection codes per objective.",
-      "status": "merged_dev",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -2035,7 +2035,7 @@
       "id": "T068",
       "name": "Tutor question review dashboard",
       "objective": "Review pending generated questions in the secure tutor page through the existing individual review: filters, full question with the key highlighted, grounding, approve or quarantine with a required reason and an optional comment, navigation, progress and live counts; verdicts recorded exactly once.",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -2057,7 +2057,7 @@
       "id": "T069",
       "name": "Quiz sizes 5-30: verification, tutor coverage and capacity",
       "objective": "Verify sizes 5-30 in all four subjects on a synthetic bank (API and browser, desktop and phone); show the tutor which sizes compose, what blocks the next one per objective and level, and the pending questions that could close it; assess the fixed 100-cell plan per size and stage; propose any plan extension in an ADR (PO-T069-2026-11-16).",
-      "status": "in_progress",
+      "status": "done",
       "role": "Developer",
       "files": {
         "create": [
@@ -2077,6 +2077,43 @@
           "app/static/tutor.js",
           "app/static/styles.css",
           ".github/workflows/ci.yml"
+        ]
+      }
+    },
+    {
+      "id": "T070",
+      "name": "Question Bank final production acceptance",
+      "objective": "Read-only production and synthetic acceptance of the Question Bank: practice flows, offered sizes start, approved-only bank items, sizes 5-30 end to end, availability matching inventory, scoring and analytics, authentic review, free bounded replenishment, coverage accuracy and data integrity; acceptance matrix and closure proposal (PO-T069-RELEASE-2026-11-16).",
+      "status": "done",
+      "role": "QA Engineer",
+      "files": {
+        "create": [
+          "docs/progress/task_T070_result.md"
+        ],
+        "modify": [
+          "docs/progress/task_T069_result.md"
+        ]
+      }
+    },
+    {
+      "id": "T071",
+      "name": "Tutor Question Bank bulk review and approval",
+      "objective": "Tutor selects explicit pending questions on the current page (inspect key and explanation, select, select page, clear) and approves them in one confirmed operation through the existing individual review; per-ID results, partial-failure feedback, max 50 IDs, no duplicates, audit rows unchanged.",
+      "status": "review",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_tutor_bulk_approve.py",
+          "docs/progress/task_T071_result.md",
+          "docs/progress/screenshots/T071/bulk-selected.png",
+          "docs/progress/screenshots/T071/bulk-result.png"
+        ],
+        "modify": [
+          "app/practice/tutor_review.py",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "docs/progress/tasks.json"
         ]
       }
     }

@@ -182,12 +182,31 @@
         </div>
       </form>
       <p id="review-empty" class="muted" hidden>No hay preguntas por revisar con estos filtros.</p>
+      <!-- T071: bulk approval of explicitly selected questions on the current page; the tutor confirms. -->
+      <div id="bulk" hidden>
+        <h3>Aprobación en bloque</h3>
+        <p class="muted small">Abrí cada pregunta para revisar la respuesta y la explicación antes de marcarla.
+          La selección se limita a esta página.</p>
+        <div class="actions">
+          <button type="button" id="bulk-select-page" class="secondary">Seleccionar toda la página</button>
+          <button type="button" id="bulk-clear" class="secondary">Limpiar selección</button>
+          <button type="button" id="bulk-approve" class="primary" disabled>Aprobar seleccionadas (0)</button>
+        </div>
+        <p id="bulk-result" class="muted small" aria-live="polite"></p>
+        <ul id="bulk-list" class="plain-list"></ul>
+        <div class="actions">
+          <button type="button" id="bulk-prev" class="secondary">Anterior</button>
+          <span id="bulk-page" class="muted small"></span>
+          <button type="button" id="bulk-next" class="secondary">Siguiente</button>
+        </div>
+        <h3>Revisión individual</h3>
+      </div>
       <div id="review-item" hidden>
         <p id="review-progress" class="choice-notice" aria-live="polite"></p>
         <p id="review-meta" class="muted small"></p>
         <p id="review-objective"></p>
         <p id="review-evidence" class="muted small"></p>
-        <p id="review-stimulus" class="source-text" hidden></p>
+        <div id="review-stimulus" hidden></div>
         <p id="review-stem" class="submitted-text"></p>
         <ol id="review-options" class="plain-list review-options"></ol>
         <h3>Explicación</h3>
