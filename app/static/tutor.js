@@ -53,15 +53,16 @@ async function api(path, options = {}) {
 }
 
 const PANELS = ["tutor-login", "tutor-queue", "tutor-detail", "tutor-practice", "tutor-practice-detail",
-  "tutor-review"];
+  "tutor-review", "tutor-coverage"];
 
 function showPanel(name) {
   for (const id of PANELS) $(id).hidden = id !== `tutor-${name}`;
   $("tutor-nav").hidden = name === "login";
   const practice = name.startsWith("practice");
-  $("tutor-nav-writing").setAttribute("aria-pressed", String(!practice && name !== "review"));
+  $("tutor-nav-writing").setAttribute("aria-pressed", String(!practice && name !== "review" && name !== "coverage"));
   $("tutor-nav-practice").setAttribute("aria-pressed", String(practice));
   $("tutor-nav-review").setAttribute("aria-pressed", String(name === "review"));
+  $("tutor-nav-coverage").setAttribute("aria-pressed", String(name === "coverage"));
   window.scrollTo({ top: 0 });
 }
 
@@ -502,5 +503,71 @@ $("review-skip").addEventListener("click", () => {
   $("review-saved").textContent = "";
   showReviewItem();
 });
+
+// ---------------------------------------------------------------- T069: quiz-size coverage (read-only)
+
+const LEVEL_ES = { easy: "fácil", medium: "media", hard: "difícil" };
+const BLOCKER_ES = {
+  structural: "el plan de generación no tiene celdas suficientes",
+  generation: "faltan preguntas por generar",
+  review: "hay preguntas generadas que esperan tu revisión",
+  duplicates: "las preguntas alcanzan, pero hay preguntas demasiado parecidas",
+};
+
+function sizeLine(s) {
+  if (s.available) return el("li", { "data-size": String(s.size), class: "coverage-ok" }, `${s.size} preguntas: disponible`);
+  const why = BLOCKER_ES[s.blocker] || "faltan preguntas aprobadas";
+  return el("li", { "data-size": String(s.size) },
+    `${s.size} preguntas: no disponible. Faltan ${s.missing.approved} aprobadas; ${why}.`);
+}
+
+function blockerLine(b, kind) {
+  const name = kind === "objective" ? b.objective_code : `Nivel ${LEVEL_ES[b.difficulty] || b.difficulty}`;
+  const pending = b.pending ? ` · por revisar ${b.pending} que podrían cubrirlo` : "";
+  return el("li", { "data-blocker": kind === "objective" ? b.objective_code : b.difficulty },
+    `${name}: necesita ${b.needed}, aprobadas ${b.approved}, faltan ${b.missing}${pending}`);
+}
+
+function cellText(c) {
+  return `${c.approved} / ${c.pending} / ${c.plan}`;
+}
+
+async function openCoverage() {
+  showError("");
+  const select = $("cv-subject");
+  const subject = select.value || "matematicas";
+  const data = await api(`/api/tutor/coverage?subject=${encodeURIComponent(subject)}`)
+    .catch((error) => { showError(error.message); return null; });
+  if (!data) return;
+  showPanel("coverage");
+  if (!select.options.length) {
+    for (const s of data.subjects) select.append(el("option", { value: s.subject }, s.name_es));
+  }
+  select.value = data.subject;
+  const sizes = data.available_sizes.length ? data.available_sizes.join(", ") : "ninguno";
+  $("cv-summary").textContent = `${data.name_es}: tamaños disponibles ${sizes}. Aprobadas ${data.approved}, `
+    + `por revisar ${data.pending}, ${data.objectives} objetivos.`;
+  const p = data.progress;
+  $("cv-progress").textContent = `Hacia ${p.size} preguntas: ${p.approved_fill} de ${p.size} lugares cubiertos `
+    + `con aprobadas; ${p.with_pending_fill} si se aprobaran todas las que esperan revisión.`;
+  $("cv-sizes").replaceChildren(...data.sizes.map(sizeLine));
+  const next = data.sizes.find((s) => !s.available);
+  $("cv-next-title").hidden = $("cv-next-note").hidden = !next;
+  if (next) {
+    $("cv-next-title").textContent = `Qué falta para ${next.size} preguntas`;
+    $("cv-next-note").textContent = "Cada objetivo y nivel tiene un mínimo; las preguntas por revisar solo cuentan "
+      + "después de que las aprobés.";
+    $("cv-blockers").replaceChildren(...next.gap.objectives.map((b) => blockerLine(b, "objective")),
+      ...next.gap.levels.map((b) => blockerLine(b, "level")));
+  } else {
+    $("cv-blockers").replaceChildren();
+  }
+  $("cv-cells").querySelector("tbody").replaceChildren(...data.cells.map((c) => el("tr",
+    { "data-objective": c.objective_code }, el("th", { scope: "row" }, c.objective_code),
+    el("td", {}, cellText(c.easy)), el("td", {}, cellText(c.medium)), el("td", {}, cellText(c.hard)))));
+}
+
+$("tutor-nav-coverage").addEventListener("click", openCoverage);
+$("cv-subject").addEventListener("change", openCoverage);
 
 if (token()) openQueue();

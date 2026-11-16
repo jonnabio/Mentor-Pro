@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-11-12",
+  "updated": "2026-11-16",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -2050,6 +2050,33 @@
           "app/static/tutor.html",
           "app/static/tutor.js",
           "app/static/styles.css"
+        ]
+      }
+    },
+    {
+      "id": "T069",
+      "name": "Quiz sizes 5-30: verification, tutor coverage and capacity",
+      "objective": "Verify sizes 5-30 in all four subjects on a synthetic bank (API and browser, desktop and phone); show the tutor which sizes compose, what blocks the next one per objective and level, and the pending questions that could close it; assess the fixed 100-cell plan per size and stage; propose any plan extension in an ADR (PO-T069-2026-11-16).",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/capacity.py",
+          "app/practice/tutor_coverage.py",
+          "tests/app/test_capacity.py",
+          "tests/app/test_quiz_sizes_subjects.py",
+          "tests/app/test_tutor_coverage.py",
+          "docs/adr/ADR-037-quiz-size-capacity.md",
+          "docs/planning/2026-11-16-T069-quiz-sizes-plan.md",
+          "docs/progress/task_T069_result.md"
+        ],
+        "modify": [
+          "app/tutor_main.py",
+          "app/practice/replenish.py",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "app/static/styles.css",
+          ".github/workflows/ci.yml"
         ]
       }
     }

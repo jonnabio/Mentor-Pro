@@ -6,6 +6,7 @@
     python -m app.practice.replenish requests [--subject S] [--all]
     python -m app.practice.replenish coverage [--subject S]           # composer gaps per size and priority (T067)
     python -m app.practice.replenish yield [--subject S] [--days N]   # generation yield and rejection codes (T067)
+    python -m app.practice.replenish capacity [--subject S]           # sizes 5-30 by stage, plan structure (T069)
     python -m app.practice.replenish tick                              # one scheduled pass (T066, host timer)
     python -m app.practice.replenish schedule-status
     python -m app.practice.replenish pause --reason TEXT | resume
@@ -42,8 +43,10 @@ def main(argv: list[str] | None = None) -> int:
     cov = sub.add_parser("coverage", help="read-only composer gaps for sizes 5-30 and the generation order")
     yld = sub.add_parser("yield", help="read-only seeder yield and rejection codes per objective and difficulty")
     yld.add_argument("--days", type=int, default=14)
+    cap = sub.add_parser("capacity", help="read-only: sizes 5-30 by stage (plan, generated, approved) and the "
+                                          "plan's structural limits (T069)")
     reqs.add_argument("--all", action="store_true", help="include closed requests")
-    for p in (inv, assess, reqs, cov, yld):
+    for p in (inv, assess, reqs, cov, yld, cap):
         p.add_argument("--subject", choices=SUBJECTS)
     run.add_argument("--subject", choices=SUBJECTS, required=True)
     run.add_argument("--max-calls", type=int, required=True)
@@ -92,6 +95,17 @@ def main(argv: list[str] | None = None) -> int:
                 out[s] = {**found["coverage"], "generation_order": [
                     {"objective_code": k, **{f: v[f] for f in ("tier_name", "size", "levels", "low_yield")}}
                     for k, v in order if v["tier"] < 5]}
+        elif args.command == "capacity":
+            from app.main import SUBJECTS as NAMES
+            from app.practice import capacity
+            from app.practice.tutor_coverage import CoverageReport
+            report = CoverageReport(lambda: url, baseline, NAMES, catalog.open_catalog)
+            out = {}
+            for s in subjects:
+                found = report.subject(s)
+                objectives = select_objectives(conn, baseline, PracticeScope.SUBJECT_SIMULATION, s).objectives
+                out[s] = {**{k: v for k, v in found.items() if k != "cells"},
+                          "structure": capacity.structural(objectives, found["plan_cells"])}
         elif args.command == "yield":
             out = {}
             for s in subjects:

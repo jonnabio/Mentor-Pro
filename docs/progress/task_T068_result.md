@@ -118,5 +118,71 @@ The PO's pre-release review found two gaps at `030714c`.
 
 ## T067 merge record
 
-PR #72 merged into `dev` as `8aeaad9` (CI run 43614514102). Not yet
-released.
+PR #72 merged into `dev` as `8aeaad9` (CI run 43614514102). Released
+together with T068 in `v2026.11.16-1` (see below).
+
+## Release PO-T067-T068-PROD-2026-11-14 (resumed PO-T067-T068-RESUME-2026-11-15)
+
+- **PR #73:** PO-reviewed after the corrective changes. Merged into `dev`
+  as `f2f308c`; `dev` CI run 43672511622 green.
+- **Release PR #74:** PR CI run 43782145310 green. Merged into `main` with
+  `--match-head-commit f2f308c`, giving `2bd7dad`.
+- **`main` CI run 43783087848:** green on all four jobs (Python Tests,
+  Release Identity, Validate and Publish Docker Image, Tag and Release).
+  `dev` synced to `main`.
+- **Release `v2026.11.16-1`:**
+  - image digest `sha256:47431d24…ee8e`;
+  - manifest sha256 `69311fd1…60c7bb`, identical for the download and the
+    server copy;
+  - the manifest reports smoke pass for student and tutor.
+- **Pause:** the server steps were paused on 2026-11-15 because the
+  workstation's Tailscale was not connected. They resumed under
+  PO-T067-T068-RESUME-2026-11-15 once it was restored.
+- **Preflight:** `DEPLOY COMPATIBLE` (schema 0001..0001, live 0001).
+- **Backup:** `mentor_pro_2026-11-16_012303.dump` (sha256 `7aacad97…f8e3`,
+  37 tables, 2290 rows), `VERIFY OK`.
+- **Deploy:** window `T067-T068-RELEASE-2026-11-16`. Result `DEPLOY OK`,
+  `SMOKE PASS (13/13)`, `STATUS HEALTHY`. The app and tutor containers run
+  `@sha256:47431d24…ee8e` and are healthy.
+
+## Production Acceptance (2026-11-16, read-only)
+
+- **Review schema:**
+  - before the deploy, `generation.bank_item_review` had no `comment`
+    column; after it, the column exists;
+  - historical verdicts are unchanged: 41 rows (26 approved, 15
+    quarantined), max `review_id` 41;
+  - the md5 fingerprint over every verdict row is `44c18195…e801`, the
+    same before and after.
+- **Dashboard:**
+  - `https://macedonianserver.tailb0ac04.ts.net:8443/tutor` (tailnet only)
+    serves the "Revisión de preguntas" section (`#tutor-nav-review`,
+    `#tutor-review`);
+  - `/api/tutor/review/queue` without the token returns 403.
+- **Review queue:**
+  - read through `ReviewQueue` in the tutor container;
+  - 23 pending: Español 7, Matemáticas 6, Ciencias 6, Estudios Sociales
+    4;
+  - every pending question has 4 options and a key;
+  - no verdict was recorded, so the original Español candidate and the
+    later ones all await the tutor.
+  - The queue grew from 1 because the T066 scheduler ran its authorized
+    3-hour ticks on `v2026.11.13-1` between 2026-11-14 and 2026-11-16.
+- **T067 priorities** (`replenish coverage`): the first tier
+  (`unblock_smallest_size`) is exactly the eight PO objectives:
+  - Matemáticas: M08, M15, M21 (size 15);
+  - Español: EL04, EL05 (size 5);
+  - Ciencias: C04, C16 (size 5);
+  - Estudios Sociales: ES24 (size 5).
+- **Eligible questions:** Matemáticas 42, Español 10, Ciencias 10,
+  Estudios Sociales 20. Mixed quizzes compose only for Matemáticas, at
+  sizes 5 and 10.
+- **T066 scheduler:**
+  - `schedule-status`: enabled, not paused, `tick_calls` 10,
+    `consecutive_failures` 0;
+  - the last 10 ticks are all `ok`, each `tick_call_limit` with 10 calls,
+    rotating through all four subjects;
+  - one cron line installed.
+  - Since 2026-11-14, `llm.usage_record` shows 140 calls, all `free`, at
+    $0. `OPENROUTER_ALLOW_PAID=false`, `MENTOR_PRO_REPLENISH_SCHEDULE=on`.
+  - Generation limits were not changed.
