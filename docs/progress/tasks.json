@@ -2094,6 +2094,28 @@
           "docs/progress/task_T069_result.md"
         ]
       }
+    },
+    {
+      "id": "T071",
+      "name": "Tutor Question Bank bulk review and approval",
+      "objective": "Tutor selects explicit pending questions on the current page (inspect key and explanation, select, select page, clear) and approves them in one confirmed operation through the existing individual review; per-ID results, partial-failure feedback, max 50 IDs, no duplicates, audit rows unchanged.",
+      "status": "review",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "tests/app/test_tutor_bulk_approve.py",
+          "docs/progress/task_T071_result.md",
+          "docs/progress/screenshots/T071/bulk-selected.png",
+          "docs/progress/screenshots/T071/bulk-result.png"
+        ],
+        "modify": [
+          "app/practice/tutor_review.py",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "docs/progress/tasks.json"
+        ]
+      }
     }
   ]
 }

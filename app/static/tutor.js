@@ -433,6 +433,9 @@ async function openReview() {
   }
   $("review-saved").textContent = "";
   showReviewItem();
+  bulk.page = 1; // T071: any filter change or reload starts on page 1 with an empty selection
+  $("bulk-result").textContent = "";
+  await loadBulk();
 }
 
 function showReviewItem() {
@@ -482,6 +485,7 @@ async function submitReview() {
     review.questions.splice(review.index, 1);
     if (review.index >= review.questions.length) review.index = 0;
     showReviewItem();
+    loadBulk(); // T071: refresh the bulk list without holding `busy` (the next question is already shown)
   } catch (error) {
     showError(error.message);
     $("review-submit").disabled = false;
@@ -569,5 +573,99 @@ async function openCoverage() {
 
 $("tutor-nav-coverage").addEventListener("click", openCoverage);
 $("cv-subject").addEventListener("change", openCoverage);
+
+// ---------------------------------------------------------------- T071 bulk approval
+// Page-scoped selection of explicit IDs, reset on every filter, page or result change. Nothing is preselected and
+// nothing is approved without the tutor confirming the exact count.
+const BULK_PAGE_SIZE = Number(window.__bulkPageSize) || 10; // the override exists only for the browser regression
+const bulk = { page: 1, pages: 1, questions: [], selected: new Set(), busy: false };
+const BULK_STATUS_ES = { already_reviewed: "ya tenía una decisión", not_pending: "ya no está pendiente",
+  error: "no se pudo registrar" };
+
+async function loadBulk() {
+  const params = new URLSearchParams(reviewQuery().slice(1));
+  params.set("page", String(bulk.page));
+  params.set("page_size", String(BULK_PAGE_SIZE));
+  const data = await api(`/api/tutor/review/queue?${params}`).catch((error) => { showError(error.message); return null; });
+  if (!data) return;
+  bulk.questions = data.questions;
+  bulk.page = data.pagination.page;
+  bulk.pages = data.pagination.pages;
+  bulk.selected.clear();
+  renderBulk(data.total);
+}
+
+function renderBulk(total) {
+  $("bulk").hidden = bulk.questions.length === 0;
+  $("bulk-list").replaceChildren(...bulk.questions.map((q) => {
+    const box = el("input", { type: "checkbox", class: "bulk-check", "data-request": q.request_id,
+      "aria-label": `Seleccionar ${q.request_id}` });
+    box.addEventListener("change", () => {
+      if (box.checked) bulk.selected.add(q.request_id); else bulk.selected.delete(q.request_id);
+      updateBulkButton();
+    });
+    const options = el("ol", { class: "plain-list review-options" }, ...q.options.map((o) => {
+      const key = o.label === q.answer_key;
+      return el("li", { class: key ? "review-key" : "" }, `${o.label}. ${o.text}${key ? " ✓ Respuesta propuesta" : ""}`);
+    }));
+    const details = el("details", {},
+      el("summary", {}, `${subjectName(q.subject)} · ${q.objective_code} · ` +
+        `${DIFFICULTY_ES[q.difficulty] || q.difficulty} · ${q.stem.slice(0, 80)}`),
+      el("p", { class: "muted small" }, `Objetivo ${q.objective_code}: ${q.objective_es}`),
+      el("p", { class: "muted small" }, q.evidencia_es ? `Evidencia: ${q.evidencia_es}` : ""),
+      el("p", { class: "source-text" }, q.stimulus || ""),
+      el("p", { class: "submitted-text" }, q.stem), options,
+      el("p", { class: "bulk-explanation" }, `Explicación: ${q.explanation || "Sin explicación."}`),
+      el("p", { class: "muted small" }, `Lote ${q.batch_id} · Solicitud ${q.request_id}`));
+    return el("li", { class: "bulk-row", "data-request": q.request_id }, box, details);
+  }));
+  $("bulk-page").textContent = `Página ${bulk.page} de ${bulk.pages} · ${total} por revisar`;
+  $("bulk-prev").disabled = bulk.page <= 1;
+  $("bulk-next").disabled = bulk.page >= bulk.pages;
+  updateBulkButton();
+}
+
+function updateBulkButton() {
+  $("bulk-approve").textContent = `Aprobar seleccionadas (${bulk.selected.size})`;
+  $("bulk-approve").disabled = bulk.busy || bulk.selected.size === 0;
+}
+
+function setAllBulk(checked) {
+  for (const box of document.querySelectorAll(".bulk-check")) {
+    box.checked = checked;
+    if (checked) bulk.selected.add(box.dataset.request); else bulk.selected.delete(box.dataset.request);
+  }
+  updateBulkButton();
+}
+
+async function approveBulk() {
+  const ids = [...bulk.selected];
+  if (!ids.length || bulk.busy) return;
+  if (!window.confirm(`¿Aprobar ${ids.length} pregunta${ids.length === 1 ? "" : "s"}? ` +
+    "Quedarán disponibles para el estudiante.")) return;
+  showError("");
+  bulk.busy = true; // no second submission while one is in flight
+  updateBulkButton();
+  try {
+    const out = await api("/api/tutor/review/bulk-approve", { method: "POST", body: JSON.stringify({ request_ids: ids }) });
+    const failed = out.results.filter((r) => r.status !== "approved")
+      .map((r) => `${r.request_id} (${BULK_STATUS_ES[r.status] || r.status})`);
+    const message = out.failed === 0 ? `Se aprobaron ${out.approved} de ${out.requested} preguntas.`
+      : `Se aprobaron ${out.approved} de ${out.requested} preguntas. No se aprobaron: ${failed.join(", ")}.`;
+    await openReview();
+    $("bulk-result").textContent = message;
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    bulk.busy = false;
+    updateBulkButton();
+  }
+}
+
+$("bulk-select-page").addEventListener("click", () => setAllBulk(true));
+$("bulk-clear").addEventListener("click", () => setAllBulk(false));
+$("bulk-approve").addEventListener("click", approveBulk);
+$("bulk-prev").addEventListener("click", () => { if (bulk.page > 1) { bulk.page -= 1; loadBulk(); } });
+$("bulk-next").addEventListener("click", () => { if (bulk.page < bulk.pages) { bulk.page += 1; loadBulk(); } });
 
 if (token()) openQueue();

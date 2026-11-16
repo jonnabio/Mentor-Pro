@@ -1,12 +1,15 @@
-# Active Context: Session Handoff 2026-11-16 (Question Bank closed)
+# Active Context: T071 Bulk Approval in Review (2026-11-16)
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-16 (session end; PO-QBANK-CLOSE-2026-11-16)
-- **Active Role:** none (session closed). The last roles were Developer
-  (T069) and QA Engineer (T070).
-- **Mode:** idle. The Question Bank development initiative is **closed**.
-  Ongoing work is operational.
+- **Last Updated:** 2026-11-16 (T071 implemented, PR into `dev` open)
+- **Active Role:** Developer (T071).
+- **Mode:** review. The T071 request (tutor bulk review and approval)
+  is the new PO-requested increment after the Question Bank closure.
+  [T071 result](../progress/task_T071_result.md).
+  - Branch `feat/T071-bulk-approve` includes the
+    `handoff/T069-T070-acceptance` evidence.
+  - Waiting for PO review. Do not merge or deploy without authorization.
 - **Earlier history:** T006-T068, deployment stages, ADR-030 to ADR-036:
   see `docs/progress/task_T0xx_result.md`, `docs/planning/`, release
   records in `docs/progress/` and this file's Git history.

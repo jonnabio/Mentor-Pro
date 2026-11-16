@@ -9,6 +9,11 @@ reopens. Pending questions stay ineligible until a verdict exists; nothing here 
 Served only by the tutor service under /api/tutor/review with the shared tutor check (allowed client address
 and the tutor token). The reviewer recorded is `tutor`, the identity that token authenticates (the same value
 the CLI records). A verdict is recorded exactly once: a repeated or simultaneous submission is refused (409).
+
+T071 bulk approval: the tutor selects explicit question IDs on the page and confirms. Each ID goes through the same
+`item_review_record` call in its own transaction (same lock, re-check and audit row), so one refused ID never
+undoes or blocks the others and the database never holds a half-recorded verdict. Bulk approval only approves;
+quarantine stays individual because it needs a reason per question.
 """
 
 from __future__ import annotations
@@ -27,6 +32,8 @@ from app.writing.tutor import LOOPBACK, tutor_guard
 
 REVIEWER = "tutor"
 LEVELS = ("easy", "medium", "hard")
+BULK_MAX = 50  # T071: the most question IDs one bulk approval accepts
+PAGE_SIZE_MAX = 50
 COUNTS_SQL = """
 SELECT b.subject,
        COUNT(*) FILTER (WHERE v.verdict = 'approved') AS approved,
@@ -42,6 +49,10 @@ class Decision(BaseModel):
     verdict: str = Field(pattern="^(approved|quarantined)$")
     reason: str = Field(default="", max_length=40)
     comment: str = Field(default="", max_length=seeding.COMMENT_MAX)
+
+
+class BulkApproval(BaseModel):
+    request_ids: list[str] = Field(min_length=1)
 
 
 class ReviewQueue:
@@ -106,6 +117,36 @@ class ReviewQueue:
         return seeding.item_review_record(self.url(), batch_id, [{
             "request_id": d.request_id, "verdict": d.verdict, "reason": d.reason, "comment": d.comment}], REVIEWER)
 
+    def approve_many(self, request_ids: list[str]) -> list[dict[str, str]]:
+        """T071: approve explicit IDs, one existing individual verdict (own transaction) per ID. Returns one result
+        per ID in request order: approved, already_reviewed (a verdict exists), not_pending (unknown here, not a
+        generated question, or no longer actively linked) or error (the database refused; nothing recorded)."""
+        self.ensure_schema()
+        url = self.url()
+        batch_of = {r["request_id"]: b["batch_id"] for b in self._batches().values()
+                    for r in seeding.links(url, b["batch_id"])}
+        results = []
+        for rid in request_ids:
+            status = "not_pending"
+            if rid in batch_of:
+                try:
+                    seeding.item_review_record(url, batch_of[rid], [{"request_id": rid, "verdict": "approved"}],
+                                               REVIEWER)
+                    status = "approved"
+                except seeding.NotAwaiting:
+                    status = "already_reviewed" if self._has_verdict(rid) else "not_pending"
+                except (seeding.SeedError, psycopg.Error):
+                    status = "error"
+            elif self._has_verdict(rid):
+                status = "already_reviewed"
+            results.append({"request_id": rid, "status": status})
+        return results
+
+    def _has_verdict(self, request_id: str) -> bool:
+        with psycopg.connect(self.url()) as conn:
+            return conn.execute("SELECT 1 FROM generation.bank_item_review WHERE request_id = %s LIMIT 1",
+                                (request_id,)).fetchone() is not None
+
 
 def build_review_router(queue: ReviewQueue, api_error: type[Exception], token: str,
                         allowed_hosts: frozenset[str] = LOOPBACK) -> APIRouter:
@@ -117,14 +158,37 @@ def build_review_router(queue: ReviewQueue, api_error: type[Exception], token: s
     def pending(subject: str | None = Query(default=None, max_length=40),
                 objective: str | None = Query(default=None, max_length=20),
                 difficulty: str | None = Query(default=None, max_length=10),
-                batch: str | None = Query(default=None, max_length=64)) -> dict[str, Any]:
+                batch: str | None = Query(default=None, max_length=64),
+                page: int | None = Query(default=None, ge=1),
+                page_size: int | None = Query(default=None, ge=1, le=PAGE_SIZE_MAX)) -> dict[str, Any]:
         if subject and subject not in codes:
             raise api_error(422, "unknown_subject", "La materia seleccionada no existe.")
         if difficulty and difficulty not in LEVELS:
             raise api_error(422, "unknown_difficulty", "La dificultad debe ser fácil, media o difícil.")
         questions = queue.pending(subject or None, (objective or "").strip().upper() or None,
                                   difficulty or None, batch or None)
-        return {"questions": questions, "counts": queue.counts(), "reasons": list(seeding.REASONS)}
+        out: dict[str, Any] = {"counts": queue.counts(), "reasons": list(seeding.REASONS), "total": len(questions)}
+        if page_size is not None or page is not None:  # T071: optional paging; without it the full list (T068)
+            size = page_size or 10
+            pages = max(1, -(-len(questions) // size))
+            current = min(page or 1, pages)
+            questions = questions[(current - 1) * size:current * size]
+            out["pagination"] = {"page": current, "page_size": size, "pages": pages}
+        return {"questions": questions, **out}
+
+    @router.post("/bulk-approve")
+    def bulk_approve(body: BulkApproval) -> dict[str, Any]:
+        ids = [i.strip() for i in body.request_ids]
+        if len(ids) > BULK_MAX:
+            raise api_error(422, "too_many", f"Podés aprobar como máximo {BULK_MAX} preguntas a la vez.")
+        if any(not i or len(i) > 64 for i in ids):
+            raise api_error(422, "invalid_id", "Hay un identificador de pregunta inválido.")
+        if len(set(ids)) != len(ids):
+            raise api_error(422, "duplicate_ids", "La selección repite una pregunta.")
+        results = queue.approve_many(ids)
+        approved = sum(1 for r in results if r["status"] == "approved")
+        return {"requested": len(ids), "approved": approved, "failed": len(ids) - approved,
+                "results": results, "counts": queue.counts()}
 
     @router.post("/decisions")
     def decide(decision: Decision) -> dict[str, Any]:
