@@ -24,12 +24,13 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.main import STATIC_DIR, SUBJECTS, ApiError
+from app.main import BASELINE_VERSION, STATIC_DIR, SUBJECTS, ApiError
 from app.practice.tutor_results import PracticeResults, build_practice_results_router
+from app.practice.tutor_review import ReviewQueue, build_review_router
 from app.writing.migrations import SchemaMigrationRequired
 from app.writing.routes import WritingService
 from app.writing.tutor import build_tutor_router
-from curriculum import db
+from curriculum import catalog, db
 
 MIN_SERVICE_TOKEN = 32
 PORT = 8000
@@ -67,14 +68,21 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
     hosts = parse_allowed_hosts(allowed_hosts if allowed_hosts is not None
                                 else db.setting("MENTOR_PRO_TUTOR_ALLOWED_HOSTS"))
     service = WritingService(lambda: database_url or db.database_url())
+    review_queue = ReviewQueue(lambda: database_url or db.database_url(), BASELINE_VERSION, SUBJECTS,
+                               catalog.open_catalog)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         service.check_schema()  # T036: refuse to start on an unmigrated writing schema
+        try:  # T068: Question Bank schema (review `comment` column) at startup, independent of student practice
+            review_queue.ensure_schema()
+        except (psycopg.OperationalError, db.ConfigurationError):
+            pass  # unreachable database: left to the first request, like check_schema; ensure_schema retries then
         yield
 
     app = FastAPI(title="Mentor Pro tutor", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.writing = service
+    app.state.review_queue = review_queue
 
     @app.exception_handler(ApiError)
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
@@ -96,6 +104,8 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
     # T060: read-only practice results and Question Bank analytics (GET only, same tutor check).
     app.include_router(build_practice_results_router(
         PracticeResults(lambda: database_url or db.database_url()), ApiError, token, hosts, SUBJECTS))
+    # T068: question review (pending queue and verdicts) through the existing individual review; tutor only.
+    app.include_router(build_review_router(review_queue, ApiError, token, hosts))
 
     @app.get("/tutor", include_in_schema=False)
     def tutor_page(request: Request) -> FileResponse:

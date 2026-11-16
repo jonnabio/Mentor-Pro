@@ -64,6 +64,20 @@ jobs:
         run: |
           python -m pytest -q -p no:warnings tests/ace tests/curriculum tests/app
 
+      # PO-T068-CORRECTIVE: the T068 tutor review browser acceptance test runs on every
+      # PR against the CI test database (synthetic data only). The step fails when the
+      # test fails, errors, is skipped or is not collected.
+      - name: Install Chromium for browser acceptance tests
+        run: python -m playwright install --with-deps chromium
+
+      - name: Browser acceptance tests (T068 tutor review)
+        env:
+          MENTOR_PRO_BROWSER: "1"
+        run: |
+          python -m pytest -p no:warnings -rA --junitxml=browser-results.xml \
+            "tests/app/test_tutor_review.py::test_review_in_the_browser"
+          python -c "import sys, xml.etree.ElementTree as E; r = E.parse('browser-results.xml').getroot(); s = r if r.tag == 'testsuite' else r.find('testsuite'); n, k = int(s.get('tests')), int(s.get('skipped')); print(f'browser tests executed={n - k} skipped={k}'); sys.exit(0 if n >= 1 and k == 0 else 1)"
+
       - name: Validate ACE skills
         run: python .ace/scripts/validate_skills.py
 

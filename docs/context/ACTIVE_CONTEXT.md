@@ -1,83 +1,82 @@
-# Active Context: Session Handoff 2026-11-12 (Evening)
+# Active Context: Session Handoff 2026-11-14
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-12 (T065 released and verified; Matemáticas
-  size 10 live; T066 scheduler in PR)
+- **Last Updated:** 2026-11-14 (T067 merged to `dev`; T068 in PR #73)
 - **Active Role:** Developer
-- **Mode:** EXECUTION
-- **Earlier history:** T006-T064, deployment stages, ADR-030 to ADR-036:
+- **Mode:** EXECUTION, awaiting PO review
+- **Earlier history:** T006-T066, deployment stages, ADR-030 to ADR-036:
   see `docs/progress/task_T0xx_result.md`, `docs/planning/`, release
   records in `docs/progress/` and this file's Git history.
 
 ## Current Objective
 
-PO-QBANK-CONTINUATION-2026-11-12: grow approved inventory toward sizes
-10-30 in every subject, and make replenishment run without an
-administrator starting each run (T066).
+PO-QBANK-COMPLETION-2026-11-14 (Question Bank Final Delivery): T067
+coverage-driven generation -> T068 tutor review dashboard -> T069 quiz
+sizes 5-30 -> T070 end-to-end acceptance. One increment at a time: ACE
+gate, PR into `dev`, PO review, release only after approval, verify.
 
 ## Handoff Summary
 
 ### Completed
 
-- **Tutor reviews recorded** (`item-review-record --reviewer tutor`,
-  each once): Phase B 11 approved (Matemáticas 5, Ciencias 3, Estudios
-  Sociales 3); QBANK-FINAL 5 approved, 3 quarantined (NEW-3 `other`, NEW-4
-  `level`, NEW-7 `other`). Review files deleted.
-- **T065 done:** PR #68, release PR #69 merged as `4245869` (main CI
-  43249020382 green), `v2026.11.12-1` deployed (digest `04e01d50…f3e8`,
-  smoke 13/13, `STATUS HEALTHY`). Evidence in
-  [T065 result](../progress/task_T065_result.md).
-- **Matemáticas size 10 live:** whole-subject mixed composes 10 distinct
-  bank questions (4 easy, 3 medium, 3 hard); `POST
-  /api/practice/availability` returns `[5, 10]`.
-- **T066** (branch `feat/T066-replenish-scheduler`): `replenish tick`,
-  host cron every 3 h, off by default, pause/resume, global lock, rotation,
-  recorded ticks. Full ACE gate pass.
-  [T066 result](../progress/task_T066_result.md).
+- **T066** released (`v2026.11.13-1`), activated and accepted in
+  production (records on `dev`: `4371f11`, `0695664`, `6c8ab99`).
+- **T067 coverage-driven generation priority:** PR #72 merged into `dev`
+  as `8aeaad9` (CI 43614514102 green). Not yet released to `main`.
+- **T068 tutor review dashboard:** branch
+  `feat/T068-tutor-review-dashboard`, commit `a53a458`, PR #73 into `dev`
+  (open). "Revisión de preguntas" section in the tutor page; `GET
+  /api/tutor/review/queue`, `POST /api/tutor/review/decisions` (tutor
+  service only, existing tutor check); verdicts via
+  `seeding.item_review_record` with advisory lock (4047, 1) and 409
+  `already_reviewed`; additive `comment` column on
+  `generation.bank_item_review`. 7 API tests + Playwright browser test;
+  full ACE gate `VERIFY_RESULT=pass gate=all`.
+  [T068 result](../progress/task_T068_result.md).
 
 ### Current State
 
-- **Production:** `v2026.11.12-1`, `STATUS HEALTHY`. Latest backup
-  `mentor_pro_2026-11-12_154415.dump` (sha256 `cec2a5ee…eb7b`) `VERIFY
-  OK`. Paid generation off.
-- **Eligible (pending, quarantined):** Matemáticas 40 (0, 4), Estudios
-  Sociales 17, Español 8, Ciencias 8 (0 pending each before the current
-  runs).
-- **Sizes offered:** Matemáticas mixed `[5, 10]`; single-level
-  Matemáticas and the other subjects generate size 5.
-- **Gaps (real composer):** Matemáticas 15: M06, M08, M11, M15, M21;
-  size 5 bank: Español EL04, EL05, EL07; Ciencias C04, C08, C12, C16;
-  Estudios Sociales ES06, ES18, ES24 (one question each).
-- **Targeted runs in progress** for those 15 objectives (free, 10 calls
-  each); log `~/mentor-pro-review/runs/qbank-cont-2026-11-12.log`. M06: 1
-  candidate.
-- **Locks:** none held at handoff.
+- **Production:** `v2026.11.13-1` (T066). T067 and T068 are not deployed.
+- **`dev`:** `8aeaad9` (T067 merged). PR #73 open, not merged: it needs
+  PO review; never merge it unreviewed.
+- **Bank:** one real pending Español candidate awaits the tutor; no
+  verdict was recorded on the tutor's behalf.
+- **Sizes offered:** unchanged from T066 (T069 not started); do not claim
+  30-question quizzes until the real composer confirms them.
+- **Locks:** none held (no lane claim in this project; replenish tick
+  lock (4047, 0) and review lock (4047, 1) are transaction-scoped).
 
 ### Next Steps
 
-1. When the runs finish: `item-review-sample` per subject, tutor review,
-   record, recount, check availability.
-2. PO review of the T066 PR, then `dev` -> `main`, deploy, install the
-   cron line, administrator enables `MENTOR_PRO_REPLENISH_SCHEDULE=on`.
-3. Bank-only for another subject only after its size 5 composes from the
-   bank (administrator edits `MENTOR_PRO_BANK_ONLY_SUBJECTS`).
+1. PO reviews PR #73 (T068); address feedback; merge into `dev` only
+   after approval.
+2. With PO release authorization: `dev` -> `main` (T067 + T068) with
+   `--match-head-commit`, deploy, smoke, record evidence in the next
+   functional PR.
+3. Tutor reviews the pending Español candidate in the production
+   dashboard (T068 acceptance). Do not infer decisions.
+4. Start T069 (quiz sizes 5-30) from `dev`.
 
 ### Blockers/Issues
 
-- PO review of T066.
+- PO review of PR #73 and release authorization for T067 + T068.
 - Tutor review time bounds inventory growth.
-- `replenishment.run` marks every difficulty of an objective
-  `candidates_generated`; cells without a candidate are later closed as
-  `reviewed` (misleading label, no duplicate generation). Follow-up.
-- Hard Ciencias/Estudios Sociales items often rejected for near-identical
-  options (C04); replenishment prioritisation alphabetical within a
-  trigger.
+- `replenishment.run` marks every difficulty `candidates_generated`;
+  cells without a candidate are later labelled `reviewed` (follow-up).
 - Pending PO decision: narrow the `mentorpro` sudo rule.
-- Older items: see this file's Git history at 2026-11-06.
 
 ### Notes
 
+- **Session slip 2026-11-14:** two "Paper G" prompts for another
+  repository (`xai-eval-framework`) were pasted into this session and
+  executed there (its PRs #119, #120 merged). Mentor-Pro was not touched by
+  that work. Check which project a pasted prompt targets before acting.
+- **Review via dashboard:** tutor tunnel `ssh -N -L 8081:127.0.0.1:8081
+  jonnabio@100.64.84.15`, section "Revisión de preguntas". The CLI
+  (`item-review-record --reviewer tutor`) still works.
+- **Windows shell:** never run `python -` with an empty heredoc; write
+  scripts to the scratchpad instead.
 - **Deploy, unattended:** `T="sudo -n /usr/local/lib/mentor-pro/mentorpro"`;
   `preflight "$M"`, `backup`, `verify-backup <dump>`, `deploy "$M" --backup
   <dump> --window <ref> --authorization <ref>`, `status`. Manifest: `gh
@@ -87,8 +86,8 @@ administrator starting each run (T066).
 - **Review recording:** decisions file into the app container (`docker
   cp`), `python -m app.practice.seed_bank item-review-record --subject <s>
   --decisions <file> --reviewer tutor` once, delete the copy and the
-  host file. Only verdicts stated by the human tutor; free-text comments
-  are not stored (reason code only).
+  host file. Only verdicts stated by the human tutor; the CLI stores
+  reason codes only (the T068 dashboard also stores an optional comment).
 - **Composer checks:** `seed_bank compose-check --subject <s>` (read-only)
   and `POST /api/practice/availability`.
 - **Release flow:** feature PR into `dev`, then `dev` -> `main` with

@@ -94,6 +94,8 @@ CREATE TABLE IF NOT EXISTS generation.bank_item_review (
     recorded_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK ((verdict = 'approved') = (reason = 'approved'))
 );
+-- T068: the tutor's optional written comment on a verdict (review dashboard); NULL for CLI verdicts.
+ALTER TABLE generation.bank_item_review ADD COLUMN IF NOT EXISTS comment TEXT;
 """
 
 # Latest review verdict of question q (NULL when never reviewed).

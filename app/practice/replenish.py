@@ -4,6 +4,8 @@
     python -m app.practice.replenish assess [--subject S]             # snapshot + open/close requests, no LLM
     python -m app.practice.replenish run --subject S --max-calls N    # generate candidates for open requests
     python -m app.practice.replenish requests [--subject S] [--all]
+    python -m app.practice.replenish coverage [--subject S]           # composer gaps per size and priority (T067)
+    python -m app.practice.replenish yield [--subject S] [--days N]   # generation yield and rejection codes (T067)
     python -m app.practice.replenish tick                              # one scheduled pass (T066, host timer)
     python -m app.practice.replenish schedule-status
     python -m app.practice.replenish pause --reason TEXT | resume
@@ -29,6 +31,7 @@ from app.practice.seed_bank import SUBJECTS, _llm_factory
 def main(argv: list[str] | None = None) -> int:
     from app.practice import replenish_schedule, replenishment, seeding
     from curriculum import catalog, db, importer
+    from curriculum.catalog import PracticeScope, select_objectives
 
     parser = argparse.ArgumentParser(prog="python -m app.practice.replenish")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -36,8 +39,11 @@ def main(argv: list[str] | None = None) -> int:
     assess = sub.add_parser("assess")
     run = sub.add_parser("run")
     reqs = sub.add_parser("requests")
+    cov = sub.add_parser("coverage", help="read-only composer gaps for sizes 5-30 and the generation order")
+    yld = sub.add_parser("yield", help="read-only seeder yield and rejection codes per objective and difficulty")
+    yld.add_argument("--days", type=int, default=14)
     reqs.add_argument("--all", action="store_true", help="include closed requests")
-    for p in (inv, assess, reqs):
+    for p in (inv, assess, reqs, cov, yld):
         p.add_argument("--subject", choices=SUBJECTS)
     run.add_argument("--subject", choices=SUBJECTS, required=True)
     run.add_argument("--max-calls", type=int, required=True)
@@ -78,6 +84,23 @@ def main(argv: list[str] | None = None) -> int:
                 out[subject] = {"totals": replenishment.totals(rows), **({"cells": rows} if args.cells else {})}
         elif args.command == "assess":
             out = {s: replenishment.assess(url, conn, baseline, s, policy) for s in subjects}
+        elif args.command == "coverage":
+            out = {}
+            for s in subjects:
+                found = replenishment.priority(url, conn, baseline, s)
+                order = sorted(found["order"].items(), key=lambda kv: kv[1]["rank"])
+                out[s] = {**found["coverage"], "generation_order": [
+                    {"objective_code": k, **{f: v[f] for f in ("tier_name", "size", "levels", "low_yield")}}
+                    for k, v in order if v["tier"] < 5]}
+        elif args.command == "yield":
+            out = {}
+            for s in subjects:
+                codes = [o["workbook_code"] for o in select_objectives(
+                    conn, baseline, PracticeScope.SUBJECT_SIMULATION, s).objectives]
+                found = replenishment.yields(url, baseline, codes, args.days)
+                out[s] = [{"objective_code": k[0], "difficulty": k[1], **{f: v[f] for f in (
+                    "attempts", "accepted", "rejected", "unavailable", "calls")},
+                    "reasons": dict(v["reasons"].most_common(5))} for k, v in sorted(found.items())]
         elif args.command == "run":
             out = replenishment.run(url, conn, baseline, args.subject, _llm_factory(url), policy, args.max_calls)
         else:

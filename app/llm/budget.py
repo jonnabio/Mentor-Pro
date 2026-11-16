@@ -27,6 +27,10 @@ class BudgetGate:
         self._paid_in_flight = 0
         self.sent = 0                 # calls reserved through this gate (the per-set count)
         self.refusal: str | None = None
+        # T067: when set, a generation attempt starts only if the per-set cap still covers this many calls, so a
+        # question is never generated and then left unchecked (solve or review blocked by the cap).
+        self.attempt_calls = 0
+        self._short = False
 
     def acquire(self, tier: str) -> bool:
         """Reserve one call; False (and `refusal` set) if any limit would be exceeded."""
@@ -54,9 +58,18 @@ class BudgetGate:
             self._in_flight = max(0, self._in_flight - calls)
             self._paid_in_flight = max(0, self._paid_in_flight - paid_calls)
 
+    def covers_attempt(self) -> bool:
+        """T067: False (set limit reached) when `attempt_calls` is set and the per-set cap cannot cover it."""
+        with self._lock:
+            if self.attempt_calls and self.max_calls is not None                     and self.max_calls - self.sent < self.attempt_calls:
+                self._short = True
+                self.refusal = "set call limit reached"
+                return False
+            return True
+
     @property
     def set_limit_hit(self) -> bool:
-        return self.max_calls is not None and self.sent >= self.max_calls
+        return self._short or (self.max_calls is not None and self.sent >= self.max_calls)
 
     def _refuse(self, reason: str) -> bool:
         self.refusal = reason

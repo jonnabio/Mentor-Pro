@@ -106,11 +106,19 @@ def test_concurrent_tick_is_skipped_as_busy(db):
 def test_tick_spends_at_most_its_call_budget_and_rotates(db):
     run = FakeRun(calls=4)
     out = tick(db, run=run)
-    assert run.seen == [("espanol", 10), ("matematicas", 6), ("ciencias", 2)]
+    # T067: each subject gets at most max(objective_calls, ceil(10 / 4)) = 5 calls of the tick.
+    assert run.seen == [("espanol", 5), ("matematicas", 5), ("ciencias", 2)]
     assert (out["status"], out["calls"], out["reason"]) == ("ok", 10, "tick_call_limit")
     run2 = FakeRun(calls=4)
     tick(db, run=run2)
     assert run2.seen[0][0] == "estudios_sociales"  # resumes after the last subject served
+
+
+def test_one_subject_cannot_take_the_whole_tick(db):
+    run = FakeRun(calls=50)  # each subject would spend everything it is given
+    out = tick(db, run=run)
+    assert [s for s, _ in run.seen] == ["espanol", "matematicas"] and all(m == 5 for _, m in run.seen)
+    assert out["calls"] == 10
 
 
 def test_budget_stop_ends_the_tick(db):

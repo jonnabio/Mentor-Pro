@@ -1,8 +1,8 @@
 # T066 Result: Scheduled Replenishment
 
 - **Role:** Developer (PO authorization PO-QBANK-CONTINUATION-2026-11-12)
-- **Status:** implemented and tested; PO review of the PR required before
-  release and activation
+- **Status:** done: released (`v2026.11.13-1`), activated 2026-11-14,
+  production acceptance verified (PO-T066-ACTIVATION-2026-11-14)
 - **Decision:** [ADR-036 amendment](../adr/ADR-036-question-bank-phase-b.md)
 
 ## Problem
@@ -85,6 +85,54 @@ reason is misleading in the tutor view. Follow-up candidate.
 3. Administrator adds `MENTOR_PRO_REPLENISH_SCHEDULE=on` to
    `/etc/mentor-pro/app.env` and force-recreates the app.
 4. Verify the first tick in `schedule-status` and the log.
+
+## Release PO-T066-PROD-2026-11-13
+
+- PR #70 (head `4bd1dcb`, PO-reviewed; wrapper correction after review)
+  merged into `dev` as `9cedc5c`; `dev` CI 43488568358 green.
+- Release PR #71 merged into `main` as `ccdf122`; `main` CI 43491602850
+  green (Python Tests, Release Identity, Validate and Publish Docker
+  Image, Tag and Release). `dev` synced to `main`.
+- `v2026.11.13-1`, image digest `sha256:064b9131…23fe`, manifest sha256
+  `2c554b81…ca21` (download and server copy identical).
+- Preflight `DEPLOY COMPATIBLE` (schema 0001..0001, live 0001). Backup
+  `mentor_pro_2026-11-13_193249.dump` (sha256 `092def74…7f56`) `VERIFY
+  OK`. Deploy window `T066-RELEASE-2026-11-13`: `DEPLOY OK`, smoke 13/13,
+  `STATUS HEALTHY`.
+- Wrapper installed (`~/mentor-pro-review/bin`, mode 700); cron line
+  installed once (`crontab -l` shows one `mentorpro-replenish` line; cron
+  active). `--check`: `CHECK_OK`, log directory 700, log 600.
+- Default off: `schedule-status` `"enabled": false`; a wrapper tick logged
+  `RESULT=SKIPPED ... reason=disabled calls=0`, `llm.usage_record`
+  unchanged (697 rows before and after). Paid stays off.
+- Pause and resume through the database, no restart.
+- 2026-11-14: the administrator set `MENTOR_PRO_REPLENISH_SCHEDULE=on`
+  and force-recreated the app; `STATUS HEALTHY`, `"enabled": true`.
+  Five cron ticks before activation logged `SKIPPED reason=disabled`.
+- With the schedule lock held by another session, a tick logged
+  `RESULT=SKIPPED ... reason=busy calls=0`; no model call.
+- First enabled tick `tick-39d20217e660`: `RESULT=OK`,
+  `tick_call_limit`, 10 calls (all `free`; no paid row today), 1
+  Español candidate held for review (pending 1), nothing approved
+  (Matemáticas eligible unchanged at 42). Calls recorded in
+  `llm.usage_record`, the table the shared daily budget reads. Rotation
+  advanced (`next_index` 1), `consecutive_failures` 0.
+
+## Production Acceptance PO-T066-ACTIVATION-2026-11-14
+
+Read-only checks at 13:25 UTC; no further generation (the single
+authorized real tick is `tick-39d20217e660`):
+
+- Container: `MENTOR_PRO_REPLENISH_SCHEDULE=on`, `OPENROUTER_ALLOW_PAID=false`.
+- `schedule-status`: `enabled` true, `paused` false, `tick_calls` 10,
+  `next_index` 1, `consecutive_failures` 0.
+- Tick records: 1 `ok` (10 calls, 1 generated), 1 `skipped busy`, 7
+  `skipped disabled`; the wrapper log matches. Model calls today: 10, all
+  `free`.
+- Pending tutor review: Español 1, others 0. Eligible unchanged:
+  Matemáticas 42, Estudios Sociales 20, Español 10, Ciencias 10.
+- One cron line, cron active; next tick 15:17 UTC, then every 3 hours.
+- `SMOKE PASS (13/13)`, `STATUS HEALTHY`, `v2026.11.13-1`.
 
 ## Tutor Review PO-QBANK-REVIEW-20-2026-11-12
 
