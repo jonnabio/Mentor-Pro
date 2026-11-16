@@ -37,6 +37,7 @@
       <button type="button" id="tutor-nav-writing" class="secondary" aria-pressed="true">Producción escrita</button>
       <button type="button" id="tutor-nav-practice" class="secondary" aria-pressed="false">Resultados de práctica</button>
       <button type="button" id="tutor-nav-review" class="secondary" aria-pressed="false">Revisión de preguntas</button>
+      <button type="button" id="tutor-nav-coverage" class="secondary" aria-pressed="false">Cobertura del banco</button>
     </nav>
 
     <section id="tutor-queue" class="card" hidden>
@@ -206,6 +207,30 @@
           <button type="button" id="review-skip" class="secondary">Siguiente pregunta</button>
         </div>
       </div>
+    </section>
+
+    <!-- T069: quiz-size coverage. Read-only; a size is available only when the real composer assembles it. -->
+    <section id="tutor-coverage" class="card" hidden>
+      <h2>Cobertura del banco</h2>
+      <p class="muted small">Tamaños de práctica de toda la materia (dificultad mezclada) que el banco arma hoy con
+        preguntas aprobadas. El total de preguntas no basta: cada objetivo y cada nivel necesita las suyas.</p>
+      <label class="field-label" for="cv-subject">Materia
+        <select id="cv-subject"></select></label>
+      <p id="cv-summary" class="choice-notice" aria-live="polite"></p>
+      <p id="cv-progress" class="muted small"></p>
+      <ul id="cv-sizes" class="plain-list feedback-scores"></ul>
+      <h3 id="cv-next-title" hidden></h3>
+      <p id="cv-next-note" class="muted small" hidden></p>
+      <ul id="cv-blockers" class="plain-list feedback-scores"></ul>
+      <details id="cv-cells-block">
+        <summary><h3 class="inline-heading">Preguntas por objetivo y dificultad</h3></summary>
+        <p class="muted small">Aprobadas / por revisar / celdas del plan, por nivel (fácil · media · difícil).</p>
+        <div class="table-scroll"><table id="cv-cells" class="coverage-table">
+          <thead><tr><th scope="col">Objetivo</th><th scope="col">Fácil</th><th scope="col">Media</th>
+            <th scope="col">Difícil</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </details>
     </section>
 
     <section id="tutor-practice-detail" class="card" hidden>
