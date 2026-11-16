@@ -105,3 +105,33 @@ Status key:
 3. **Configuration decision for the PO:** enable bank-only practice for
    Español, Ciencias and Estudios Sociales, now or when their first sizes
    compose.
+
+## 6. Closure (PO-QBANK-CLOSE-2026-11-16)
+
+The PO approved closing the Question Bank development initiative after this
+acceptance. **The Question Bank feature is closed from a software-development
+perspective.**
+
+- **T070 and the initiative are complete.** No further Question Bank
+  development increment.
+- **Kept as is:**
+  - automated replenishment, enabled with the existing free-only limits;
+  - the 100-cell curriculum plan, unchanged;
+  - the ADR-037 16-cell extension, deferred;
+  - mandatory tutor approval.
+- **Bank-only configuration:** stays enabled for Matemáticas only. It is
+  not enabled for Español, Ciencias or Estudios Sociales yet.
+  - For each of those subjects, report to the PO when the real composer
+    builds a five-question practice.
+  - Request authorization before changing that subject's configuration.
+- **Operations, not unfinished development:**
+  - question generation;
+  - tutor review;
+  - curriculum coverage.
+- **Operational acceptance follow-up:** the first authentic tutor-dashboard
+  review.
+- **Maintenance backlog:** the minor issues in section 4 are in
+  [TODO-maintenance.md](../TODO-maintenance.md).
+- **Evidence:** release, test and acceptance records, including `eb18ee9`,
+  stay on `handoff/T069-T070-acceptance` and go into the next functional PR
+  (no documentation-only PR).
