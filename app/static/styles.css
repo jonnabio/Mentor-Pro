@@ -316,3 +316,9 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 /* T068: the proposed correct answer in the tutor's question review. */
 .review-options li { padding: 0.4rem 0.6rem; border: 1px solid #d0d5dd; border-radius: 6px; margin: 0.3rem 0; }
 .review-options li.review-key { border: 2px solid #1a7f37; background: #e9f7ee; font-weight: 600; }
+/* T069: tutor coverage table (scrolls inside its card on a phone). */
+.table-scroll { overflow-x: auto; }
+.coverage-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+.coverage-table th, .coverage-table td { border: 1px solid var(--border); padding: 4px 8px; text-align: left;
+  white-space: nowrap; }
+.feedback-scores .coverage-ok { border-color: var(--accent); }
