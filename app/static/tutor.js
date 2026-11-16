@@ -21,6 +21,62 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+// T071: a question's stimulus is {type: "none"} or {type: "text" | "table", text} (generation/parsing.py), or a
+// plain string in older records. Returns a node (or null when there is nothing to show). Built only with DOM nodes
+// and text, never innerHTML, so model-authored content cannot inject markup. A table's text becomes a <table> when
+// at least two lines are pipe- or tab-delimited; anything else keeps its line breaks, so no content is dropped.
+function stimulusText(stimulus) {
+  if (typeof stimulus === "string") return stimulus;
+  if (stimulus && typeof stimulus === "object" && stimulus.type !== "none" && typeof stimulus.text === "string") {
+    return stimulus.text;
+  }
+  return "";
+}
+
+function tableCells(line) {
+  const trimmed = line.trim();
+  if (trimmed.includes("\t")) return trimmed.split("\t").map((c) => c.trim());
+  if (!trimmed.includes("|")) return null;
+  return trimmed.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+}
+
+function renderStimulus(stimulus) {
+  const text = stimulusText(stimulus).trim();
+  if (!text) return null;
+  const box = el("div", { class: "source-text stimulus", "data-stimulus": stimulus.type || "text" });
+  const lines = text.split(/\r?\n/);
+  const rows = lines.map(tableCells);
+  if (stimulus.type !== "table" || rows.filter(Boolean).length < 2) {
+    box.textContent = text;
+    return box;
+  }
+  let table = null;
+  let header = true;
+  lines.forEach((line, i) => {
+    const cells = rows[i];
+    if (!cells) {
+      table = null;
+      header = true;
+      if (line.trim()) box.append(el("p", {}, line.trim()));
+      return;
+    }
+    if (cells.every((c) => /^:?-{2,}:?$/.test(c))) return; // markdown separator row
+    if (!table) {
+      table = el("table", { class: "stimulus-table" });
+      box.append(table);
+    }
+    table.append(el("tr", {}, ...cells.map((c) => el(header ? "th" : "td", {}, c))));
+    header = false;
+  });
+  return box;
+}
+
+function showStimulus(target, stimulus) {
+  const node = renderStimulus(stimulus);
+  target.replaceChildren(...(node ? [node] : []));
+  target.hidden = !node;
+}
+
 function token() {
   try {
     return sessionStorage.getItem(TOKEN_KEY) || "";
@@ -373,7 +429,7 @@ async function openPracticeSession(id) {
       return el("li", { class: cls, "data-label": o.label }, `${o.label}. ${o.text}`,
         ...tags.map((t) => el("span", { class: "option-tag" }, t)));
     }));
-    const stimulus = q.stimulus && q.stimulus.text ? [el("p", { class: "source-text" }, q.stimulus.text)] : [];
+    const stimulus = [renderStimulus(q.stimulus)].filter(Boolean);
     return el("li", { "data-slot": String(q.slot), "data-result": q.result },
       el("p", { class: "meta-line" }, `${q.objective_code} · ${DIFFICULTY_ES[q.difficulty] || "Sin nivel"} · ${SOURCE_ES[q.source]}`),
       ...stimulus, el("p", { class: "objective-text" }, q.stem), options,
@@ -449,8 +505,7 @@ function showReviewItem() {
     `${DIFFICULTY_ES[q.difficulty] || q.difficulty} · Lote ${q.batch_id} · Solicitud ${q.request_id}`;
   $("review-objective").textContent = `Objetivo ${q.objective_code}: ${q.objective_es}`;
   $("review-evidence").textContent = q.evidencia_es ? `Evidencia: ${q.evidencia_es}` : "";
-  $("review-stimulus").textContent = q.stimulus || "";
-  $("review-stimulus").hidden = !q.stimulus;
+  showStimulus($("review-stimulus"), q.stimulus);
   $("review-stem").textContent = q.stem;
   $("review-options").replaceChildren(...q.options.map((o) => {
     const key = o.label === q.answer_key;
@@ -613,7 +668,7 @@ function renderBulk(total) {
         `${DIFFICULTY_ES[q.difficulty] || q.difficulty} · ${q.stem.slice(0, 80)}`),
       el("p", { class: "muted small" }, `Objetivo ${q.objective_code}: ${q.objective_es}`),
       el("p", { class: "muted small" }, q.evidencia_es ? `Evidencia: ${q.evidencia_es}` : ""),
-      el("p", { class: "source-text" }, q.stimulus || ""),
+      ...[renderStimulus(q.stimulus)].filter(Boolean),
       el("p", { class: "submitted-text" }, q.stem), options,
       el("p", { class: "bulk-explanation" }, `Explicación: ${q.explanation || "Sin explicación."}`),
       el("p", { class: "muted small" }, `Lote ${q.batch_id} · Solicitud ${q.request_id}`));

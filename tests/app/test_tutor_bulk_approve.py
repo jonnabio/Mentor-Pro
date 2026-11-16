@@ -243,3 +243,106 @@ def test_bulk_approval_in_the_browser(server, url):  # noqa: F811
             page.screenshot(path=os.path.join(shots, "bulk-result.png"), full_page=True)
         assert len(all_reviews(url)) == 4 and {r[1] for r in all_reviews(url)} == {"approved"}
         browser.close()
+
+
+# ---------------------------------------------------------------- structured stimulus (PR #77 review)
+
+TABLE = {"type": "table", "text": "Ventas de la feria\n| Puesto | Lunes | Martes |\n| --- | --- | --- |\n"
+                                  "| Frutas | 12 | 15 |\n| Pan | 8 | 11 |"}
+TEXT = {"type": "text", "text": "En la feria hay cuatro puestos.\nCada puesto vende frutas."}
+
+
+def set_stimulus(url, request_id, stimulus):  # noqa: F811
+    from psycopg.types.json import Jsonb
+
+    with psycopg.connect(url) as conn:  # synthetic test database only
+        conn.execute("UPDATE generation.question_attempt SET item = jsonb_set(item::jsonb, '{stimulus}', %s) "
+                     "WHERE request_id = %s", (Jsonb(stimulus), request_id))
+
+
+def test_the_queue_returns_the_structured_stimulus_unchanged(six, url):  # noqa: F811
+    app, _ = six
+    rid = ids(app)[0]
+    set_stimulus(url, rid, TABLE)
+    q = next(q for q in call(app, QUEUE).json()["questions"] if q["request_id"] == rid)
+    assert q["stimulus"] == TABLE
+
+
+@pytest.mark.skipif(not os.environ.get("MENTOR_PRO_BROWSER"), reason="set MENTOR_PRO_BROWSER=1")
+def test_stimulus_rendering_cases(server):
+    from playwright.sync_api import sync_playwright
+
+    base, _ = server
+    cases = {
+        "none": {"type": "none"}, "missing": None, "empty": {"type": "text", "text": "  "},
+        "plain": "Texto simple de un registro anterior.", "text": TEXT, "table": TABLE,
+        "tabs": {"type": "table", "text": "Mes\tLluvia\nEnero\t20\nFebrero\t35"},
+        "loose": {"type": "table", "text": "Lunes: 12 frutas\nMartes: 15 frutas"},
+        "unsafe": {"type": "text", "text": "<img src=x onerror=\"window.hacked=1\"><b>negrita</b>"},
+    }
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto(base)
+        out = page.evaluate("""(cases) => Object.fromEntries(Object.entries(cases).map(([k, s]) => {
+            const n = renderStimulus(s);
+            if (n) document.body.append(n);
+            return [k, n && { text: n.textContent, html: n.innerHTML,
+              rows: [...n.querySelectorAll('tr')].map((r) => [...r.children].map((c) => c.tagName + ':' + c.textContent)),
+              paras: [...n.querySelectorAll('p')].map((x) => x.textContent) }];
+        }))""", cases)
+        assert out["none"] is None and out["missing"] is None and out["empty"] is None
+        assert out["plain"]["text"] == cases["plain"] and out["plain"]["rows"] == []
+        assert out["text"]["text"] == TEXT["text"] and out["text"]["rows"] == []          # line breaks kept
+        assert out["table"]["paras"] == ["Ventas de la feria"]
+        assert out["table"]["rows"] == [["TH:Puesto", "TH:Lunes", "TH:Martes"], ["TD:Frutas", "TD:12", "TD:15"],
+                                        ["TD:Pan", "TD:8", "TD:11"]]                        # separator dropped
+        assert out["tabs"]["rows"] == [["TH:Mes", "TH:Lluvia"], ["TD:Enero", "TD:20"], ["TD:Febrero", "TD:35"]]
+        assert out["loose"]["rows"] == [] and out["loose"]["text"] == cases["loose"]["text"]  # nothing dropped
+        assert out["unsafe"]["text"] == cases["unsafe"]["text"] and "<img" not in out["unsafe"]["html"]
+        assert page.evaluate("window.hacked === undefined && document.querySelectorAll('img').length === 0")
+        browser.close()
+
+
+@pytest.mark.skipif(not os.environ.get("MENTOR_PRO_BROWSER"), reason="set MENTOR_PRO_BROWSER=1")
+def test_structured_stimulus_in_both_review_views(server, url):  # noqa: F811
+    from playwright.sync_api import expect, sync_playwright
+
+    base, _ = server
+    shots = os.environ.get("MENTOR_PRO_SCREENSHOTS")
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(viewport={"width": 390, "height": 844})
+        page.goto(base)
+        page.fill("#tutor-token", TOKEN)
+        page.click("#tutor-enter")
+        page.click("#tutor-nav-review")
+        expect(page.locator("#bulk-list .bulk-row")).to_have_count(6)          # the queue has loaded
+        first = page.locator("#review-item").get_attribute("data-request")
+        second = page.locator("#bulk-list .bulk-row").nth(1).get_attribute("data-request")
+        set_stimulus(url, first, TABLE)
+        set_stimulus(url, second, TEXT)
+        page.click("#review-filters button[type=submit]")                     # reload with the stimuli
+
+        individual = page.locator("#review-stimulus")                          # individual review
+        expect(individual).to_be_visible()
+        expect(individual.locator("table th")).to_have_text(["Puesto", "Lunes", "Martes"])
+        expect(individual.locator("table tr")).to_have_count(3)
+        expect(individual).not_to_contain_text("[object Object]")
+        page.click("#review-skip")
+        expect(individual).to_have_text(TEXT["text"])
+        page.click("#review-skip")
+        expect(individual).to_be_hidden()                                     # type none: nothing shown
+
+        row = page.locator(f'#bulk-list .bulk-row[data-request="{first}"]')    # bulk review
+        row.locator("summary").click()
+        expect(row.locator("table td")).to_have_text(["Frutas", "12", "15", "Pan", "8", "11"])
+        expect(row.locator(".bulk-explanation")).to_contain_text("Explicación:")
+        expect(row.locator("li.review-key")).to_contain_text("Respuesta propuesta")
+        plain = page.locator(f'#bulk-list .bulk-row[data-request="{second}"]')
+        plain.locator("summary").click()
+        expect(plain.locator(".stimulus")).to_have_text(TEXT["text"])
+        expect(page.locator("#tutor-review")).not_to_contain_text("[object Object]")
+        if shots:
+            page.screenshot(path=os.path.join(shots, "structured-stimulus.png"), full_page=True)
+        browser.close()

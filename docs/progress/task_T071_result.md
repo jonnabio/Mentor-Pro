@@ -77,7 +77,25 @@
 - An approval makes a question servable to the student at once. The
   confirmation dialog and the expandable inspection keep the tutor in
   control, but the page cannot force the tutor to open every question.
-- The individual and bulk views both show `[object Object]` when a
-  stimulus is a structured object. This rendering predates T071 (T068).
+- **PR #77 review correction (structured stimulus):** both views used to
+  show `[object Object]` for a structured stimulus. This is fixed.
+  - Supported shapes (`generation/parsing.py`): `{"type": "none"}`,
+    `{"type": "text" | "table", "text": ...}`, and plain strings in older
+    records.
+  - `renderStimulus` in `tutor.js` builds DOM nodes and text only, never
+    `innerHTML`.
+  - A table stimulus with at least two pipe- or tab-delimited lines
+    becomes a table. Any other text keeps its line breaks, so no content
+    is dropped. `none` and empty stimuli are hidden.
+  - The same function now serves the individual review, the bulk review
+    and the practice-results detail.
+  - No schema, generation or approval change.
+  - Production table text was not sampled because the read-only
+    production query was not permitted from this session. Unrecognised
+    layouts fall back to line-preserving text.
+  - Evidence: `screenshots/T071/structured-stimulus.png`; tests
+    `test_stimulus_rendering_cases` and
+    `test_structured_stimulus_in_both_review_views`. Those tests include
+    an injection case.
 - Operations: no migration and no configuration change. Deploying needs
   the standard release flow and PO authorization.
