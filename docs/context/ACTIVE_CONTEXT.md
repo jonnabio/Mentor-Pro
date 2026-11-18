@@ -1,133 +1,163 @@
-# Active Context: T071 Bulk Approval in Review (2026-11-16)
+# Active Context: Session Handoff 2026-11-18 (T071 released, Gate B pending)
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-16 (T071 implemented, PR into `dev` open)
-- **Active Role:** Developer (T071).
-- **Mode:** review. The T071 request (tutor bulk review and approval)
-  is the new PO-requested increment after the Question Bank closure.
-  [T071 result](../progress/task_T071_result.md).
-  - Branch `feat/T071-bulk-approve` includes the
-    `handoff/T069-T070-acceptance` evidence.
-  - Waiting for PO review. Do not merge or deploy without authorization.
-- **Earlier history:** T006-T068, deployment stages, ADR-030 to ADR-036:
+- **Last Updated:** 2026-11-18 (session end, after T071 Gate A)
+- **Active Role:** none (session closed). The last role was Developer and
+  Release Agent (T071).
+- **Mode:** idle, waiting for the PO's Gate B decision (production
+  deployment of `v2026.11.18-1`).
+- **Earlier history:** T006-T070, deployment stages, ADR-030 to ADR-037:
   see `docs/progress/task_T0xx_result.md`, `docs/planning/`, release
   records in `docs/progress/` and this file's Git history.
 
 ## Current Objective
 
-None in development. The PO closed the Question Bank initiative after T070
-(PO-QBANK-CLOSE-2026-11-16). Operations continue:
+T071 (tutor bulk review and approval) is implemented, reviewed, merged and
+published as `v2026.11.18-1`. It is **not deployed**. Gate B (production
+deployment) needs a separate, explicit PO authorization. Until then the
+work is operational:
 
 - free scheduled generation;
 - tutor review in the dashboard;
 - monitoring curriculum coverage.
 
-Do not start another Question Bank development increment without a new PO
-authorization.
+No other development increment is authorized.
 
 ## Handoff Summary
 
 ### Completed
 
-- **T069 implementation (PO-T069-2026-11-16):**
-  - `app/practice/capacity.py`: exact per-size counts by stage (plan,
-    generated, approved).
-  - Tutor "Cobertura del banco" (`GET /api/tutor/coverage`).
-  - `replenish capacity` on the command line.
-  - Four-subject synthetic regression for sizes 5-30 (API, plus browser on
-    desktop and phone). The CI browser step runs 5 tests.
-  - [ADR-037](../adr/ADR-037-quiz-size-capacity.md): structural capacity
-    analysis.
-  - PR #75 merged into `dev` as `2e1dca9`.
-- **T069 release (PO-T069-RELEASE-2026-11-16):**
-  - release PR #76 merged into `main` as `835ffb2`; `main` CI run
-    43796742401 green;
-  - tag `v2026.11.16-2`, image `@sha256:dc5d1ce4…805b`, manifest sha256
-    `ed76e384…19e5d`;
-  - backup `mentor_pro_2026-11-16_032417.dump`, `VERIFY OK`;
-  - `DEPLOY OK`, smoke 13/13, `STATUS HEALTHY`;
-  - post-deploy: coverage, `replenish capacity` and student availability
-    agree; data fingerprints identical before and after; scheduler and
-    configuration unchanged.
-- **ADR-037 decision:** the 100-cell plan is kept; the 16-cell extension is
-  deferred.
-- **T070 final acceptance:** every mandatory criterion passes
-  ([T070 result](../progress/task_T070_result.md)).
-- **Closure (PO-QBANK-CLOSE-2026-11-16):**
-  - T070 and the initiative are complete;
-  - the minor issues are in [TODO-maintenance.md](../TODO-maintenance.md);
-  - the tutor-dashboard review is recorded as an operational follow-up.
-- **Records:** T069 and T070 results, ADR-037, the T069 plan, `tasks.json`
-  (T067-T070 `done`), screenshots in `docs/progress/screenshots/T069/`.
+- **T071 implementation** ([T071 result](../progress/task_T071_result.md)):
+  - `GET /api/tutor/review/queue`:
+    - optional `page` and `page_size` (at most 50);
+    - adds `total` and `pagination`;
+    - without them the T068 full list is unchanged.
+  - `POST /api/tutor/review/bulk-approve`:
+    - explicit IDs only, 1 to 50 per call; duplicate, empty or over-long IDs
+      are refused with 422;
+    - each ID goes through the existing `seeding.item_review_record` in its
+      own transaction (review lock, re-check, audit row with reviewer
+      `tutor`);
+    - one result per ID: `approved`, `already_reviewed`, `not_pending` or
+      `error`.
+  - Tutor page, "Aprobación en bloque":
+    - expandable full question and a checkbox per question;
+    - page-scoped "Seleccionar toda la página", "Limpiar selección", and
+      "Aprobar seleccionadas (N)" with a confirmation;
+    - partial-failure feedback;
+    - the selection resets on a result, a page change or a filter change.
+  - Review correction: `renderStimulus` in `tutor.js` renders structured
+    stimuli in the individual review, the bulk review and the practice
+    results.
+    - `none` is hidden, `text` keeps its line breaks, and a `table` with
+      pipe- or tab-delimited rows becomes a table;
+    - other layouts fall back to text;
+    - DOM text only, never `innerHTML`.
+  - Fixed a busy-flag regression: the bulk refresh had dropped a fast
+    second individual decision.
+  - Tests: `tests/app/test_tutor_bulk_approve.py` (API and browser).
+    Screenshots are in `docs/progress/screenshots/T071/`.
+  - No schema, configuration, generation or deployment change.
+- **Integration:**
+  - PR #77, approved at head `7b6a880`, was merged into `dev` as
+    `dd2440492a75981157d36aa7b31bff39b0cbcf44`.
+  - PR CI run 43871162934 and `dev` CI run 43877468777 are green.
+  - Local gate: `VERIFY_RESULT=pass gate=all`, 1203 passed, 17 skipped,
+    lint passed.
+  - PR #77 also carried the T069/T070 handoff evidence (`eb18ee9`,
+    `6c1b508`).
+- **Gate A, release publication (PO authorized):**
+  - Release PR #78 was merged into `main` with the guard on `dd24404…`,
+    giving merge commit `bc590fb6c144c2f94537488f45db0fa555d5d237`.
+  - PR CI run 43879335351 passed on attempt 2. Attempt 1 hit the known
+    deadlock in the `test_quiz_sizes_subjects.py` setup.
+  - `main` CI run 44232643285 is green on all four jobs, including Tag and
+    Release.
+  - Tag `v2026.11.18-1` points to `bc590fb`.
+  - Image: `ghcr.io/jonnabio/mentor-pro@sha256:71723c4eed2e3b493bfd640453ed191b3eaf18143316cd29726edc60ac0aee2e`.
+  - Manifest sha256 `7685f567a8a6b3436a0f80424fcb03c93ef75d25918bcc319fa34beba5f79f9a`:
+    commit `bc590fb`, schema 0001..0001, smoke student and tutor pass,
+    status "Published, not authorized for deployment".
+  - `dev` was synced to `main` (it was an ancestor, so nothing was
+    discarded).
+- **Production was not modified this session.**
 
 ### Current State
 
-- **Production:** `v2026.11.16-2` (T066 to T069), `STATUS HEALTHY`.
-  - The app and tutor containers run `@sha256:dc5d1ce4…805b`.
-  - The tutor page has "Revisión de preguntas" and "Cobertura del banco".
-- **`main` and `dev`:** both `835ffb2`.
-- **Branch `handoff/T069-T070-acceptance`:** pushed, **intentionally not
-  merged, and no PR open.**
-  - It holds the release evidence (`eb18ee9`), the closure records and this
-  handoff.
-  - The PO forbids a documentation-only PR. Bring this branch into the next
-    functional PR.
-- **Configuration:**
-  - `MENTOR_PRO_BANK_ONLY_SUBJECTS=matematicas:5,10,15,20,25,30`;
-  - `OPENROUTER_ALLOW_PAID=false`;
-  - `MENTOR_PRO_REPLENISH_SCHEDULE=on`, `tick_calls` 10, not paused.
-- **Inventory** (whole subject, mixed):
-
-  | Subject | Approved | Composes | Missing for size 30 |
-  | --- | --- | --- | --- |
-  | Matemáticas | 42 | 5, 10 | 11 |
-  | Español | 10 | none | 22 |
-  | Ciencias | 10 | none | 23 |
-  | Estudios Sociales | 20 | none | 19 |
-
-  Hard is the scarcest level everywhere.
-- **Review queue:** 26 pending at the last check. No dashboard verdict has
-  been recorded yet.
-- **Locks:** none held. There is no lane claim in this project. The
-  replenish lock (4047, 0) and review lock (4047, 1) are
-  transaction-scoped and released when each transaction ends.
+- **Production:** still `v2026.11.16-2` (T066 to T069), `@sha256:dc5d1ce4…805b`,
+  last known `STATUS HEALTHY`. The bulk approval and stimulus fix are
+  **not live**.
+- **`main`, `dev` and tag `v2026.11.18-1`:** all
+  `bc590fb6c144c2f94537488f45db0fa555d5d237`.
+- **Branch `handoff/T071-release`:** this handoff (based on `bc590fb`).
+  It is pushed but **not merged and has no PR**, following the
+  no-docs-only-PR rule. Bring it into the next functional PR or the Gate B
+  records.
+- **`tasks.json`:** T071 status is `review`. Set it to `done` after Gate B
+  and production acceptance.
+- **Configuration and inventory:** unchanged since the 2026-11-16 handoff.
+  - Bank-only is on for Matemáticas only; paid models are off; the
+    scheduler is on.
+  - Last known review queue: 26 pending.
+- **Locks:** none held. There is no lane claim. The replenish lock
+  (4047, 0) and review lock (4047, 1) are transaction-scoped.
 
 ### Next Steps
 
-1. **Check the review queue** (read-only). If it passes **40** before the
-   tutor's first substantial review:
-   - pause with `replenish pause --reason "<backlog> pending before first
-     review"`;
-   - record the backlog and reason;
-   - notify the PO;
-   - never resume without authorization.
-2. **Run `replenish capacity` for Español, Ciencias and Estudios Sociales.**
-   Report to the PO when the real composer builds a five-question practice
-   for a subject. Request PO authorization before changing that subject's
-   bank-only configuration.
-3. **Confirm the first authentic tutor-dashboard decision** once the tutor
-   has reviewed (read-only `bank_item_review` rows with reviewer `tutor`).
-   That is the operational acceptance follow-up. Never record a verdict for
-   the tutor.
-4. **Next functional PR:** branch from `dev` and merge in
-   `handoff/T069-T070-acceptance` so the evidence goes in with it. Any
-   maintenance item needs its own authorization.
+1. **Wait for the PO's Gate B decision.** Do not deploy without it.
+2. **On Gate B authorization, deploy `v2026.11.18-1`** with the
+   unattended deploy procedure (Notes):
+   - download the manifest and compare its sha256 with `7685f567…f79f9a`;
+   - preflight, backup, `verify-backup`, deploy with the window and
+     authorization references, then `status` and smoke;
+   - data fingerprints before and after.
+3. **Production acceptance** (plan in the PR #78 description). The tutor
+   records every verdict; run no synthetic production submissions.
+   - Structured stimuli display correctly in both views.
+   - One individual approval and one bulk approval, each with its audit
+     rows.
+   - Partial failures: observe them only if they happen naturally;
+     otherwise rely on the CI evidence.
+   - Approved questions count as servable (capacity, coverage,
+     availability).
+   - `bulk-approve` returns 403 without the token.
+   - Scheduler and configuration unchanged.
+4. **Record the Gate A and Gate B evidence** in the T071 result and
+   `tasks.json`, bringing in `handoff/T071-release`. Do it in the next
+   functional PR, not a docs-only PR.
+5. **Operational checks continue (read-only):**
+   - review queue: pause the scheduler only if it passes 40 before the
+     tutor's first substantial review;
+   - `replenish capacity` for the other subjects;
+   - confirm the first authentic tutor decision.
 
 ### Blockers/Issues
 
-- No development blockers. The Question Bank is closed.
+- **Gate B (production deployment of `v2026.11.18-1`):** not authorized;
+  waiting for the PO.
+- **Intermittent test deadlock (new maintenance candidate):**
+  - `test_quiz_sizes_subjects.py` fixture setup raises `DeadlockDetected`
+    (7 errors);
+  - seen in `dev` CI run 43797888363 (`835ffb2`), the first attempt of PR
+    CI run 43879335351, and one local gate run;
+  - it passes on rerun and alone, and it predates T071;
+  - it needs a maintenance authorization before anyone works on it.
+- **Production table-stimulus layouts were not sampled.** The read-only
+  production query was not permitted from this session. Check them during
+  Gate B acceptance.
 - **Pending PO decisions:**
-  - bank-only for the other three subjects, once each composes size 5;
-  - narrowing the `mentorpro` sudo rule (backlog M3);
-  - the ADR-037 extension, which stays deferred.
+  - Gate B;
+  - bank-only for the other three subjects;
+  - narrowing the `mentorpro` sudo rule (M3);
+  - the ADR-037 extension (deferred).
 - **Maintenance backlog** ([TODO-maintenance.md](../TODO-maintenance.md)):
-  - M1: replenishment request labels;
+  - M1: replenishment labels;
   - M2: `test_practice_browser.py` is not in CI;
   - M3: the sudo rule;
   - M4: local `initdb.exe` blocked.
-- **Operational:** tutor review throughput limits inventory growth. The
-  queue grows by about 2 to 3 candidates every 3 hours.
+- **Operational:** tutor review throughput limits inventory growth. Bulk
+  approval addresses this once it is deployed.
 
 ### Notes
 
@@ -135,6 +165,9 @@ authorization.
   - `https://macedonianserver.tailb0ac04.ts.net:8443/tutor` (tailnet only);
   - "Revisión de preguntas": Aprobar, or Cuarentena (a reason is required),
     an optional comment, or "Omitir" to skip;
+  - after `v2026.11.18-1` is deployed, "Aprobación en bloque" appears above
+    the individual review. It approves only; quarantine stays individual,
+    with at most 50 IDs per call;
   - "Cobertura del banco": the sizes each subject composes and what the
     next size lacks;
   - the SSH tunnel `ssh -N -L 8081:127.0.0.1:8081 jonnabio@100.64.84.15`
@@ -186,6 +219,14 @@ authorization.
     Control blocks `initdb.exe`; confirm they are the only failures and
     rely on CI;
   - records go in the next functional PR, never a docs-only PR;
+  - if `test_quiz_sizes_subjects.py` setup fails with `DeadlockDetected`,
+    rerun the failed CI job (`gh run rerun <id> --failed`) and record it.
+    Never bypass a red check;
+  - T071 browser tests: `MENTOR_PRO_BROWSER=1
+    MENTOR_PRO_SCREENSHOTS=<dir> pytest tests/app/test_tutor_bulk_approve.py`;
+  - GHCR digest check: the `gh` token lacks `read:packages` and Docker is
+    not installed locally, so confirm the digest in the CI log ("exporting
+    manifest sha256:…");
   - skip `scripts/pubs/check_lane.py`;
   - check which project a pasted prompt targets before acting on it.
 - **Never:**
