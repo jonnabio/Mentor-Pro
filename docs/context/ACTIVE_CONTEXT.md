@@ -1,4 +1,4 @@
-# Active Context: Session Handoff 2026-11-18 (T071 released, Gate B pending)
+# Active Context: Session Handoff 2026-11-18 (T071 deployed, tutor acceptance pending)
 
 ## Session Metadata
 
@@ -10,6 +10,26 @@
 - **Earlier history:** T006-T070, deployment stages, ADR-030 to ADR-037:
   see `docs/progress/task_T0xx_result.md`, `docs/planning/`, release
   records in `docs/progress/` and this file's Git history.
+
+## Gate B Update (2026-11-18 21:06 UTC)
+
+- **`v2026.11.18-1` is deployed to production.** Image
+  `@sha256:71723c4e…0aee2e`, `DEPLOY OK`, smoke 13/13, `STATUS HEALTHY`.
+- Backup: `mentor_pro_2026-11-18_210616.dump` (`VERIFY OK`).
+- All 37 table fingerprints are identical before and after the deploy.
+- Configuration and scheduler are unchanged.
+- Bulk approval without the token returns 403, and the student service
+  returns 404 for it.
+- **Next:**
+  - the tutor runs the production acceptance checklist (T071 result,
+    section 5, and the PR #78 description);
+  - after that, set T071 to `done` in `tasks.json`.
+- **Risk:** the review queue is at 51 pending, above the 40 threshold.
+  Waiting on the PO to decide whether to pause the scheduler; bulk
+  approval is now live to reduce it.
+- The sections below are from before Gate B. Where they say Gate B is
+  pending or production runs `v2026.11.16-2`, this update supersedes
+  them.
 
 ## Current Objective
 
