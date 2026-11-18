@@ -210,3 +210,61 @@ Screenshots (synthetic data): [coverage, phone](screenshots/T069/t069-coverage-3
   - Markdown lint: 0 issues. Skill validation passes (36 skills, 0
     problems).
 - **CI:** see the PR.
+
+## Release PO-T069-RELEASE-2026-11-16
+
+- **ADR-037 decision:**
+  - the PO kept the 100-cell plan;
+  - the 16-cell extension is **deferred, not authorized**;
+  - nothing was renumbered or expanded;
+  - the structural analysis stays in ADR-037 for future consideration.
+- **PR #75:** PO-reviewed, merged into `dev` as `2e1dca9`. `dev` CI run
+  43794545892 green.
+- **Release PR #76:** PR CI run 43795545821 green. Merged into `main` with
+  `--match-head-commit 2e1dca9`, giving `835ffb2`.
+- **`main` CI run 43796742401:** green on all four jobs (Python Tests,
+  Release Identity, Validate and Publish Docker Image, Tag and Release).
+  `dev` synced to `main`.
+- **Release `v2026.11.16-2`:**
+  - image `ghcr.io/jonnabio/mentor-pro@sha256:dc5d1ce4…805b`;
+  - schema 0001..0001;
+  - manifest sha256 `ed76e384…19e5d`, identical for the download and the
+    server copy;
+  - the manifest reports smoke pass for student and tutor.
+- **Preflight:** `DEPLOY COMPATIBLE`.
+- **Backup:** `mentor_pro_2026-11-16_032417.dump` (sha256
+  `7b6150c0…a1de`, 37 tables, 2318 rows), `VERIFY OK`.
+- **Deploy:** window `T069-RELEASE-2026-11-16`. Result `DEPLOY OK`,
+  `SMOKE PASS (13/13)`, `STATUS HEALTHY`. The app and tutor containers run
+  `@sha256:dc5d1ce4…805b` and are healthy.
+
+### Post-deploy checks (read-only)
+
+- **Tutor page:** serves "Cobertura del banco" (`#tutor-nav-coverage`).
+  `/api/tutor/coverage` returns 403 without the token and the report with
+  it. The token was used on the server only, never printed.
+- **Agreement:**
+
+  | Subject | Coverage API | `replenish capacity` | Student availability |
+  | --- | --- | --- | --- |
+  | Matemáticas | 5, 10 | 5, 10 | bank 5, 10 |
+  | Español | none | none | 5 by generation (bank-only off) |
+  | Ciencias | none | none | 5 by generation (bank-only off) |
+  | Estudios Sociales | none | none | 5 by generation (bank-only off) |
+
+  The plan holds mixed sizes 5–30 in every subject (0 extra cells).
+- **Unchanged across the deploy:** md5 fingerprints taken before and after
+  are identical for:
+  - verdicts (41, max id 41);
+  - student sessions (16), items (66) and answers (38);
+  - session classifications;
+  - batches and batch links;
+  - curriculum objectives (98) and evidencias (344).
+- **Scheduler:**
+  - enabled, `tick_calls` 10, not paused, 0 consecutive failures;
+  - `OPENROUTER_ALLOW_PAID=false`, `MENTOR_PRO_REPLENISH_SCHEDULE=on`,
+    `MENTOR_PRO_BANK_ONLY_SUBJECTS=matematicas:5,10,15,20,25,30`;
+  - cron entries unchanged;
+  - 149 calls in the last 3 days, all free, $0.
+- **Review queue:** 26 pending, below the 40 pause threshold. It grew from
+  23 through the authorized 03:17 UTC tick. No pause; no verdict recorded.

@@ -322,3 +322,10 @@ dialog#exit-dialog h2 { margin-top: 0; font-size: 1.2rem; }
 .coverage-table th, .coverage-table td { border: 1px solid var(--border); padding: 4px 8px; text-align: left;
   white-space: nowrap; }
 .feedback-scores .coverage-ok { border-color: var(--accent); }
+
+/* T071: structured stimulus in the tutor review (table stimuli keep rows and columns) */
+.stimulus p { margin: 0 0 6px; }
+.stimulus-table { border-collapse: collapse; margin: 6px 0; max-width: 100%; display: block; overflow-x: auto; }
+.stimulus-table th, .stimulus-table td { border: 1px solid var(--border); padding: 4px 8px; text-align: left;
+  white-space: normal; }
+.stimulus-table th { background: var(--surface-2, var(--surface)); font-weight: 600; }
