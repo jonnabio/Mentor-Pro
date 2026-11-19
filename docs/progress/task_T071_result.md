@@ -99,3 +99,46 @@
     an injection case.
 - Operations: no migration and no configuration change. Deploying needs
   the standard release flow and PO authorization.
+
+## 5. Gate B: production deployment (2026-11-18)
+
+The PO authorized Gate B (`PO-T071-GATE-B-2026-11-18`). Production
+acceptance by the tutor remains a separate decision and is **pending**.
+
+- **Release identity:** `release-manifest.json` sha256
+  `7685f567a8a6b3436a0f80424fcb03c93ef75d25918bcc319fa34beba5f79f9a`
+  matched. Commit `bc590fb6c144c2f94537488f45db0fa555d5d237`, CI run
+  44232643285 (success), schema 0001..0001 and the image digest all
+  agree.
+- **Preflight:** `PREFLIGHT OK: DEPLOY COMPATIBLE`. The server retrieved
+  the image, and the live schema is current.
+- **Backup:** `mentor_pro_2026-11-18_210616.dump`, sha256
+  `462ad9451eed426d388597244e5bec61a4b8b09e41f0ca0ec27acfa840aa7080`
+  (37 tables, 2850 rows). `verify-backup` returned `VERIFY OK`.
+- **Deploy:** 2026-11-18T21:06:41Z, window `T071-RELEASE-2026-11-18`.
+  - Result: `DEPLOY OK`, `SMOKE PASS (13/13)`, `STATUS HEALTHY`.
+  - Both app and tutor run
+    `ghcr.io/jonnabio/mentor-pro@sha256:71723c4eed2e3b493bfd640453ed191b3eaf18143316cd29726edc60ac0aee2e`.
+  - The previous image was `@sha256:dc5d1ce4…805b` (`v2026.11.16-2`).
+    Rollback was not required.
+- **Data integrity:** row counts and md5 fingerprints for all 37 tables
+  (curriculum, generation, llm, practice, writing) are identical before
+  (21:05:34Z) and after (21:06:52Z) the deploy.
+  - Verdicts: 41 (26 approved, 15 quarantined). No verdict was recorded.
+- **Configuration:** unchanged.
+  - `OPENROUTER_ALLOW_PAID=false`, `MENTOR_PRO_REPLENISH_SCHEDULE=on`,
+    `MENTOR_PRO_BANK_ONLY_SUBJECTS=matematicas:5,10,15,20,25,30`.
+  - The env key set hash and the crontab hash are unchanged.
+  - Scheduler: enabled, `tick_calls` 10, not paused, 0 failures.
+- **T071 security (non-mutating checks):**
+  - tutor `bulk-approve` without the token: 403;
+  - the paged queue without the token: 403;
+  - the student service `bulk-approve`: 404;
+  - the tutor page: 200, and the deployed `tutor.js` contains
+    `renderStimulus` and bulk approval.
+- **Operational risk:** the review queue is **51 pending**, above the 40
+  pause threshold:
+  - Español 8, Matemáticas 23, Ciencias 11, Estudios Sociales 9;
+  - it was 26 at the last handoff;
+  - it is reported to the PO. The scheduler was not paused, because Gate
+    B requires the configuration to be preserved.
