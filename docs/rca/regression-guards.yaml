@@ -210,3 +210,24 @@ guards:
 
     review_triggers:
       - "Changes to create_session, create_bank_only or the job status rules"
+
+  - id: RCA-007
+    title: "Proposed answer unreadable in dark mode in the tutor review"
+    severity: major
+    created: 2026-11-18
+    rca_file: docs/rca/RCA-007-review-key-unreadable-dark-mode.md
+
+    guarded_files:
+      - app/static/styles.css
+
+    invariants:
+      - "The review-key highlight uses theme tokens only (no literal colours)"
+      - "Highlighted review text meets WCAG AA (4.5:1) in light and dark schemes"
+
+    tests:
+      - tests/app/test_review_key_contrast.py
+
+    standard_rule: "RCA-007 Lessons Learned (highlights use theme tokens; check both colour schemes)"
+
+    review_triggers:
+      - "Changes to theme tokens or to .review-options rules in styles.css"
