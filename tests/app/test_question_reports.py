@@ -18,13 +18,12 @@ import psycopg
 import pytest
 
 from app.generation.validation import CHECKER_VERSION
-from app.main import STATIC_DIR, ApiError
+from app.main import STATIC_DIR
 from app.practice import question_reports, replenishment, seeding
 from app.practice import replenish_schedule as rs
 from app.practice.bank import auto_eligibility
 from app.practice.replenish_schedule import ScheduleError, ScheduleSettings
 from app.practice.store import PracticeStore
-from app.practice.tutor_review import build_reports_router
 from app.tutor_main import create_tutor_app
 from conftest import SYNTHETIC
 from test_bank_seeding import eligible, seed_run, url  # noqa: F401  (fixture)
@@ -55,7 +54,6 @@ def bank(url, catalog_conn, synthetic_client, monkeypatch):  # noqa: F811
     batch_id = seed_run(url, catalog_conn)["batch_id"]  # six generated questions, cells 1..6, all pending
     _, schema = synthetic_client.app.state.catalog_target
     app = review_app(url, schema)
-    app.include_router(build_reports_router(lambda: url, ApiError, TOKEN, frozenset({GATEWAY})))
     yield app, batch_id
     _clean_sessions(url)
 
