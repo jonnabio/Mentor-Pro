@@ -28,7 +28,7 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
-from app.practice import replenishment, seeding
+from app.practice import question_reports, replenishment, seeding
 
 SCHEDULE_LOCK = (seeding.LOCK_NAMESPACE, 0)  # subject locks use crc32 keys masked to 31 bits, never 0 in practice
 STALE_MINUTES = 120
@@ -67,6 +67,7 @@ class ScheduleError(ValueError):
 class ScheduleSettings:
     enabled: bool = False
     tick_calls: int = 10
+    report_pause: int = 10  # T072 (ADR-038 D5): skip ticks while this many questions have open student reports
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] = os.environ) -> ScheduleSettings:
@@ -79,7 +80,13 @@ class ScheduleSettings:
             raise ScheduleError("MENTOR_PRO_REPLENISH_TICK_CALLS must be an integer") from None
         if not 1 <= calls <= 50:
             raise ScheduleError("MENTOR_PRO_REPLENISH_TICK_CALLS must be 1..50")
-        return cls(enabled=raw == "on", tick_calls=calls)
+        try:
+            report_pause = int(env.get("MENTOR_PRO_REPORT_PAUSE", cls.report_pause))
+        except ValueError:
+            raise ScheduleError("MENTOR_PRO_REPORT_PAUSE must be an integer") from None
+        if not 1 <= report_pause <= 1000:
+            raise ScheduleError("MENTOR_PRO_REPORT_PAUSE must be 1..1000")
+        return cls(enabled=raw == "on", tick_calls=calls, report_pause=report_pause)
 
 
 def ensure_schema(url: str) -> None:
@@ -122,6 +129,8 @@ def tick(url: str, catalog: psycopg.Connection, baseline: str, llm_factory: Call
             return _finish_skip(conn, "disabled")
         if state["paused"]:
             return _finish_skip(conn, "paused")
+        if question_reports.open_count(url) >= settings.report_pause:
+            return _finish_skip(conn, "reports_open")
     lock = psycopg.connect(url, autocommit=True, row_factory=dict_row)
     try:
         if not lock.execute("SELECT pg_try_advisory_lock(%s, %s) AS ok", SCHEDULE_LOCK).fetchone()["ok"]:
@@ -198,5 +207,6 @@ def status(url: str, settings: ScheduleSettings, limit: int = 10) -> dict[str, A
             break
         failures += 1
     return {"enabled": settings.enabled, "tick_calls": settings.tick_calls, "paused": state["paused"],
+            "open_reports": question_reports.open_count(url), "report_pause": settings.report_pause,
             "pause_reason": state["reason"], "next_index": state["next_index"],
             "consecutive_failures": failures, "recent": ticks}

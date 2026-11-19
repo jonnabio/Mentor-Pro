@@ -424,8 +424,54 @@ function renderQuestion() {
   $("answer-submit").disabled = true;
   $("answer-submit").hidden = false;
   $("feedback").hidden = true;
+  showReportState(question);
   if (question.answered) showFeedback(question);
 }
+
+// T072 (ADR-038): the student reports a question without leaving it. The question is held from new practices
+// until the tutor reviews it; this practice and its answers are unchanged.
+function showReportState(question) {
+  $("report-open").hidden = Boolean(question.reported);
+  $("report-done").hidden = !question.reported;
+  $("report-done").textContent = question.reported ? "Gracias. Tu tutor revisará esta pregunta." : "";
+}
+
+const reportDialog = $("report-dialog");
+
+$("report-open").addEventListener("click", () => {
+  $("report-form").reset();
+  $("report-send").disabled = true;
+  showError($("report-error"), "");
+  reportDialog.showModal();
+});
+
+$("report-form").addEventListener("change", () => {
+  $("report-send").disabled = !$("report-form").elements.reason.value;
+});
+
+$("report-cancel").addEventListener("click", () => reportDialog.close());
+
+$("report-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("report-send");
+  const reason = $("report-form").elements.reason.value;
+  if (!reason || button.disabled || !state.session) return;
+  button.disabled = true; // one report per question; the server also keeps only the first
+  showError($("report-error"), "");
+  const question = state.session.questions[state.current];
+  const comment = $("report-comment").value.trim();
+  try {
+    await api(`/api/practice/sessions/${state.session.session_id}/reports`, {
+      method: "POST", body: JSON.stringify({ slot: question.slot, reason, comment: comment || null }),
+    });
+    question.reported = true;
+    reportDialog.close();
+    showReportState(question);
+  } catch (error) {
+    showError($("report-error"), error.message);
+    button.disabled = false;
+  }
+});
 
 function showFeedback(result) {
   const options = $("quiz-options");

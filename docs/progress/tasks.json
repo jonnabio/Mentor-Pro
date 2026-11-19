@@ -2,7 +2,7 @@
   "version": "1.0",
   "plan_ref": "docs/planning/2026-10-21-question-engine-skills-plan.md",
   "created": "2026-10-21T15:00:00Z",
-  "updated": "2026-11-16",
+  "updated": "2026-11-19",
   "defaults": {
     "max_attempts": 3,
     "runner": "claude-code",
@@ -2112,6 +2112,38 @@
           "app/practice/tutor_review.py",
           "app/static/tutor.html",
           "app/static/tutor.js",
+          "docs/context/ACTIVE_CONTEXT.md",
+          "docs/progress/tasks.json"
+        ]
+      }
+    },
+    {
+      "id": "T072",
+      "name": "Automatic question eligibility (flagged) and student-initiated reports",
+      "objective": "Validated questions become eligible without tutor approval behind MENTOR_PRO_AUTO_ELIGIBILITY (default off); students report a question (held from new practices until the tutor retains or quarantines it); scheduler skips while open reports reach MENTOR_PRO_REPORT_PAUSE (ADR-038).",
+      "status": "review",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "app/practice/question_reports.py",
+          "tests/app/test_question_reports.py",
+          "docs/adr/ADR-038-automatic-eligibility-and-student-reports.md",
+          "docs/planning/2026-11-19-T072-auto-eligibility-plan.md",
+          "docs/progress/task_T072_result.md"
+        ],
+        "modify": [
+          "app/practice/bank.py",
+          "app/practice/routes.py",
+          "app/practice/tutor_review.py",
+          "app/tutor_main.py",
+          "app/practice/replenishment.py",
+          "app/practice/tutor_coverage.py",
+          "app/practice/replenish_schedule.py",
+          "app/static/index.html",
+          "app/static/app.js",
+          "app/static/tutor.html",
+          "app/static/tutor.js",
+          "app/static/styles.css",
           "docs/context/ACTIVE_CONTEXT.md",
           "docs/progress/tasks.json"
         ]

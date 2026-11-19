@@ -488,10 +488,83 @@ async function openReview() {
     if (!known.has(q.batch_id)) { batch.append(el("option", { value: q.batch_id }, q.batch_id)); known.add(q.batch_id); }
   }
   $("review-saved").textContent = "";
+  $("review-policy").textContent = data.auto_eligibility
+    ? "Revisión opcional: las preguntas validadas automáticamente ya están disponibles para el estudiante."
+    : "Las preguntas por revisar no se muestran al estudiante hasta que las aprobés.";
   showReviewItem();
   bulk.page = 1; // T071: any filter change or reload starts on page 1 with an empty selection
   $("bulk-result").textContent = "";
-  await loadBulk();
+  await Promise.all([loadBulk(), loadReports()]);
+}
+
+// ------------------------------------------------------------------ student reports (T072, ADR-038)
+const REPORT_REASON_ES = { wrong_answer: "La respuesta parece incorrecta", confusing: "La pregunta es confusa",
+  missing_info: "Falta información", display: "La imagen o tabla no se muestra bien", other: "Otro problema" };
+const reports = { busy: false, reasons: [] };
+
+async function loadReports() {
+  const data = await api("/api/tutor/reports").catch((error) => { showError(error.message); return null; });
+  if (!data) return;
+  reports.reasons = data.reasons;
+  $("reports-empty").hidden = data.questions.length > 0;
+  $("reports-list").replaceChildren(...data.questions.map(reportRow));
+}
+
+function reportRow(q) {
+  const options = el("ol", { class: "plain-list review-options" }, ...q.options.map((o) => {
+    const key = o.label === q.answer_key;
+    return el("li", { class: key ? "review-key" : "" }, `${o.label}. ${o.text}${key ? " ✓ Respuesta propuesta" : ""}`);
+  }));
+  const v = q.validation || {};
+  const evidence = `Validación automática: ${v.checker_verdict || "sin dato"} (${v.checker_version || "?"})` +
+    (v.independent_solve_agrees === true ? " · resolución independiente coincide" : "") +
+    (v.rubric ? ` · rúbrica ${Object.values(v.rubric).join("/")}` : "") +
+    (q.tutor_verdict ? ` · decisión del tutor: ${q.tutor_verdict === "approved" ? "aprobada" : "en cuarentena"}` : "");
+  const use = q.used_in || {};
+  const items = q.reports.map((r) => el("li", {}, `${when(r.created_at)} · ${REPORT_REASON_ES[r.reason] || r.reason}` +
+    (r.comment ? ` · «${r.comment}»` : "") + (r.same_content ? "" : " · (versión distinta de la actual)")));
+  const reason = el("select", { class: "report-reason", "aria-label": "Motivo de cuarentena" },
+    el("option", { value: "" }, "Motivo de cuarentena"),
+    ...reports.reasons.map((r) => el("option", { value: r }, REASON_ES[r] || r)));
+  const comment = el("input", { type: "text", class: "report-comment", maxlength: "1000",
+    placeholder: "Comentario (opcional)", "aria-label": "Comentario" });
+  const keep = el("button", { type: "button", class: "secondary report-retain" }, "Mantener (pregunta válida)");
+  const quarantine = el("button", { type: "button", class: "primary report-quarantine" }, "Cuarentena");
+  keep.addEventListener("click", () => resolveReport(q.request_id, "retain", "", comment.value));
+  quarantine.addEventListener("click", () => {
+    if (!reason.value) { $("reports-result").textContent = "Elegí el motivo de la cuarentena."; reason.focus(); return; }
+    resolveReport(q.request_id, "quarantine", reason.value, comment.value);
+  });
+  return el("li", { class: "report-item", "data-request": q.request_id },
+    el("details", { open: "" },
+      el("summary", {}, `${subjectName(q.subject)} · ${q.objective_code} · ${DIFFICULTY_ES[q.difficulty] || q.difficulty}` +
+        ` · ${q.reports.length} reporte(s)`),
+      el("ul", { class: "plain-list report-reasons-list" }, ...items),
+      ...[renderStimulus(q.stimulus)].filter(Boolean),
+      el("p", { class: "submitted-text" }, q.stem || ""), options,
+      el("p", { class: "bulk-explanation" }, `Explicación: ${q.explanation || "Sin explicación."}`),
+      el("p", { class: "muted small" }, evidence),
+      el("p", { class: "muted small" }, `Usada en ${use.sessions || 0} práctica(s) · respondida ${use.answered || 0}` +
+        ` vez/veces · correctas ${use.correct || 0}. Las calificaciones anteriores no cambian.`),
+      el("div", { class: "actions" }, reason, comment, keep, quarantine)));
+}
+
+async function resolveReport(requestId, action, reason, comment) {
+  if (reports.busy) return;
+  reports.busy = true;
+  try {
+    const out = await api(`/api/tutor/reports/${encodeURIComponent(requestId)}/resolve`, {
+      method: "POST", body: JSON.stringify({ action, reason, comment }),
+    });
+    $("reports-result").textContent = out.status === "retained"
+      ? "Pregunta mantenida: vuelve a estar disponible para prácticas nuevas."
+      : "Pregunta en cuarentena: ya no se usará.";
+  } catch (error) {
+    $("reports-result").textContent = error.message;
+  } finally {
+    reports.busy = false;
+  }
+  await Promise.all([loadReports(), loadBulk()]);
 }
 
 function showReviewItem() {

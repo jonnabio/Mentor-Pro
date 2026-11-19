@@ -23,11 +23,12 @@ from typing import Any
 
 import psycopg
 from fastapi import APIRouter, Depends, Query
+from fastapi import Path as PathParam
 from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
-from app.practice import seeding
-from app.practice.bank import QuestionBank
+from app.practice import question_reports, seeding
+from app.practice.bank import QuestionBank, auto_eligibility
 from app.writing.tutor import LOOPBACK, tutor_guard
 
 REVIEWER = "tutor"
@@ -167,7 +168,8 @@ def build_review_router(queue: ReviewQueue, api_error: type[Exception], token: s
             raise api_error(422, "unknown_difficulty", "La dificultad debe ser fácil, media o difícil.")
         questions = queue.pending(subject or None, (objective or "").strip().upper() or None,
                                   difficulty or None, batch or None)
-        out: dict[str, Any] = {"counts": queue.counts(), "reasons": list(seeding.REASONS), "total": len(questions)}
+        out: dict[str, Any] = {"counts": queue.counts(), "reasons": list(seeding.REASONS), "total": len(questions),
+                               "auto_eligibility": auto_eligibility()}  # T072: review optional when on
         if page_size is not None or page is not None:  # T071: optional paging; without it the full list (T068)
             size = page_size or 10
             pages = max(1, -(-len(questions) // size))
@@ -203,5 +205,39 @@ def build_review_router(queue: ReviewQueue, api_error: type[Exception], token: s
         except seeding.SeedError:
             raise api_error(422, "invalid_decision", "La decisión no es válida.") from None
         return {**out, "counts": queue.counts()}
+
+    return router
+
+
+class Resolution(BaseModel):
+    """T072: the tutor's resolution of every open report of one question (ADR-038 D4)."""
+    action: str = Field(pattern="^(retain|quarantine)$")
+    reason: str = Field(default="", max_length=40)
+    comment: str = Field(default="", max_length=seeding.COMMENT_MAX)
+
+
+def build_reports_router(url: Callable[[], str], api_error: type[Exception], token: str,
+                         allowed_hosts: frozenset[str] = LOOPBACK) -> APIRouter:
+    """T072: student reports in the tutor service only (same tutor check as the review). No student identity."""
+    router = APIRouter(prefix="/api/tutor/reports", tags=["tutor"],
+                       dependencies=[Depends(tutor_guard(api_error, token, allowed_hosts))])
+
+    @router.get("")
+    def reports() -> dict[str, Any]:
+        questions = question_reports.open_reports(url())
+        return {"questions": questions, "open": len(questions), "reasons": list(seeding.REASONS),
+                "auto_eligibility": auto_eligibility()}
+
+    @router.post("/{request_id}/resolve")
+    def resolve(body: Resolution, request_id: str = PathParam(min_length=1, max_length=64)) -> dict[str, Any]:
+        if body.action == "quarantine" and body.reason not in seeding.REASONS:
+            raise api_error(422, "reason_required", "Elegí el motivo de la cuarentena.")
+        try:
+            out = question_reports.resolve(url(), request_id, body.action, body.reason, body.comment, REVIEWER)
+        except question_reports.NotOpen:
+            raise api_error(409, "not_open", "Este reporte ya fue resuelto.") from None
+        except question_reports.ReportError:
+            raise api_error(422, "invalid_resolution", "La resolución no es válida.") from None
+        return {**out, "open": question_reports.open_count(url())}
 
     return router

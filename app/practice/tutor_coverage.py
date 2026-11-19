@@ -30,9 +30,10 @@ LEVELS = MIXED_CYCLE
 TARGET_SIZE = max(QUESTION_COUNTS)
 
 
-def _pending_and_plan(url: str, baseline: str, subject: str,
-                      objectives: list[dict[str, Any]]) -> tuple[dict[str, Counter[str]], dict[str, Counter[str]]]:
-    """Questions awaiting review and planned cells, per objective and level, from the subject's current batch."""
+def _pending_and_plan(url: str, baseline: str, subject: str, objectives: list[dict[str, Any]],
+                      servable: frozenset[str] = frozenset()) -> tuple[dict[str, Counter[str]], dict[str, Counter[str]]]:
+    """Questions awaiting review and planned cells, per objective and level, from the subject's current batch.
+    T072: a question already eligible (`servable`, automatic eligibility) is counted as approved, not pending."""
     pending: dict[str, Counter[str]] = {o["workbook_code"]: Counter() for o in objectives}
     batch = seeding.current_batch(url, baseline, subject)
     if batch is None:
@@ -42,6 +43,8 @@ def _pending_and_plan(url: str, baseline: str, subject: str,
     for c in batch["plan"]:
         plan.setdefault(c["objective_code"], Counter())[c["difficulty"]] += 1
     for link in seeding._awaiting_item_review(url, batch["batch_id"]).values():
+        if link["request_id"] in servable:
+            continue
         cell = cells[link["cell"]]
         pending.setdefault(cell["objective_code"], Counter())[cell["difficulty"]] += 1
     return pending, plan
@@ -79,7 +82,8 @@ class CoverageReport:
                 available = composer.available_sizes(QUESTION_COUNTS)
                 single = {lv: BankComposer(bank, catalog, self.baseline, subject, objectives, lv, db)
                           .available_sizes(QUESTION_COUNTS) for lv in LEVELS}
-            pending, plan = _pending_and_plan(url, self.baseline, subject, objectives)
+            servable = frozenset(c["request_id"] for o in objectives for c in composer._candidates(o))
+            pending, plan = _pending_and_plan(url, self.baseline, subject, objectives, servable)
         finally:
             catalog.close()
         sizes = []

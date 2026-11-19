@@ -138,16 +138,20 @@ def inventory(url: str, catalog: psycopg.Connection, baseline: str, subject: str
     codes = [o["workbook_code"] for o in objectives]
     bank = QuestionBank(url)
     eligible: Counter[tuple[str, str]] = Counter()
+    servable: set[str] = set()
     with bank.connect() as db:
         for o in objectives:
             evidences = {e["id"]: e["ordinal"] for e in o["evidences"]}
             for row in bank.candidates(catalog, baseline, subject, o["workbook_code"], evidences, LEVELS, db=db):
                 eligible[(o["workbook_code"], row["difficulty"])] += 1
+                servable.add(row["request_id"])
     pending: Counter[tuple[str, str]] = Counter()
     batch = seeding.current_batch(url, baseline, subject)
     if batch is not None:
         plan = {c["cell"]: c for c in batch["plan"]}
         for link in seeding._awaiting_item_review(url, batch["batch_id"]).values():
+            if link["request_id"] in servable:  # T072: already eligible (automatic eligibility), not held stock
+                continue
             cell = plan[link["cell"]]
             pending[(cell["objective_code"], cell["difficulty"])] += 1
     with _connect(url) as conn:
