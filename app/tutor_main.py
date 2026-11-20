@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from app.main import BASELINE_VERSION, STATIC_DIR, SUBJECTS, ApiError
 from app.practice.tutor_coverage import CoverageReport, build_coverage_router
 from app.practice.tutor_results import PracticeResults, build_practice_results_router
-from app.practice.tutor_review import ReviewQueue, build_review_router
+from app.practice.tutor_review import ReviewQueue, build_reports_router, build_review_router
 from app.writing.migrations import SchemaMigrationRequired
 from app.writing.routes import WritingService
 from app.writing.tutor import build_tutor_router
@@ -107,6 +107,8 @@ def create_tutor_app(database_url: str | None = None, token: str | None = None,
         PracticeResults(lambda: database_url or db.database_url()), ApiError, token, hosts, SUBJECTS))
     # T068: question review (pending queue and verdicts) through the existing individual review; tutor only.
     app.include_router(build_review_router(review_queue, ApiError, token, hosts))
+    # T072: student question reports (list and resolve: retain or quarantine); tutor only.
+    app.include_router(build_reports_router(lambda: database_url or db.database_url(), ApiError, token, hosts))
     # T069: quiz-size coverage per subject (read-only; the real composer decides availability).
     app.include_router(build_coverage_router(
         CoverageReport(lambda: database_url or db.database_url(), BASELINE_VERSION, SUBJECTS, catalog.open_catalog),

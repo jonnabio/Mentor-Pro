@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Path
 from pydantic import BaseModel, Field
 
 from app.allocation import QuestionCount, allocate
+from app.practice import question_reports
 from app.practice.bank import QuestionBank
 from app.practice.bank_allocation import BankComposer, Shortage
 from app.practice.jobs import JobQueue, SetRunner
@@ -53,6 +54,13 @@ class SessionRequest(BaseModel):
     client_request_id: str = Field(pattern=r"^[A-Za-z0-9-]{8,64}$")
     # Anonymous per-tab token (sessionStorage); only its hash is stored, to prefer unseen bank questions.
     browser_token: str | None = Field(default=None, pattern=r"^[A-Za-z0-9-]{16,64}$")
+
+
+class ReportRequest(BaseModel):
+    """T072: a student's report on one question of a practice (ADR-038 D3)."""
+    slot: int = Field(ge=1, le=100)
+    reason: Literal["wrong_answer", "confusing", "missing_info", "display", "other"]
+    comment: str | None = Field(default=None, max_length=question_reports.COMMENT_MAX)
 
 
 class AvailabilityRequest(BaseModel):
@@ -299,6 +307,25 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
         rows = [row if r["slot"] == request.slot else r for r in rows]
         return {"slot": request.slot, **feedback(row, stored["chosen_label"], stored["is_correct"]),
                 "already_answered": not first, "summary": summary(session, rows)}
+
+    @router.post("/sessions/{session_id}/reports")
+    def report(request: ReportRequest, session_id: str = SESSION_ID) -> dict:
+        """T072 (ADR-038): the student reports a question of this practice. It is held from new practices until the
+        tutor resolves it; this practice, its answers and its score are unchanged. No answer key is returned."""
+        load(session_id)  # 404 for an unknown session
+        bank = service.get()[2]
+        try:
+            out = question_reports.create(bank.url, session_id, request.slot, request.reason, request.comment)
+        except question_reports.NotFound:
+            raise api_error(404, "question_not_found", "Esa pregunta no existe en esta práctica.") from None
+        except question_reports.NotReportable:
+            raise api_error(422, "not_reportable", "Esta pregunta no se puede reportar.") from None
+        except question_reports.CapReached:
+            raise api_error(429, "report_limit", "Ya recibimos muchos reportes hoy. Intentá de nuevo mañana.") from None
+        except question_reports.ReportError:
+            raise api_error(422, "invalid_report", "El reporte no es válido.") from None
+        return {"slot": request.slot, "reported": True, "already_reported": out["already_reported"],
+                "message_es": "Gracias. Tu tutor revisará esta pregunta."}
 
     @router.post("/sessions/{session_id}/cancel")
     def cancel(session_id: str = SESSION_ID) -> dict:

@@ -116,8 +116,33 @@
         <p id="feedback-explanation"></p>
         <button type="button" id="next" class="primary"></button>
       </div>
+      <div class="report-row">
+        <button type="button" id="report-open" class="link-button">⚑ Reportar problema</button>
+        <p id="report-done" class="report-done" role="status" hidden></p>
+      </div>
       <button type="button" id="quiz-exit" class="secondary">Salir de la práctica</button>
     </section>
+
+    <dialog id="report-dialog" aria-labelledby="report-title">
+      <form id="report-form" method="dialog" novalidate>
+        <h2 id="report-title">¿Qué problema encontraste?</h2>
+        <fieldset class="report-reasons">
+          <legend class="visually-hidden">Motivo</legend>
+          <label><input type="radio" name="reason" value="wrong_answer"> La respuesta parece incorrecta.</label>
+          <label><input type="radio" name="reason" value="confusing"> La pregunta es confusa.</label>
+          <label><input type="radio" name="reason" value="missing_info"> Falta información.</label>
+          <label><input type="radio" name="reason" value="display"> La imagen o tabla no se muestra correctamente.</label>
+          <label><input type="radio" name="reason" value="other"> Otro problema.</label>
+        </fieldset>
+        <label for="report-comment" class="field-label">Explicación (opcional)</label>
+        <textarea id="report-comment" name="comment" maxlength="300" rows="3"></textarea>
+        <p id="report-error" class="alert" role="alert" hidden></p>
+        <div class="actions">
+          <button type="button" id="report-cancel" class="secondary">Cancelar</button>
+          <button type="submit" id="report-send" class="primary" disabled>Enviar reporte</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="exit-dialog" aria-labelledby="exit-title" aria-describedby="exit-message">
       <h2 id="exit-title">¿Querés salir de la práctica?</h2>
