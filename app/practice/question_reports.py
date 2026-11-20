@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from typing import Any
 
 import psycopg
@@ -27,6 +28,22 @@ from psycopg.rows import dict_row
 
 from app.practice import seeding
 from app.practice.bank import QuestionBank
+
+_SCHEMA_LOCK = threading.Lock()
+_SCHEMA_READY: set[str] = set()
+
+
+def _ensure_schema(url: str) -> None:
+    """Create the Question Bank tables once per database URL and process.
+
+    The schema SQL takes an ACCESS EXCLUSIVE lock (ALTER TABLE ... ADD COLUMN IF NOT EXISTS) even when nothing
+    changes; running it on every request deadlocked against a concurrent resolution's verdict insert."""
+    if url in _SCHEMA_READY:
+        return
+    with _SCHEMA_LOCK:
+        if url not in _SCHEMA_READY:
+            QuestionBank(url)
+            _SCHEMA_READY.add(url)
 
 REASONS = ("wrong_answer", "confusing", "missing_info", "display", "other")
 COMMENT_MAX = 300
@@ -71,7 +88,7 @@ def create(url: str, session_id: str, slot: int, reason: str, comment: str | Non
     comment = (comment or "").strip() or None
     if comment is not None and len(comment) > COMMENT_MAX:
         raise ReportError("comment too long")
-    QuestionBank(url)  # the report table (fresh databases)
+    _ensure_schema(url)  # the report table (fresh databases)
     with _connect(url) as conn, conn.transaction():
         row = conn.execute("SELECT i.item, i.source_request_id FROM practice.item i "
                            "WHERE i.session_id = %s AND i.slot = %s", (session_id, slot)).fetchone()
@@ -105,7 +122,7 @@ def create(url: str, session_id: str, slot: int, reason: str, comment: str | Non
 
 
 def open_count(url: str) -> int:
-    QuestionBank(url)
+    _ensure_schema(url)
     with _connect(url) as conn:
         return conn.execute("SELECT count(DISTINCT request_id) AS n FROM generation.question_report "
                             "WHERE status = 'open'").fetchone()["n"]
@@ -113,7 +130,7 @@ def open_count(url: str) -> int:
 
 def open_reports(url: str) -> list[dict[str, Any]]:
     """Open reports grouped by question, oldest first, with what the tutor needs to decide. No student identity."""
-    QuestionBank(url)
+    _ensure_schema(url)
     with _connect(url) as conn:
         reports = conn.execute(
             """SELECT r.report_id, r.request_id, r.reason, r.comment, r.created_at, r.content_sha256
@@ -167,7 +184,7 @@ def resolve(url: str, request_id: str, action: str, reason: str = "", comment: s
     comment = (comment or "").strip() or None
     if comment is not None and len(comment) > seeding.COMMENT_MAX:
         raise ReportError("comment too long")
-    QuestionBank(url)
+    _ensure_schema(url)
     with _connect(url) as conn, conn.transaction():
         conn.execute("SELECT pg_advisory_xact_lock(%s, %s)", seeding.REVIEW_LOCK)
         ids = [r["report_id"] for r in conn.execute(

@@ -160,3 +160,16 @@
   PostgreSQL in CI).
 - **Unchanged:** image identity checks, backup evidence, deploy lock, schema
   compatibility and the other gates.
+
+## 8. Concurrency fix found by CI (PR #82)
+
+- **Symptom:** `test_simultaneous_resolutions_apply_once` failed once in CI
+  with `DeadlockDetected` (run 44671405859). It is a real defect: two tutor
+  resolutions at the same time could fail one of them.
+- **Cause:** every report call ran the Question Bank schema SQL, whose
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` takes an ACCESS EXCLUSIVE lock
+  even when nothing changes. It deadlocked against the other request's
+  verdict insert.
+- **Fix:** `question_reports._ensure_schema` runs the schema SQL once per
+  database URL and process, under a thread lock. The report suites passed
+  six consecutive local runs.
