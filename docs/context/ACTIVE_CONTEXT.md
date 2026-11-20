@@ -2,7 +2,8 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-19, T072 implementation (PR into `dev`).
+- **Last Updated:** 2026-11-19, T072 merged into `dev`; rollback safeguard
+  (PR into `dev`).
 - **Active Role:** Developer (T072).
 - **Mode:** T072 is in review. T071 Gate C (tutor acceptance) is still
   pending.
@@ -38,9 +39,14 @@
   - student reports with a hold;
   - tutor resolution (retain or quarantine);
   - `reports_open` scheduler pause.
-  - Status: `review`. Not merged, released, deployed or activated.
+  - Status: `review`. PR #81 merged into `dev` 2026-11-19 (merge
+    `550fc21`, exact-head guard `73391a1`; `dev` CI 44648495199 green).
+    Not released, deployed or activated.
+  - Rollback safeguard (ADR-038 D6, RCA-008): deploy, rollback and
+    preflight refuse an image without the report-hold label while reports
+    are open. Feature PR into `dev`, awaiting review.
 - **Next:**
-  1. Review and merge T072 into `dev`.
+  1. Review and merge the rollback safeguard into `dev`.
   2. Release and deploy T072 only with PO authorization.
   3. Activate the flag only with separate PO authorization.
   4. Finish Gate C, then the scheduler-resume decision.

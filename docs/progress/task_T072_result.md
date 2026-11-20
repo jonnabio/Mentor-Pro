@@ -1,8 +1,10 @@
 # T072 Result: Automatic Eligibility and Student Reports
 
-- **Status:** implemented, tests passed locally. PR review, merge,
-  release, deploy, activation and production acceptance are separate
-  gates; none has happened yet.
+- **Status:** PR #81 reviewed and merged into `dev` on 2026-11-19 (merge
+  `550fc211440842f8a2daa77338ed9b39dd1f177d`, exact-head guard `73391a1`,
+  PR CI 44580444939, `dev` CI 44648495199, all green). Rollback safeguard
+  in a follow-up PR (section 7). Release, deploy, activation and production
+  acceptance are separate gates; none has happened yet.
 - **Design:** [ADR-038](../adr/ADR-038-automatic-eligibility-and-student-reports.md),
   [plan](../planning/2026-11-19-T072-auto-eligibility-plan.md)
 - **PO decisions (2026-11-19):**
@@ -119,8 +121,8 @@
 - **Additive:** one table and one partial index, created with `CREATE ...
   IF NOT EXISTS` like the other Question Bank tables. The writing schema
   version is unchanged.
-- **Rollback:** the previous image ignores the table. Open reports would
-  stop holding questions until T072 is redeployed.
+- **Rollback:** the previous image ignores the table, so the deploy helper
+  refuses it while reports are open (section 7).
 - **New settings:** `MENTOR_PRO_AUTO_ELIGIBILITY` (absent means off) and
   `MENTOR_PRO_REPORT_PAUSE` (absent means 10). Production needs no
   configuration change to deploy T072.
@@ -134,3 +136,66 @@
   Afterwards, watch the report queue and the cap.
 - The scheduler stays paused (PO 2026-11-18). Once resumed, the report pause
   bounds the tutor's workload.
+
+## 7. Rollback safeguard (ADR-038 D6, RCA-008)
+
+- **PO decision (2026-11-19):** an older image must not run while open
+  reports exist.
+- **Capability:** CI labels every image
+  `io.mentorpro.capability.report-holds=1`. The helper reads the label only
+  after verifying the registry digest, version tag, commit and labels, so it
+  is bound to the immutable release identity. A manifest cannot supply it.
+- **Check:** `preflight`, `deploy` (and `migrate`, through it) and
+  `rollback` (manifest and legacy targets), inside the lock, before any
+  container change. The open count is a read-only query, read only when the
+  image lacks the label.
+- **Matrix:** label `1` proceeds; no label with 0 reports or no table
+  proceeds; no label with open reports, an unreadable count, or an unknown
+  label value is BLOCKED. A blocked rollback is recorded `REFUSED`.
+- **Write barrier (PR #82 review):** for an image without the label, one
+  read-only psql session takes the report lock `(4047, 2)` before the count
+  and keeps it until the containers changed; on release it terminates
+  report requests still waiting for it. A report therefore commits before
+  the count (and blocks) or never.
+- **Recovery:** production runbook, "Report holds". No override flag; the
+  script never clears reports or changes verdicts.
+- **Tests:** `tests/app/test_deploy_report_holds.py` (matrix, label parsing,
+  count parsing, psql failures, deploy, rollback for manifest and legacy
+  targets, preflight, CLI refusal, release labels, the real query on
+  PostgreSQL in CI).
+- **Unchanged:** image identity checks, backup evidence, deploy lock, schema
+  compatibility and the other gates.
+
+## 8. Concurrency fix found by CI (PR #82)
+
+- **Symptom:** `test_simultaneous_resolutions_apply_once` failed once in CI
+  with `DeadlockDetected` (run 44671405859). It is a real defect: two tutor
+  resolutions at the same time could fail one of them.
+- **Cause:** every report call ran the Question Bank schema SQL, whose
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` takes an ACCESS EXCLUSIVE lock
+  even when nothing changes. It deadlocked against the other request's
+  verdict insert.
+- **Fix:** `question_reports._ensure_schema` runs the schema SQL once per
+  database URL and process, under a thread lock. The report suites passed
+  six consecutive local runs.
+
+## 9. PR #82 review corrections (2026-11-20)
+
+- **Race closed:** the write barrier above replaces the separate count in
+  deploy and rollback; preflight keeps the advisory count.
+  `test_in_flight_report_cannot_commit_across_the_switch` starts a report
+  after the barrier counted zero, switches only once PostgreSQL shows it
+  waiting for the lock, and proves it is rolled back and nothing is open.
+  Further tests: a report committed first blocks; a failed switch leaves no
+  lock; an unreachable database refuses; the lock key equals the
+  application's.
+- **PostgreSQL tests mandatory:** CI sets `MENTORPRO_REQUIRE_PSQL=1`; without
+  psql these tests fail instead of skipping.
+- **`_ensure_schema` cache:** safe in production. The student service runs
+  one uvicorn process (no `--workers`), the tutor service one
+  `uvicorn.run` process, and each scheduler tick is a new `docker exec`
+  process. The schema is additive and never dropped while a process runs;
+  a restore goes into a new database with restarted containers. No change.
+  Residual, pre-existing: the first schema run of a tick process can still
+  meet a tutor resolution (replenishment also builds `QuestionBank` per
+  tick); PostgreSQL then aborts one side and the tutor retries.

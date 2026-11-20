@@ -104,6 +104,46 @@ Replenishment no longer counts an eligible question as "pending review".
 Coverage and capacity follow the same rule, so the review backlog doesn't
 block generation in either mode.
 
+### D6. Rollback safeguard (PO, 2026-11-19)
+
+An image older than T072 ignores `generation.question_report` and would
+serve reported questions again. Every image built by CI now carries the
+OCI label `io.mentorpro.capability.report-holds=1`
+(`scripts/release/release.py labels()`, proven by `check-labels`). The
+deploy helper reads it only from an image whose registry digest, version
+tag, commit and labels it has verified; labels are part of the digest, so
+the capability is bound to the immutable release identity. A manifest
+field cannot supply it.
+
+Inside the deploy lock, before any container changes, `preflight`, `deploy`
+and `rollback` (manifest or adopted legacy targets, and `migrate`, which
+runs the deploy path):
+
+| Target image | Open reports | Result |
+| --- | --- | --- |
+| label `1` | any (not read) | existing gates decide |
+| no label | 0, or no report table | permitted, existing gates decide |
+| no label | 1 or more | BLOCKED |
+| no label | unreadable | BLOCKED (fail closed) |
+| other label value | any | BLOCKED (fail closed) |
+
+**Write barrier (PR #82 review).** A count alone leaves a window: the
+running T072 service can accept a report after the count and before the
+older image starts. For an image without the label, deploy and rollback
+open one psql session that takes the session-level advisory lock
+`REPORT_LOCK` (4047, 2) before counting, and hold it until the containers
+have changed. `question_reports.create` needs the same lock to insert, so a
+report either committed before the count (and blocks the switch) or waits.
+After the switch, the session terminates every request still waiting for
+that lock (rolled back), then releases it. If the deploy process dies,
+PostgreSQL ends the session and frees the lock. The session is read-only
+and writes no table.
+
+There is no override flag. Recovery is
+documented in the production runbook: stay on a capable release, or have
+the tutor resolve the reports first. The script never clears reports,
+changes verdicts or re-exposes questions.
+
 ## Consequences
 
 - With the flag on, the trust boundary for student-facing content becomes
@@ -112,7 +152,7 @@ block generation in either mode.
   stored by mode.
 - **Migration:** one additive table, created with `CREATE TABLE IF NOT
   EXISTS` like the other Question Bank tables. Rolling back to the previous
-  image ignores the table. A rollback also drops the report hold, so open
-  reports would no longer exclude their questions.
+  image ignores the table. A rollback also drops the report hold, so the
+  deploy helper refuses one while reports are open (D6).
 - Reporting is active as soon as T072 is deployed, independent of the flag.
   It can only remove questions from practices.
