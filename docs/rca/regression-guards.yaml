@@ -241,12 +241,16 @@ guards:
     guarded_files:
       - deploy/mentorpro_deploy.py
       - scripts/release/release.py
+      - app/practice/question_reports.py
+      - .github/workflows/ci.yml
 
     invariants:
       - "release.labels() always emits io.mentorpro.capability.report-holds=1"
       - "The capability is read only from the labels of a digest-verified image, never from a manifest or argument"
       - "preflight, deploy and rollback call check_report_holds before any container changes"
       - "No label with open reports, an unreadable count, or an unknown label value refuses; no override flag"
+      - "Deploy and rollback to an image without the label hold REPORT_LOCK from the count until after the switch"
+      - "md.REPORT_LOCK equals question_reports.REPORT_LOCK, and create() takes it before inserting"
 
     tests:
       - tests/app/test_deploy_report_holds.py

@@ -11,12 +11,16 @@ is installed (CI).
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
+import psycopg
 import pytest
 
 from test_deploy_rollout import (CURRENT, DIGEST, REPOSITORY, SHA, manifest, md, provenance_cfg, release,
@@ -84,7 +88,8 @@ def test_capability_cannot_come_from_the_manifest_file():
 def test_capability_is_read_from_the_verified_image_only():
     """No code path takes the capability from the manifest, the arguments or the environment."""
     source = (Path(md.__file__)).read_text(encoding="utf-8")
-    assert source.count("check_report_holds(cfg, labels)") == 3  # preflight, deploy, rollback
+    assert source.count("check_report_holds(cfg, labels)") == 1  # preflight (advisory)
+    assert source.count("report_hold_barrier(cfg, labels)") == 2  # deploy and rollback, around the switch
     assert not re.search(r"add_argument\([^)]*(report|force|override)", source)  # no operator bypass
 
 
@@ -157,9 +162,26 @@ def gates(monkeypatch):
     monkeypatch.setattr(md, "verified_labels", lambda cfg, m: state["labels"])
     monkeypatch.setattr(md, "pull_and_inspect", lambda cfg, ref, digest: state["labels"])
     monkeypatch.setattr(md, "read_open_reports", lambda cfg: state["open"])
+    state["events"] = []
+
+    class FakeBarrier:
+        def __init__(self, cfg):
+            pass
+
+        def start(self):
+            state["events"].append("barrier on")
+            return state["open"]
+
+        def close(self):
+            state["events"].append("barrier off")
+
+        terminated = 0
+
+    monkeypatch.setattr(md, "ReportBarrier", FakeBarrier)
 
     def change(cfg, args, action, ref, version, live, backup_sha, propose_rollback=True):
         state["changed"].append((action, ref))
+        state["events"].append(action)
         return 0
 
     monkeypatch.setattr(md, "change", change)
@@ -188,6 +210,8 @@ def test_deploy(tmp_path, gates, labels, open_reports, allowed):
     args = deploy_args(tmp_path)
     if allowed:
         assert md.deploy(args, cfg) == 0 and gates["changed"] == [("deploy", f"{REPOSITORY}@{DIGEST}")]
+        # without the capability, the barrier spans the count and the switch
+        assert gates["events"] == (["deploy"] if labels is NEW else ["barrier on", "deploy", "barrier off"])
     else:
         with pytest.raises(md.Refused, match=BLOCKED):
             md.deploy(args, cfg)
@@ -232,10 +256,11 @@ def test_rollback(tmp_path, gates, legacy, labels, open_reports, allowed):
     args = deploy_args(tmp_path)
     if allowed:
         assert md.rollback(args, cfg) == 0 and gates["changed"] == [("rollback", target)]
+        assert gates["events"] == (["rollback"] if labels is NEW else ["barrier on", "rollback", "barrier off"])
     else:
         with pytest.raises(md.Refused, match=BLOCKED):
             md.rollback(args, cfg)
-        assert gates["changed"] == []
+        assert gates["changed"] == [] and gates["events"] in ([], ["barrier on", "barrier off"])
         refused = [r for r in md.releases(cfg) if r.get("action") == "rollback"]
         assert len(refused) == 1 and refused[0]["result"] == "REFUSED" and refused[0]["image"] == target
         assert md.current_image(cfg) != target  # release.env untouched
@@ -252,28 +277,112 @@ def test_preflight_reports_the_block(tmp_path, gates, monkeypatch, capsys):
     assert md.preflight(args, cfg) == 0 and md.preflight_path(cfg, DIGEST).exists()
 
 
-# ---------------------------------------------------------------- the real query against PostgreSQL
+# ---------------------------------------------------------------- the barrier against PostgreSQL (CI requires psql)
 
 PSQL = shutil.which("psql")
 
 
-@pytest.mark.skipif(not PSQL, reason="psql not installed (runs in CI)")
-def test_query_on_postgres(bank, url):  # noqa: F811
+def test_report_lock_is_the_application_lock():
     from app.practice import question_reports
+    assert md.REPORT_LOCK == question_reports.REPORT_LOCK
+
+
+@pytest.fixture()
+def psql_url(bank, url, monkeypatch):  # noqa: F811
+    """The real barrier and count against mentor_pro_test. CI sets MENTORPRO_REQUIRE_PSQL=1: a missing psql fails."""
+    if not PSQL:
+        if os.environ.get("MENTORPRO_REQUIRE_PSQL") == "1":
+            pytest.fail("psql is required in CI (MENTORPRO_REQUIRE_PSQL=1)")
+        pytest.skip("psql not installed (required in CI)")
+    monkeypatch.setattr(md, "psql_cmd", lambda cfg: [PSQL, url, "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1"])
+    return url
+
+
+def two_questions(url, bank):  # noqa: F811
     from test_question_reports import by_cell, practice
-
-    def count():
-        out = subprocess.run([PSQL, url, "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1"], input=md.OPEN_REPORTS_SQL,
-                             capture_output=True, text=True, timeout=60)
-        assert out.returncode == 0, out.stderr
-        return md.parse_open_reports(out.stdout)
-
-    assert count() == 0
     _, batch_id = bank
-    session = practice(url, list(by_cell(url, batch_id).values())[:2])
+    return practice(url, list(by_cell(url, batch_id).values())[:2])
+
+
+def open_now(url):  # noqa: F811
+    with psycopg.connect(url) as conn:
+        return conn.execute("SELECT count(*) FROM generation.question_report WHERE status = 'open'").fetchone()[0]
+
+
+def waiting_for_report_lock(url):  # noqa: F811
+    with psycopg.connect(url) as conn:
+        return conn.execute("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' AND classid = %s "
+                            "AND objid = %s AND objsubid = 2 AND NOT granted", md.REPORT_LOCK).fetchone()[0]
+
+
+def test_query_on_postgres(psql_url, bank):
+    from app.practice import question_reports
+    url = psql_url
+    assert md.read_open_reports({}) == 0
+    session = two_questions(url, bank)
     question_reports.create(url, session, 1, "wrong_answer", None)
     question_reports.create(url, session, 2, "confusing", None)
-    assert count() == 2
+    assert md.read_open_reports({}) == 2
+
+
+def test_report_committed_before_the_barrier_is_counted(psql_url, bank):
+    from app.practice import question_reports
+    url = psql_url
+    question_reports.create(url, two_questions(url, bank), 1, "wrong_answer", None)
+    with pytest.raises(md.Refused, match="BLOCKED: 1 open student report"):
+        with md.report_hold_barrier({}, OLD):
+            raise AssertionError("no switch with an open report")
+    assert waiting_for_report_lock(url) == 0
+
+
+def test_in_flight_report_cannot_commit_across_the_switch(psql_url, bank):
+    """The race the review named: a report arrives after the count but before the older image runs.
+
+    Deterministic: the report request is started only after the barrier counted zero, and the switch happens only
+    once PostgreSQL shows that request waiting for the report lock. It must never commit."""
+    from app.practice import question_reports
+    url = psql_url
+    session = two_questions(url, bank)
+    outcome = {}
+
+    def student_reports():
+        try:
+            outcome["result"] = question_reports.create(url, session, 1, "wrong_answer", None)
+        except psycopg.Error as exc:
+            outcome["error"] = type(exc).__name__
+
+    with md.report_hold_barrier({}, OLD) as _:
+        thread = threading.Thread(target=student_reports)
+        thread.start()
+        deadline = time.monotonic() + 30
+        while waiting_for_report_lock(url) == 0:
+            assert thread.is_alive() and time.monotonic() < deadline, outcome
+            time.sleep(0.05)
+        assert open_now(url) == 0  # the switch to the older image happens here
+    thread.join(30)
+    assert not thread.is_alive()
+    assert "result" not in outcome and "error" in outcome  # terminated, rolled back
+    assert open_now(url) == 0
+    assert waiting_for_report_lock(url) == 0
+    # the lock is released: reports work again (e.g. a failed deploy left T072 running)
+    assert question_reports.create(url, session, 2, "confusing", None)["already_reported"] is False
+
+
+def test_barrier_session_holds_no_lock_after_failure(psql_url, bank):
+    url = psql_url
+    with pytest.raises(RuntimeError):
+        with md.report_hold_barrier({}, OLD):
+            raise RuntimeError("compose failed")
+    with psycopg.connect(url) as conn:
+        assert conn.execute("SELECT pg_try_advisory_lock(%s, %s)", md.REPORT_LOCK).fetchone()[0]
+        conn.execute("SELECT pg_advisory_unlock(%s, %s)", md.REPORT_LOCK)
+
+
+def test_unreachable_barrier_refuses(tmp_path):
+    cfg = full_cfg(state_cfg(tmp_path, ["no-such-docker-binary-here"]))
+    with pytest.raises(md.Refused, match="BLOCKED: open student reports could not be counted"):
+        with md.report_hold_barrier(cfg, OLD):
+            raise AssertionError("no switch without a barrier")
 
 
 from test_question_reports import bank  # noqa: E402,F401  (fixture)

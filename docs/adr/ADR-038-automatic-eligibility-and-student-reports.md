@@ -127,7 +127,19 @@ runs the deploy path):
 | no label | unreadable | BLOCKED (fail closed) |
 | other label value | any | BLOCKED (fail closed) |
 
-The count is a read-only query. There is no override flag. Recovery is
+**Write barrier (PR #82 review).** A count alone leaves a window: the
+running T072 service can accept a report after the count and before the
+older image starts. For an image without the label, deploy and rollback
+open one psql session that takes the session-level advisory lock
+`REPORT_LOCK` (4047, 2) before counting, and hold it until the containers
+have changed. `question_reports.create` needs the same lock to insert, so a
+report either committed before the count (and blocks the switch) or waits.
+After the switch, the session terminates every request still waiting for
+that lock (rolled back), then releases it. If the deploy process dies,
+PostgreSQL ends the session and frees the lock. The session is read-only
+and writes no table.
+
+There is no override flag. Recovery is
 documented in the production runbook: stay on a capable release, or have
 the tutor resolve the reports first. The script never clears reports,
 changes verdicts or re-exposes questions.

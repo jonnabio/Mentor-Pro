@@ -30,11 +30,13 @@ import getpass
 import hashlib
 import json
 import os
+import queue
 import re
 import shlex
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -268,12 +270,17 @@ def parse_open_reports(answer: str) -> int | None:
     return 0 if match.group(1) == "none" else int(match.group(1))
 
 
+def psql_cmd(cfg: dict) -> list[str]:
+    """psql in the PostgreSQL container, unaligned, no headers, stopping at the first error."""
+    return [*cfg["docker"], "exec", "-i", cfg["pg_container"], "psql", "-U", cfg["pg_user"], "-d", cfg["pg_db"],
+            "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1"]
+
+
 def read_open_reports(cfg: dict) -> int | None:
-    """Read-only count of open student reports; None when PostgreSQL cannot answer."""
-    cmd = [*cfg["docker"], "exec", "-i", cfg["pg_container"], "psql", "-U", cfg["pg_user"], "-d", cfg["pg_db"],
-           "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1"]
+    """Read-only count of open student reports; None when PostgreSQL cannot answer. Preflight only: deploy and
+    rollback count under the ReportBarrier instead."""
     try:
-        out = subprocess.run(cmd, input=OPEN_REPORTS_SQL, capture_output=True, text=True, timeout=60)
+        out = subprocess.run(psql_cmd(cfg), input=OPEN_REPORTS_SQL, capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if out.returncode != 0:
@@ -295,16 +302,126 @@ def report_hold_verdict(capability: str, open_reports: int | None) -> str:
     return "no open reports"
 
 
-def check_report_holds(cfg: dict, labels: dict | None) -> str:
-    """Refuses unless the image enforces report holds or PostgreSQL proves none is open. The count is read only
-    when the image lacks the capability, inside the deploy lock, just before any container changes."""
-    capability = report_capability(labels)
-    verdict = report_hold_verdict(capability, None if capability != "no" else read_open_reports(cfg))
+def _refuse_blocked(verdict: str) -> None:
     print(f"report holds: {verdict}")
     if verdict.startswith("BLOCKED"):
         raise Refused(f"report holds {verdict}. Nothing changed. Recovery: docs/runbooks/production-deployment.md"
                       " (report holds)")
+
+
+def check_report_holds(cfg: dict, labels: dict | None) -> str:
+    """Preflight: refuses unless the image enforces report holds or PostgreSQL shows none is open. Advisory only;
+    deploy and rollback decide under `report_hold_barrier`."""
+    capability = report_capability(labels)
+    verdict = report_hold_verdict(capability, None if capability != "no" else read_open_reports(cfg))
+    _refuse_blocked(verdict)
     return verdict
+
+
+# Must equal app.practice.question_reports.REPORT_LOCK (checked by the tests): question_reports.create takes it,
+# transaction-scoped, before inserting a report.
+REPORT_LOCK = (4047, 2)
+BARRIER_TIMEOUT = 60  # seconds for each answer from psql
+BARRIER_LOCK_SQL = ("SET default_transaction_read_only = on;\n"
+                    f"SET lock_timeout = '{BARRIER_TIMEOUT - 10}s';\n"
+                    f"SELECT 'locked|' || pg_backend_pid() FROM (SELECT pg_advisory_lock{REPORT_LOCK}) AS l;\n")
+# Every session still waiting for the report lock belongs to a report request that started before the switch.
+# Terminating it rolls the report back, so no report can commit once an image without holds may be running.
+BARRIER_RELEASE_SQL = (f"SELECT 'released|' || count(pg_terminate_backend(pid)) FROM pg_locks "
+                       f"WHERE locktype = 'advisory' AND classid = {REPORT_LOCK[0]} AND objid = {REPORT_LOCK[1]} "
+                       f"AND objsubid = 2 AND NOT granted;\n"
+                       f"SELECT 'unlocked|' || pg_advisory_unlock{REPORT_LOCK};\n")
+
+
+class ReportBarrier:
+    """A write barrier for student reports across a switch to an image without report holds.
+
+    One psql session holds the session-level advisory lock REPORT_LOCK from before the open-report count until
+    after the containers changed. question_reports.create needs the same lock to insert, so a report either
+    committed before the count (and is counted) or waits. On close, waiting report sessions are terminated
+    (rolled back), then the lock is released. If this process dies, PostgreSQL ends the session and releases the
+    lock; nothing is left behind. Never writes to any table."""
+
+    def __init__(self, cfg: dict):
+        self.cfg = cfg
+        self.proc: subprocess.Popen | None = None
+        self.lines: "queue.Queue[str | None]" = queue.Queue()
+        self.terminated = 0
+
+    def _read(self) -> None:
+        for line in self.proc.stdout:
+            self.lines.put(line.strip())
+        self.lines.put(None)
+
+    def _send(self, sql: str, prefix: str) -> str | None:
+        """Send SQL and return the first answer line starting with `prefix`, or None (error, exit, timeout)."""
+        try:
+            self.proc.stdin.write(sql)
+            self.proc.stdin.flush()
+        except (OSError, ValueError):
+            return None
+        deadline = time.monotonic() + BARRIER_TIMEOUT
+        while True:
+            try:
+                line = self.lines.get(timeout=max(0.0, deadline - time.monotonic()))
+            except queue.Empty:
+                return None
+            if line is None:
+                return None
+            if line.startswith(prefix):
+                return line
+
+    def start(self) -> int | None:
+        """Take the report lock, then count open reports; None when either fails (the caller refuses)."""
+        try:
+            self.proc = subprocess.Popen(psql_cmd(self.cfg), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                         stderr=subprocess.DEVNULL, text=True)
+        except OSError:
+            return None
+        threading.Thread(target=self._read, daemon=True).start()
+        if not self._send(BARRIER_LOCK_SQL, "locked|"):
+            return None
+        body = OPEN_REPORTS_SQL.split("\n", 1)[1]  # the same query, in this session (it holds no write)
+        answer = self._send(body, "open|")
+        return parse_open_reports(answer) if answer else None
+
+    def close(self) -> None:
+        if self.proc is None:
+            return
+        try:
+            answer = self._send(BARRIER_RELEASE_SQL, "released|")
+            if answer:
+                self.terminated = int(answer.split("|", 1)[1])
+                self._send("", "unlocked|")
+        finally:
+            with contextlib.suppress(OSError, ValueError):
+                self.proc.stdin.close()
+            try:
+                self.proc.wait(timeout=BARRIER_TIMEOUT)
+            except subprocess.TimeoutExpired:  # ending the session releases the lock in PostgreSQL
+                self.proc.kill()
+                self.proc.wait()
+            self.proc = None
+
+
+@contextlib.contextmanager
+def report_hold_barrier(cfg: dict, labels: dict | None):
+    """Deploy and rollback: refuse an image that cannot enforce open report holds, and for an image without the
+    capability keep new reports out from the count until the containers changed (ReportBarrier)."""
+    capability = report_capability(labels)
+    if capability != "no":
+        _refuse_blocked(report_hold_verdict(capability, None))
+        yield
+        return
+    barrier = ReportBarrier(cfg)
+    try:
+        _refuse_blocked(report_hold_verdict(capability, barrier.start()))
+        print("report holds: new student reports are held until the switch is complete")
+        yield
+    finally:
+        barrier.close()
+        if barrier.terminated:
+            print(f"report holds: {barrier.terminated} report request(s) in flight during the switch were rolled back")
 
 
 # ---------------------------------------------------------------- registry and image identity
@@ -692,13 +809,13 @@ def deploy_locked(args, cfg: dict, backup_live: tuple | None = None, propose_rol
     verdict = compatibility(image_range(labels), live[1])
     if verdict != "compatible":
         raise Refused(f"{verdict} on live schema {live[1]}")
-    check_report_holds(cfg, labels)
     backup_sha = check_backup(Path(args.backup), read_backup_record(Path(args.backup)), cfg["pg_db"],
                               backup_live or live, now)
-    manifests = cfg["state"] / "manifests"
-    manifests.mkdir(parents=True, exist_ok=True)
-    (manifests / f"{manifest['release']}.json").write_bytes(Path(args.manifest).read_bytes())
-    return change(cfg, args, "deploy", ref, manifest["release"], live, backup_sha, propose_rollback)
+    with report_hold_barrier(cfg, labels):  # from the open-report count until the containers changed
+        manifests = cfg["state"] / "manifests"
+        manifests.mkdir(parents=True, exist_ok=True)
+        (manifests / f"{manifest['release']}.json").write_bytes(Path(args.manifest).read_bytes())
+        return change(cfg, args, "deploy", ref, manifest["release"], live, backup_sha, propose_rollback)
 
 
 def stored_manifest(cfg: dict, version: str | None = None, digest: str | None = None) -> tuple[dict, str] | None:
@@ -815,16 +932,17 @@ def rollback(args, cfg: dict) -> int:
                   "Nothing changed. Crossing a migration is a database restore into a new database "
                   "(ADR-030 section 6, G3, PO approval), never an application rollback.")
             return 1
-        try:
-            check_report_holds(cfg, labels)
-        except Refused:
-            record_release(cfg, action="rollback", result="REFUSED", version=version, image=ref,
-                           schema=f"{live[0]}:{live[1]}", error="open student reports not enforced",
-                           window=args.window, authorization=args.authorization, authorization_verified="no")
-            raise
         backup_sha = check_backup(Path(args.backup), read_backup_record(Path(args.backup)), cfg["pg_db"], live,
                                   utc_now())
-        return change(cfg, args, "rollback", ref, version, live, backup_sha)
+        with contextlib.ExitStack() as barrier:
+            try:  # from the open-report count until the containers changed
+                barrier.enter_context(report_hold_barrier(cfg, labels))
+            except Refused:
+                record_release(cfg, action="rollback", result="REFUSED", version=version, image=ref,
+                               schema=f"{live[0]}:{live[1]}", error="open student reports not enforced",
+                               window=args.window, authorization=args.authorization, authorization_verified="no")
+                raise
+            return change(cfg, args, "rollback", ref, version, live, backup_sha)
 
 
 def main(argv: list[str] | None = None) -> int:

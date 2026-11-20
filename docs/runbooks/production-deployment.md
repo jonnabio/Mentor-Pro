@@ -100,7 +100,9 @@ refuse an image without the label `io.mentorpro.capability.report-holds=1`
 while any student report is open, and print `report holds BLOCKED`.
 Releases from T072 on carry the label; every earlier image lacks it. An
 unrecognised label value, or an open-report count PostgreSQL cannot
-answer, also refuses. A refused rollback is recorded as `REFUSED` in
+answer, also refuses. While switching to an image without the label, new
+student reports wait, and any still waiting at the end is rolled back
+(the student can report again). A refused rollback is recorded as `REFUSED` in
 RELEASES; nothing changes. There is no override flag. Safe recovery, in
 order, each a PO decision:
 

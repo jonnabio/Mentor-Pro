@@ -152,6 +152,11 @@
 - **Matrix:** label `1` proceeds; no label with 0 reports or no table
   proceeds; no label with open reports, an unreadable count, or an unknown
   label value is BLOCKED. A blocked rollback is recorded `REFUSED`.
+- **Write barrier (PR #82 review):** for an image without the label, one
+  read-only psql session takes the report lock `(4047, 2)` before the count
+  and keeps it until the containers changed; on release it terminates
+  report requests still waiting for it. A report therefore commits before
+  the count (and blocks) or never.
 - **Recovery:** production runbook, "Report holds". No override flag; the
   script never clears reports or changes verdicts.
 - **Tests:** `tests/app/test_deploy_report_holds.py` (matrix, label parsing,
@@ -173,3 +178,24 @@
 - **Fix:** `question_reports._ensure_schema` runs the schema SQL once per
   database URL and process, under a thread lock. The report suites passed
   six consecutive local runs.
+
+## 9. PR #82 review corrections (2026-11-20)
+
+- **Race closed:** the write barrier above replaces the separate count in
+  deploy and rollback; preflight keeps the advisory count.
+  `test_in_flight_report_cannot_commit_across_the_switch` starts a report
+  after the barrier counted zero, switches only once PostgreSQL shows it
+  waiting for the lock, and proves it is rolled back and nothing is open.
+  Further tests: a report committed first blocks; a failed switch leaves no
+  lock; an unreachable database refuses; the lock key equals the
+  application's.
+- **PostgreSQL tests mandatory:** CI sets `MENTORPRO_REQUIRE_PSQL=1`; without
+  psql these tests fail instead of skipping.
+- **`_ensure_schema` cache:** safe in production. The student service runs
+  one uvicorn process (no `--workers`), the tutor service one
+  `uvicorn.run` process, and each scheduler tick is a new `docker exec`
+  process. The schema is additive and never dropped while a process runs;
+  a restore goes into a new database with restarted containers. No change.
+  Residual, pre-existing: the first schema run of a tick process can still
+  meet a tutor resolution (replenishment also builds `QuestionBank` per
+  tick); PostgreSQL then aborts one side and the tutor retries.

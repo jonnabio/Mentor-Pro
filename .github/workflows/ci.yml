@@ -44,6 +44,9 @@ jobs:
       # without Docker they fail instead of skipping. Their containers, networks and
       # volumes are named mentorpro-test-live-* and mentorpro-verify-* only.
       MENTORPRO_REQUIRE_DOCKER: "1"
+      # T072 (ADR-038 D6): the report-hold barrier and count run through real psql
+      # against the service database here; without psql those tests fail instead of skipping.
+      MENTORPRO_REQUIRE_PSQL: "1"
 
     steps:
       - name: Checkout repository

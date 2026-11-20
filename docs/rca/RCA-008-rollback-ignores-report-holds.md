@@ -36,6 +36,9 @@ questions back into new practices.
 - `preflight`, `deploy` and `rollback` read the label only after verifying
   the image, then refuse an image without it while any report is open. An
   unknown label value or an unreadable count also refuses.
+- A write barrier closes the window between the count and the switch: the
+  deploy holds the report lock from before the count until the containers
+  changed, then rolls back report requests still waiting for it.
 - The runbook gives the safe recovery path. No override exists.
 
 ## Prevention
