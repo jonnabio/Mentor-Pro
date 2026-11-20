@@ -1,8 +1,10 @@
 # T072 Result: Automatic Eligibility and Student Reports
 
-- **Status:** implemented, tests passed locally. PR review, merge,
-  release, deploy, activation and production acceptance are separate
-  gates; none has happened yet.
+- **Status:** PR #81 reviewed and merged into `dev` on 2026-11-19 (merge
+  `550fc211440842f8a2daa77338ed9b39dd1f177d`, exact-head guard `73391a1`,
+  PR CI 44580444939, `dev` CI 44648495199, all green). Rollback safeguard
+  in a follow-up PR (section 7). Release, deploy, activation and production
+  acceptance are separate gates; none has happened yet.
 - **Design:** [ADR-038](../adr/ADR-038-automatic-eligibility-and-student-reports.md),
   [plan](../planning/2026-11-19-T072-auto-eligibility-plan.md)
 - **PO decisions (2026-11-19):**
@@ -119,8 +121,8 @@
 - **Additive:** one table and one partial index, created with `CREATE ...
   IF NOT EXISTS` like the other Question Bank tables. The writing schema
   version is unchanged.
-- **Rollback:** the previous image ignores the table. Open reports would
-  stop holding questions until T072 is redeployed.
+- **Rollback:** the previous image ignores the table, so the deploy helper
+  refuses it while reports are open (section 7).
 - **New settings:** `MENTOR_PRO_AUTO_ELIGIBILITY` (absent means off) and
   `MENTOR_PRO_REPORT_PAUSE` (absent means 10). Production needs no
   configuration change to deploy T072.
@@ -134,3 +136,27 @@
   Afterwards, watch the report queue and the cap.
 - The scheduler stays paused (PO 2026-11-18). Once resumed, the report pause
   bounds the tutor's workload.
+
+## 7. Rollback safeguard (ADR-038 D6, RCA-008)
+
+- **PO decision (2026-11-19):** an older image must not run while open
+  reports exist.
+- **Capability:** CI labels every image
+  `io.mentorpro.capability.report-holds=1`. The helper reads the label only
+  after verifying the registry digest, version tag, commit and labels, so it
+  is bound to the immutable release identity. A manifest cannot supply it.
+- **Check:** `preflight`, `deploy` (and `migrate`, through it) and
+  `rollback` (manifest and legacy targets), inside the lock, before any
+  container change. The open count is a read-only query, read only when the
+  image lacks the label.
+- **Matrix:** label `1` proceeds; no label with 0 reports or no table
+  proceeds; no label with open reports, an unreadable count, or an unknown
+  label value is BLOCKED. A blocked rollback is recorded `REFUSED`.
+- **Recovery:** production runbook, "Report holds". No override flag; the
+  script never clears reports or changes verdicts.
+- **Tests:** `tests/app/test_deploy_report_holds.py` (matrix, label parsing,
+  count parsing, psql failures, deploy, rollback for manifest and legacy
+  targets, preflight, CLI refusal, release labels, the real query on
+  PostgreSQL in CI).
+- **Unchanged:** image identity checks, backup evidence, deploy lock, schema
+  compatibility and the other gates.

@@ -231,3 +231,28 @@ guards:
 
     review_triggers:
       - "Changes to theme tokens or to .review-options rules in styles.css"
+
+  - id: RCA-008
+    title: "Rollback to an image without report holds re-exposes reported questions"
+    severity: critical
+    created: 2026-11-19
+    rca_file: docs/rca/RCA-008-rollback-ignores-report-holds.md
+
+    guarded_files:
+      - deploy/mentorpro_deploy.py
+      - scripts/release/release.py
+
+    invariants:
+      - "release.labels() always emits io.mentorpro.capability.report-holds=1"
+      - "The capability is read only from the labels of a digest-verified image, never from a manifest or argument"
+      - "preflight, deploy and rollback call check_report_holds before any container changes"
+      - "No label with open reports, an unreadable count, or an unknown label value refuses; no override flag"
+
+    tests:
+      - tests/app/test_deploy_report_holds.py
+
+    standard_rule: "RCA-008 Lessons Learned (data-dependent safety must survive rollback)"
+
+    review_triggers:
+      - "Changes to verified_labels, rollback, deploy_locked, preflight or the release labels"
+      - "A future feature whose safety depends on code that an older image lacks"
