@@ -1,12 +1,55 @@
-# Active Context: Session Handoff 2026-11-18 (T071 deployed, tutor acceptance pending)
+# Active Context: 2026-11-19 (T072 in review; T071 Gate C pending; scheduler paused)
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-18 (session end, after T071 Gate A)
-- **Active Role:** none (session closed). The last role was Developer and
-  Release Agent (T071).
-- **Mode:** idle, waiting for the PO's Gate B decision (production
-  deployment of `v2026.11.18-1`).
+- **Last Updated:** 2026-11-19, T072 merged into `dev`; rollback safeguard
+  (PR into `dev`).
+- **Active Role:** Developer (T072).
+- **Mode:** T072 is in review. T071 Gate C (tutor acceptance) is still
+  pending.
+
+## Update 2026-11-19 (supersedes the sections below where they differ)
+
+- **Production:** `v2026.11.19-1`, deployed 2026-11-19 at about 00:21 UTC
+  (`PO-M5-DEPLOY-2026-11-19`).
+  - Image `@sha256:8e6eacef…0541d9`, commit `1cbd857`, CI 44426535451.
+  - `DEPLOY OK`, smoke 13/13, `STATUS HEALTHY`.
+  - Backup `mentor_pro_2026-11-19_002029.dump` (`VERIFY OK`).
+  - Fingerprints identical before and after the deploy.
+  - It carries M5 (RCA-007, PR #79 and #80): the proposed answer is readable
+    in dark mode.
+- **Scheduler:** **paused** since 2026-11-18 21:12 UTC (reason "Gate C T071",
+  PO-approved).
+  - It resumes only when all of these hold: the queue is below 40, Gate C is
+    complete, the post-acceptance checks pass, and the PO explicitly
+    authorizes it.
+  - Paused ticks record `skipped (paused)` with 0 calls.
+- **T071 Gate C:** pending.
+  - One tutor approval was recorded at 2026-11-18 23:52:39 UTC (42 verdicts
+    in total).
+  - The tutor found no wrong questions and asked for approve-all. They were
+    pointed to page-by-page bulk approval; option A, a page-size selector,
+    was proposed as M6.
+  - Pre-acceptance baseline: 2026-11-18 21:13:01Z, `/tmp/gatec_fp_pre.txt` on
+    the server.
+- **T072** ([result](../progress/task_T072_result.md),
+  [ADR-038](../adr/ADR-038-automatic-eligibility-and-student-reports.md)):
+  - automatic eligibility behind `MENTOR_PRO_AUTO_ELIGIBILITY` (default
+    off);
+  - student reports with a hold;
+  - tutor resolution (retain or quarantine);
+  - `reports_open` scheduler pause.
+  - Status: `review`. PR #81 merged into `dev` 2026-11-19 (merge
+    `550fc21`, exact-head guard `73391a1`; `dev` CI 44648495199 green).
+    Not released, deployed or activated.
+  - Rollback safeguard (ADR-038 D6, RCA-008): deploy, rollback and
+    preflight refuse an image without the report-hold label while reports
+    are open. Feature PR into `dev`, awaiting review.
+- **Next:**
+  1. Review and merge the rollback safeguard into `dev`.
+  2. Release and deploy T072 only with PO authorization.
+  3. Activate the flag only with separate PO authorization.
+  4. Finish Gate C, then the scheduler-resume decision.
 - **Earlier history:** T006-T070, deployment stages, ADR-030 to ADR-037:
   see `docs/progress/task_T0xx_result.md`, `docs/planning/`, release
   records in `docs/progress/` and this file's Git history.

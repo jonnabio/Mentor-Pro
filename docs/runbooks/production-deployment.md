@@ -95,6 +95,30 @@ database, never over the live one). The protected pre-migration backup is
 `/var/backups/mentor-pro/mentor_pro_2026-10-31_170927.dump` (sha256
 `a8e923b9…c664`); keep it.
 
+**Report holds (T072, ADR-038 D6).** `preflight`, `deploy` and `rollback`
+refuse an image without the label `io.mentorpro.capability.report-holds=1`
+while any student report is open, and print `report holds BLOCKED`.
+Releases from T072 on carry the label; every earlier image lacks it. An
+unrecognised label value, or an open-report count PostgreSQL cannot
+answer, also refuses. While switching to an image without the label, new
+student reports wait, and any still waiting at the end is rolled back
+(the student can report again). A refused rollback is recorded as `REFUSED` in
+RELEASES; nothing changes. There is no override flag. Safe recovery, in
+order, each a PO decision:
+
+1. Stay on, or redeploy, a release that carries the label (any release
+   from T072 on). Report holds stay enforced.
+2. If the fault needs an older image, the tutor first resolves the open
+   reports in "Reportes de estudiantes" (Mantener or Cuarentena): a
+   quarantine stays effective in every image, a retain releases the
+   question deliberately. The script never clears reports or changes
+   verdicts; then rerun `rollback`.
+3. If the database cannot be read, restore service per ADR-030 section 6;
+   do not bypass the count.
+
+Count open reports read-only:
+`docker exec -i mentor-pro-postgres-1 psql -U mentor_pro_admin -d mentor_pro -X -c "SELECT count(*) FROM generation.question_report WHERE status = 'open'"`.
+
 **Retention.** Ten routine dumps plus every pre-migration dump, no
 automatic deletion (ADR-033). On 2026-10-31: 4 dumps, 528K; nothing
 deleted.

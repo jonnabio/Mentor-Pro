@@ -164,7 +164,18 @@
     <!-- T068: question review. Verdicts use the existing individual review; nothing is approved without the tutor. -->
     <section id="tutor-review" class="card" hidden>
       <h2>Revisión de preguntas</h2>
-      <p class="muted small">Las preguntas por revisar no se muestran al estudiante hasta que las aprobés.</p>
+      <!-- T072 (ADR-038): student reports first; a reported question is held from new practices until resolved. -->
+      <div id="reports">
+        <h3>Reportes de estudiantes</h3>
+        <p class="muted small">Una pregunta reportada no se usa en prácticas nuevas hasta que la resolvás.
+          «Mantener» la devuelve a las prácticas sin registrar una aprobación; «Cuarentena» la retira.</p>
+        <p id="reports-empty" class="muted">No hay reportes pendientes.</p>
+        <p id="reports-result" class="muted small" aria-live="polite"></p>
+        <ul id="reports-list" class="plain-list"></ul>
+      </div>
+      <h3>Preguntas por revisar</h3>
+      <p id="review-policy" class="muted small">Las preguntas por revisar no se muestran al estudiante hasta que las
+        aprobés.</p>
       <ul id="review-counts" class="plain-list feedback-scores"></ul>
       <form id="review-filters" class="practice-filters">
         <label class="field-label" for="rf-subject">Materia

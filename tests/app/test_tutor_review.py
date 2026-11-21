@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.main import STATIC_DIR, SUBJECTS, ApiError, open_catalog
 from app.practice import seeding
-from app.practice.tutor_review import ReviewQueue, build_review_router
+from app.practice.tutor_review import ReviewQueue, build_reports_router, build_review_router
 from conftest import SYNTHETIC
 from test_bank_seeding import eligible, targeted, url  # noqa: F401  (fixture)
 from test_generation import catalog_conn  # noqa: F401  (fixture)
@@ -42,6 +42,7 @@ def review_app(url, schema):
 
     queue = ReviewQueue(lambda: url, SYNTHETIC, SUBJECTS, lambda u: open_catalog(u, schema))
     app.include_router(build_review_router(queue, ApiError, TOKEN, frozenset({GATEWAY})))
+    app.include_router(build_reports_router(lambda: url, ApiError, TOKEN, frozenset({GATEWAY})))  # T072, as in the tutor app
 
     @app.get("/api/tutor/queue")  # the writing queue the page opens after login (not under test here)
     def writing_queue(request: Request):

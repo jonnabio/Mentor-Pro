@@ -48,6 +48,8 @@ def labels(version: str, revision: str, created: str) -> dict[str, str]:
         "org.opencontainers.image.source": SOURCE,
         "io.mentorpro.schema.min": migrations.SCHEMA_MIN,
         "io.mentorpro.schema.max": migrations.SCHEMA_MAX,
+        # T072: this code holds questions with open student reports (deploy refuses older images while any is open).
+        "io.mentorpro.capability.report-holds": "1",
     }
 
 
