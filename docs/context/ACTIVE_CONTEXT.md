@@ -1,12 +1,45 @@
-# Active Context: 2026-11-19 (T072 in review; T071 Gate C pending; scheduler paused)
+# Active Context: 2026-11-22 (T072 deployed; Gate C pending; scheduler paused)
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-19, T072 merged into `dev`; rollback safeguard
-  (PR into `dev`).
-- **Active Role:** Developer (T072).
-- **Mode:** T072 is in review. T071 Gate C (tutor acceptance) is still
+- **Last Updated:** 2026-11-22. T072 Gate B is complete, and the T071
+  "approve all pending" enhancement is in a PR into `dev`.
+- **Active Role:** Developer (T071 enhancement).
+- **Mode:** consolidated Gate C (T071 and T072 human acceptance) is
   pending.
+
+## Update 2026-11-22 (supersedes the sections below where they differ)
+
+- **Merged:**
+  - the rollback safeguard (PR #82) into `dev`;
+  - `dev` into `main` (PR #83, merge `e039cd3`).
+- **Released:** `v2026.11.21-1` (commit `e039cd3`, CI 44913217764).
+- **Production:** `v2026.11.21-1`, deployed 2026-11-22 at about 20:30 UTC
+  (`PO-T072-GATE-B-2026-11-21`).
+  - Image `@sha256:22cfcbf3…bce1b2`, `DEPLOY OK`, smoke 13/13,
+    `STATUS HEALTHY`.
+  - Backup `mentor_pro_2026-11-22_202801.dump` (`VERIFY OK`).
+  - Fingerprints are identical apart from the new, empty
+    `generation.question_report`.
+  - Evidence: [T072 result](../progress/task_T072_result.md) section 10.
+- **Helper:** the administrator installed the T072 `mentorpro_deploy.py`.
+  All three helper files match the release.
+- **Flags:** automatic eligibility is off, paid generation is off, and the
+  scheduler is still paused ("Gate C T071").
+- **Gate C:** consolidated T071 and T072 human acceptance on
+  `v2026.11.21-1`.
+  - The checklist was handed to the tutor.
+  - Baseline 21:38:27Z: 33 pending, 0 open reports.
+  - T071 and T072 stay `review` until the tutor confirms.
+- **T071 enhancement:** "Seleccionar todas las pendientes", frontend only,
+  approving in batches of at most 50
+  ([T071 result](../progress/task_T071_result.md) section 6). It is in a
+  feature PR into `dev`; it is not released or deployed.
+- **Next:**
+  1. Review and merge the enhancement.
+  2. Run Gate C with the tutor.
+  3. Release and deploy the enhancement, only with PO authorization.
+  4. Decide on resuming the scheduler, only with PO authorization.
 
 ## Update 2026-11-19 (supersedes the sections below where they differ)
 

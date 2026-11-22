@@ -199,3 +199,50 @@
   Residual, pre-existing: the first schema run of a tick process can still
   meet a tutor resolution (replenishment also builds `QuestionBank` per
   tick); PostgreSQL then aborts one side and the tutor retries.
+
+## 10. Gate B: production deployment (2026-11-22)
+
+PO authorization `PO-T072-GATE-B-2026-11-21`, window
+`T072-RELEASE-2026-11-21`. Human functional acceptance is **pending**.
+
+- **Release identity:** `v2026.11.21-1`, commit
+  `e039cd32171d779225e5ec2afba48800bcd747f6`, CI 44913217764.
+  `release-manifest.json` sha256
+  `b262e85e696b14585a719d55739a2c2e1d5f24c3698e1486dc0841a09e4b6e35`
+  matched, locally and on the server. Image
+  `ghcr.io/jonnabio/mentor-pro@sha256:22cfcbf3819f40ef0f7df51d0a874135346b1eace31a5def6831ff9138bce1b2`;
+  labels `report-holds=1`, revision and version match, schema 0001..0001.
+- **Helper:** the first attempt stopped. `mentorpro_deploy.py` on the
+  server predated T072, and the sudoers rule covers only `mentorpro`. The
+  administrator installed the release copy (root, 644). All three files
+  then matched `git show` at the release commit: `mentorpro` `da92f99e…`,
+  `mentorpro_deploy.py` `f76c89a1…`, `mentorpro_migrate.py` `880545d3…`.
+- **PostgreSQL:** the helper connects as `mentor_pro_admin`, a superuser
+  with effective `pg_signal_backend`. The write barrier is not used for an
+  image with the label. For a future rollback to a legacy image, the
+  privilege is present but the path was not exercised in production.
+- **Preflight:** `report holds: enforced`,
+  `PREFLIGHT OK: DEPLOY COMPATIBLE`.
+- **Backup:** `mentor_pro_2026-11-22_202801.dump`, sha256
+  `ef01e917b7693ce42118d8c993202ccc27701061f01dc41c90fa43767be54655`
+  (37 tables, 2900 rows), `VERIFY OK`.
+- **Deploy:** about 20:30Z, `DEPLOY OK`, `SMOKE PASS (13/13)`,
+  `STATUS HEALTHY`. The previous image was `@sha256:8e6eacef…0541d9`
+  (`v2026.11.19-1`). Rollback was not required.
+- **Data integrity:** row counts and md5 for all 37 tables are identical
+  before (20:27:41Z) and after the deploy. The only difference is the new,
+  empty `generation.question_report`. Verdicts: 59 (44 approved, 15
+  quarantined). The env key and value hashes and the crontab hash are
+  unchanged.
+- **T072 checks (non-mutating):**
+  - student report endpoint present (422 for an invalid body);
+  - tutor report list and resolve without the token: 403;
+  - the same routes on the student service: 404;
+  - the tutor page shows "Reportes de estudiantes".
+- **Flags:** `MENTOR_PRO_AUTO_ELIGIBILITY` is unset (off), and
+  `OPENROUTER_ALLOW_PAID=false`. The scheduler stays paused ("Gate C
+  T071"); ticks record `skipped (paused)` with 0 calls.
+- **Gate C baseline** (2026-11-22T21:38:27Z, read only): 33 pending
+  (Español 0, Matemáticas 13, Ciencias 11, Estudios Sociales 9); 32 text
+  stimuli and 1 table stimulus (M21 `req-11d145760cff49ea`); 0 open
+  reports.
