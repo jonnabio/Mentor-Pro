@@ -186,3 +186,46 @@ mandatory in CI):
 Risk: if other approvals happen while the selection is read page by page,
 the pages shift and a question can be missed. It then stays pending; it is
 never approved by mistake. The dialog always shows the revalidated count.
+
+### 6.1 Review correction and integration (2026-11-24)
+
+- **Correction (PO review of PR #84):** a failed batch is now reported as
+  **unconfirmed**: the server may or may not have applied it, it is never
+  retried, and the tutor is pointed to the refreshed queue. The batches
+  after it are reported as **not sent** (never attempted; still pending).
+  The queue refresh is unchanged. Commit `31dc74d`, with the new test
+  `test_a_failed_last_batch_is_unconfirmed_with_nothing_unsent`.
+- **PR #84:** final head `31dc74df3ade59e9a6a0eb4f80d5a037314d209d`,
+  exact-head CI 45417773859 success (browser tests executed=29,
+  skipped=0). Merged into `dev` with the exact-head guard as
+  `97e29646192ac1b1edd6c70bfeeda37c7893de89`; `dev` CI 45420176013
+  success (executed=29, skipped=0).
+
+## 7. Gate A: release publication (2026-11-24)
+
+PO authorized. Production was not modified.
+
+- **Release PR #85** (`dev` → `main`): head `97e2964` (the approved
+  integration commit, 8 files, PR #84 changes only). Exact-head CI
+  45494892496 success (executed=29, skipped=0). `main` has no branch
+  protection and requires no review. Merged with the exact-head guard as
+  `141d0725eb1583579601885a3de215c5e03aab9f`.
+- **`main` CI 45496672372:** all four jobs green, including Tag and
+  Release.
+- **Release `v2026.11.24-1`:** tag points to `141d072`; not a draft or
+  prerelease; asset `release-manifest.json`.
+- **Image:** `ghcr.io/jonnabio/mentor-pro@sha256:9948605d05bedf176543f7621a398e85f819862b75e9b98851f1fd5d57e3a384`.
+  The registry digest for the tag was checked independently and matches
+  the manifest.
+- **Labels (read from the registry):** version `v2026.11.24-1`, revision
+  `141d072…`, `io.mentorpro.capability.report-holds=1`, schema
+  `0001..0001`.
+- **Manifest:** sha256
+  `d0f4167b3f2ec83abcf3c31b11b26f20f87fe2f6bfd7c9228757debb4311e60e`;
+  commit `141d072`, CI run 45496672372, schema 0001..0001, smoke student
+  and tutor pass, status "Published, not authorized for deployment".
+- **Database compatibility:** schema range 0001..0001, the same as
+  production `v2026.11.21-1`; no migration in this release.
+- **`dev`** was fast-forwarded to `main` (`141d072`; it was an ancestor).
+- **Not done (separately gated):** deployment, automatic eligibility,
+  scheduler resumption, T071/T072 human acceptance.

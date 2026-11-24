@@ -1,11 +1,33 @@
-# Active Context: 2026-11-24 (T072 deployed; Gate C pending; scheduler paused)
+# Active Context: 2026-11-24 (v2026.11.24-1 published, not deployed; Gate C pending; scheduler paused)
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-24, session handoff.
+- **Last Updated:** 2026-11-24, T071 approve-all Gate A.
 - **Active Role:** none; the session ended.
-- **Mode:** waiting for consolidated Gate C (T071 and T072 human
-  acceptance) and PO decisions.
+- **Mode:** waiting for Gate B (deploy `v2026.11.24-1`), consolidated
+  Gate C (T071 and T072 human acceptance) and PO decisions.
+
+## Update 2026-11-24, Gate A (supersedes the sections below where they differ)
+
+- **PR #84** (corrected per the PO review: a failed batch is reported as
+  unconfirmed and never retried, later batches as not sent): head
+  `31dc74d`, CI 45417773859; merged into `dev` as `97e2964`, `dev` CI
+  45420176013, both success with 29 browser tests and 0 skipped.
+- **Release PR #85** (head `97e2964`, CI 45494892496) merged into `main` as
+  `141d0725eb1583579601885a3de215c5e03aab9f`; `main` CI 45496672372 green.
+- **Release `v2026.11.24-1`:** image
+  `ghcr.io/jonnabio/mentor-pro@sha256:9948605d…e3a384`, manifest sha256
+  `d0f4167b…311e60e`, labels `report-holds=1` and schema 0001..0001 (same
+  as production). Status "Published, not authorized for deployment".
+  Details: [T071 result](../progress/task_T071_result.md) section 7.
+- **`dev` = `main` = `141d072`.**
+- **Production unchanged:** `v2026.11.21-1`, without approve-all.
+- **This record:** branch `handoff/T071-approve-all-release`, pushed, no
+  PR (no-docs-only-PR rule). Fold it into the next functional PR or the
+  Gate B records.
+- **Next:** PO Gate B for `v2026.11.24-1` (compare the manifest sha256
+  `d0f4167b…311e60e` before deploying); then Gate C. Scheduler, automatic
+  eligibility and acceptance stay separately gated.
 
 ## Handoff 2026-11-24 (supersedes the sections below where they differ)
 
@@ -54,7 +76,7 @@
 - **Queue at the baseline:** 33 pending (Español 0, Matemáticas 13,
   Ciencias 11, Estudios Sociales 9); 0 open reports. Verdicts: 59 (44
   approved, 15 quarantined).
-- **Branches:** `dev` has PR #84; `main` stays at `e039cd3`, so the
+- **Branches:** (superseded by the Gate A update above) `dev` had PR #84; `main` was at `e039cd3`, so the
   enhancement is not released.
 - **Tasks:** T071 and T072 are `review` in `tasks.json` until the tutor
   confirms Gate C.
