@@ -855,9 +855,10 @@ function confirmBulk({ count, subjects, scope, dropped }) {
   });
 }
 
-// Sends `ids` in sequential batches; stops at the first failed request, so nothing already sent is sent again.
+// Sends `ids` in sequential batches; stops at the first failed request and never retries it. The failed batch
+// is "unconfirmed" (the server may or may not have applied it); the batches after it are "unsent" (never attempted).
 async function approveInBatches(ids) {
-  const out = { approved: 0, requested: ids.length, refused: [], unsent: 0, error: "" };
+  const out = { approved: 0, requested: ids.length, refused: [], unconfirmed: 0, unsent: 0, error: "" };
   for (let start = 0; start < ids.length; start += BULK_MAX) {
     const chunk = ids.slice(start, start + BULK_MAX);
     $("bulk-result").textContent = `Aprobando… ${start} de ${ids.length} enviadas.`;
@@ -865,7 +866,8 @@ async function approveInBatches(ids) {
     try {
       result = await api("/api/tutor/review/bulk-approve", { method: "POST", body: JSON.stringify({ request_ids: chunk }) });
     } catch (error) {
-      out.unsent = ids.length - start;
+      out.unconfirmed = chunk.length;
+      out.unsent = ids.length - start - chunk.length;
       out.error = error.message;
       break;
     }
@@ -902,7 +904,9 @@ async function approveBulk() {
     const out = await approveInBatches(ids);
     const parts = [`Se aprobaron ${out.approved} de ${out.requested} preguntas.`];
     if (out.refused.length) parts.push(`No se aprobaron: ${out.refused.join(", ")}.`);
-    if (out.unsent) parts.push(`Sin enviar por un error (${out.error}): ${out.unsent}; siguen pendientes.`);
+    if (out.unconfirmed) parts.push(`Sin confirmar por un error (${out.error}): ${out.unconfirmed}; ` +
+      "pudieron aprobarse o no, no se reintentaron; revise la cola actualizada.");
+    if (out.unsent) parts.push(`Sin enviar: ${out.unsent}; no se intentaron y siguen pendientes.`);
     clearBulkSelection();
     await openReview();
     parts.push(`Quedan ${bulk.total} por revisar.`);

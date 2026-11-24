@@ -222,8 +222,10 @@ def test_a_failed_batch_stops_without_resending_and_reports_what_remains(server)
         page.click("#bulk-approve")
         page.click("#bulk-dialog-confirm")
         expect(page.locator("#bulk-result")).to_contain_text("Se aprobaron 50 de 120 preguntas.")
-        expect(page.locator("#bulk-result")).to_contain_text("Sin enviar por un error")
-        expect(page.locator("#bulk-result")).to_contain_text(": 70; siguen pendientes. Quedan 70 por revisar.")
+        expect(page.locator("#bulk-result")).to_contain_text("): 50; pudieron aprobarse o no")
+        expect(page.locator("#bulk-result")).to_contain_text("no se reintentaron")
+        expect(page.locator("#bulk-result")).to_contain_text(
+            "Sin enviar: 20; no se intentaron y siguen pendientes. Quedan 70 por revisar.")
         assert [len(b) for b in fake.posts] == [50, 50]                      # the third batch is never sent
         assert len(fake.pending) == 70
         page.click("#bulk-select-all")                                       # a retry sends only what is left
@@ -234,6 +236,25 @@ def test_a_failed_batch_stops_without_resending_and_reports_what_remains(server)
         expect(page.locator("#bulk-result")).to_have_text("Se aprobaron 70 de 70 preguntas. Quedan 0 por revisar.")
         sent = [i for b in fake.posts[2:] for i in b]
         assert set(sent).isdisjoint(fake.posts[0]) and len(sent) == 70
+        browser.close()
+
+
+@browser_only
+def test_a_failed_last_batch_is_unconfirmed_with_nothing_unsent(server):  # noqa: F811
+    from playwright.sync_api import expect, sync_playwright
+
+    base, _ = server
+    fake = FakeQueue(60, fail_batch=2)
+    with sync_playwright() as p:
+        browser, page = scripted(p, base, fake)
+        page.click("#bulk-select-all")
+        page.click("#bulk-approve")
+        page.click("#bulk-dialog-confirm")
+        expect(page.locator("#bulk-result")).to_contain_text("Se aprobaron 50 de 60 preguntas.")
+        expect(page.locator("#bulk-result")).to_contain_text("): 10; pudieron aprobarse o no")
+        expect(page.locator("#bulk-result")).not_to_contain_text("Sin enviar")
+        expect(page.locator("#bulk-result")).to_contain_text("Quedan 10 por revisar.")  # the queue was refreshed
+        assert [len(b) for b in fake.posts] == [50, 10]                      # the failed batch is not retried
         browser.close()
 
 
