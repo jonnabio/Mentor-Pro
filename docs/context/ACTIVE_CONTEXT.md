@@ -1,12 +1,116 @@
-# Active Context: 2026-11-19 (T072 in review; T071 Gate C pending; scheduler paused)
+# Active Context: 2026-11-24 (T072 deployed; Gate C pending; scheduler paused)
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-19, T072 merged into `dev`; rollback safeguard
-  (PR into `dev`).
-- **Active Role:** Developer (T072).
-- **Mode:** T072 is in review. T071 Gate C (tutor acceptance) is still
-  pending.
+- **Last Updated:** 2026-11-24, session handoff.
+- **Active Role:** none; the session ended.
+- **Mode:** waiting for consolidated Gate C (T071 and T072 human
+  acceptance) and PO decisions.
+
+## Handoff 2026-11-24 (supersedes the sections below where they differ)
+
+### Completed (2026-11-24)
+
+- **T072 Gate B** (`PO-T072-GATE-B-2026-11-21`, window
+  `T072-RELEASE-2026-11-21`):
+  - `v2026.11.21-1` (commit `e039cd3`) is deployed to production,
+    2026-11-22 at about 20:30 UTC.
+  - Image `@sha256:22cfcbf3…bce1b2`, `DEPLOY OK`, smoke 13/13,
+    `STATUS HEALTHY`.
+  - Backup `mentor_pro_2026-11-22_202801.dump` (`VERIFY OK`).
+  - Fingerprints are identical, apart from the new, empty
+    `generation.question_report`.
+  - Evidence: [T072 result](../progress/task_T072_result.md) section 10.
+- **Deploy helper:** the first Gate B attempt stopped because the installed
+  `mentorpro_deploy.py` predated T072. The administrator installed the
+  release copy, and all three helper files now match `e039cd3`.
+- **Gate C preparation:** the read-only baseline was taken at
+  2026-11-22T21:38:27Z (server `~/t072-helper/fp_gatec_pre.txt`), and the
+  browser checklist was handed to the PO and tutor.
+- **T071 "approve all pending" enhancement** (PR #84 into `dev`, head
+  `306095b`, merged at session end):
+  - "Seleccionar todas las pendientes (N)" works across pages, respects the
+    applied filters and states its scope.
+  - A confirmation dialog shows the count, subjects and scope; Cancelar and
+    Escape send nothing.
+  - The selection is re-checked against the queue at confirmation.
+  - Approvals go to the existing endpoint in sequential batches of at most
+    50, and a failed batch is never resent.
+  - Frontend only. Details:
+    [T071 result](../progress/task_T071_result.md) section 6.
+- **CI gap closed:** the T071 bulk, stimulus and approve-all browser tests
+  had never run in CI. `ci.yml` now runs them, with a minimum of 18
+  executed and 0 skipped. Exact-head CI 45085023962 passed with 28
+  executed and 0 skipped.
+
+### Current State (2026-11-24)
+
+- **Production:** `v2026.11.21-1`, healthy. It does **not** include the
+  approve-all enhancement.
+- **Flags:** `MENTOR_PRO_AUTO_ELIGIBILITY` is unset (off), and
+  `OPENROUTER_ALLOW_PAID=false`.
+- **Scheduler:** paused ("Gate C T071"). Ticks record `skipped (paused)`
+  with 0 calls.
+- **Queue at the baseline:** 33 pending (Español 0, Matemáticas 13,
+  Ciencias 11, Estudios Sociales 9); 0 open reports. Verdicts: 59 (44
+  approved, 15 quarantined).
+- **Branches:** `dev` has PR #84; `main` stays at `e039cd3`, so the
+  enhancement is not released.
+- **Tasks:** T071 and T072 are `review` in `tasks.json` until the tutor
+  confirms Gate C.
+
+### Next Steps (2026-11-24)
+
+1. Record PR #84's merge SHA and its `dev` CI run in the next docs update
+   (not a docs-only PR).
+2. Get the tutor's Gate C results (checklist: T071 steps 1–5, T072 steps
+   6–12).
+3. Run the post-acceptance verification:
+   - compare with `fp_gatec_pre.txt` (`bash ~/t072-helper/fp.sh <out>` on
+     the server);
+   - check verdicts against the tutor's actions;
+   - check the report and resolution rows, `status`, and smoke.
+4. If the tutor confirms: record separate T071 and T072 acceptance and set
+   both tasks to `done`.
+5. Release and deploy the approve-all enhancement (`dev` → `main`), only
+   with PO authorization.
+6. Decide on resuming the scheduler, only with PO authorization.
+
+### Blockers/Issues (2026-11-24)
+
+- **Gate C:** waiting for human tutor acceptance. Nothing may be accepted
+  without the tutor's explicit confirmation.
+- **PO decisions pending:**
+  - releasing the enhancement;
+  - resuming the scheduler (queue below 40, Gate C complete,
+    post-acceptance checks passed, explicit authorization);
+  - activating automatic eligibility.
+- **Local only:** `test_bulk_approval_in_the_browser` exceeds its 5 s
+  timeout on the Windows machine, on unmodified `dev` too. CI passes it.
+- **Not tested in production:** the legacy-rollback write barrier. The
+  `mentor_pro_admin` role is a superuser with `pg_signal_backend`.
+- **Approve-all residual risk:** approvals made elsewhere while the
+  selection is read can shift pages, so a question can be missed. It stays
+  pending; it is never wrongly approved.
+
+### Notes (2026-11-24)
+
+- **Server access:** `ssh jonnabio@100.64.84.15`. The agent may run only
+  `sudo -n /usr/local/lib/mentor-pro/mentorpro`. Installing helper files
+  needs the administrator (an interactive `sudo install`).
+- **Manifest:** `/opt/mentor-pro/manifests/v2026.11.21-1.json` (sha256
+  `b262e85e…4b6e35`).
+- **Tutor API from the server:** a call without the token returns 403. Read
+  the queue read-only through `ReviewQueue` inside `mentor-pro-tutor-1`;
+  do not look up the token.
+- **Staging files on the server:** `~/t072-helper/` holds `fp.sh`, the
+  fingerprints and the staged helper. Remove them only once Gate C is
+  closed.
+- **Local browser tests:**
+  `MENTOR_PRO_BROWSER=1 .venv/Scripts/python.exe -m pytest tests/app/test_tutor_approve_all.py`.
+- **Earlier history:** T006-T070, the deployment stages, ADR-030 to
+  ADR-038, the release records in `docs/progress/` and this file's Git
+  history.
 
 ## Update 2026-11-19 (supersedes the sections below where they differ)
 
