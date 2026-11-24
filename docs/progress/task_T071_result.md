@@ -142,3 +142,47 @@ acceptance by the tutor remains a separate decision and is **pending**.
   - it was 26 at the last handoff;
   - it is reported to the PO. The scheduler was not paused, because Gate
     B requires the configuration to be preserved.
+
+## 6. Enhancement: approve all pending questions (2026-11-22)
+
+PO requirement: the tutor approves the whole queue in one explicit
+operation instead of page by page (10 per page). Frontend only; the
+backend, the API limit and the approval path are unchanged.
+
+- **Selection:** "Seleccionar todas las pendientes (N)", where N is the
+  total for the applied filters. It reads every page of
+  `GET /api/tutor/review/queue` (`page_size` 50). The selection survives
+  page changes, and the checkboxes show it. Individual checks, "Seleccionar
+  toda la página" and "Limpiar selección" keep working. A filter change or
+  a result clears the selection.
+- **Scope:** the panel and the dialog state the scope: "todas las materias,
+  sin filtros" or "solo las preguntas filtradas (…)". Filters edited but
+  not applied are ignored.
+- **Confirmation:** a modal dialog shows the exact count, the subjects
+  represented, the scope and a warning that these are real tutor approval
+  decisions. Nothing is sent before "Aprobar"; Cancelar or Escape send
+  nothing.
+- **Revalidation:** at confirmation the queue is read again. Questions no
+  longer pending are dropped and counted in the dialog. Questions that
+  appeared after the selection are never added.
+- **Batches:** the existing `POST /api/tutor/review/bulk-approve`, in
+  sequential batches of at most 50 (`BULK_MAX`). Each ID still goes through
+  `item_review_record` (lock, re-check, audit row, reviewer `tutor`). A
+  failed request stops the run; nothing already sent is resent.
+- **Result:** approved, not approved (with the status per ID), not sent,
+  and the pending count remaining. Progress shows between batches. The
+  buttons are disabled while a run is in flight.
+- **Page selection:** unchanged; it keeps the native confirmation.
+
+Tests: `tests/app/test_tutor_approve_all.py` (browser, opt-in locally,
+mandatory in CI):
+
+- real tutor app and database: cross-page selection, filters,
+  cancellation, revalidation and audit rows;
+- scripted queue: sizes 0, 10, 33, 50, 51 and 120; batch bounds; a failed
+  batch that is never resent; questions added after the selection;
+- the frontend batch size equals `tutor_review.BULK_MAX`.
+
+Risk: if other approvals happen while the selection is read page by page,
+the pages shift and a question can be missed. It then stays pending; it is
+never approved by mistake. The dialog always shows the revalidated count.

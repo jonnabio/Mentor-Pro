@@ -703,31 +703,68 @@ $("tutor-nav-coverage").addEventListener("click", openCoverage);
 $("cv-subject").addEventListener("change", openCoverage);
 
 // ---------------------------------------------------------------- T071 bulk approval
-// Page-scoped selection of explicit IDs, reset on every filter, page or result change. Nothing is preselected and
-// nothing is approved without the tutor confirming the exact count.
+// Explicit IDs only. A page selection resets on every filter, page or result change; "Seleccionar todas las
+// pendientes" selects every pending question of the applied filters (all pages) and survives page changes. Nothing is
+// preselected and nothing is approved without the tutor confirming the exact count. Approvals use the existing
+// bulk-approve endpoint in sequential batches of at most BULK_MAX IDs.
 const BULK_PAGE_SIZE = Number(window.__bulkPageSize) || 10; // the override exists only for the browser regression
-const bulk = { page: 1, pages: 1, questions: [], selected: new Set(), busy: false };
+const BULK_MAX = 50; // the API limit per request (tutor_review.BULK_MAX) and the queue's page_size maximum
+const bulk = { page: 1, pages: 1, total: 0, query: "", questions: [], selected: new Set(), all: null, busy: false };
 const BULK_STATUS_ES = { already_reviewed: "ya tenía una decisión", not_pending: "ya no está pendiente",
   error: "no se pudo registrar" };
 
-async function loadBulk() {
-  const params = new URLSearchParams(reviewQuery().slice(1));
+async function loadBulk({ keepAll = false } = {}) {
+  const query = reviewQuery();
+  const params = new URLSearchParams(query.slice(1));
   params.set("page", String(bulk.page));
   params.set("page_size", String(BULK_PAGE_SIZE));
   const data = await api(`/api/tutor/review/queue?${params}`).catch((error) => { showError(error.message); return null; });
   if (!data) return;
+  bulk.query = query;
   bulk.questions = data.questions;
   bulk.page = data.pagination.page;
   bulk.pages = data.pagination.pages;
-  bulk.selected.clear();
-  renderBulk(data.total);
+  bulk.total = data.total;
+  if (!(keepAll && bulk.all)) clearBulkSelection();
+  renderBulk();
 }
 
-function renderBulk(total) {
+function clearBulkSelection() {
+  bulk.selected.clear();
+  bulk.all = null;
+}
+
+// Every pending question of the applied filters, page by page: [{request_id, subject}], without duplicates.
+async function fetchAllPending(query) {
+  const found = new Map();
+  for (let page = 1, pages = 1; page <= pages; page += 1) {
+    const params = new URLSearchParams(query.slice(1));
+    params.set("page", String(page));
+    params.set("page_size", String(BULK_MAX));
+    const data = await api(`/api/tutor/review/queue?${params}`);
+    pages = data.pagination.pages;
+    for (const q of data.questions) found.set(q.request_id, q.subject);
+  }
+  return [...found].map(([request_id, subject]) => ({ request_id, subject }));
+}
+
+function scopeText(query) {
+  const params = new URLSearchParams(query.slice(1));
+  if (![...params.keys()].length) return "Alcance: todas las materias, sin filtros.";
+  const parts = [];
+  if (params.get("subject")) parts.push(`materia ${subjectName(params.get("subject"))}`);
+  if (params.get("objective")) parts.push(`objetivo ${params.get("objective")}`);
+  if (params.get("difficulty")) parts.push(`dificultad ${DIFFICULTY_ES[params.get("difficulty")] || params.get("difficulty")}`);
+  if (params.get("batch")) parts.push(`lote ${params.get("batch")}`);
+  return `Alcance: solo las preguntas filtradas (${parts.join(", ")}).`;
+}
+
+function renderBulk() {
   $("bulk").hidden = bulk.questions.length === 0;
   $("bulk-list").replaceChildren(...bulk.questions.map((q) => {
     const box = el("input", { type: "checkbox", class: "bulk-check", "data-request": q.request_id,
       "aria-label": `Seleccionar ${q.request_id}` });
+    box.checked = bulk.selected.has(q.request_id);
     box.addEventListener("change", () => {
       if (box.checked) bulk.selected.add(q.request_id); else bulk.selected.delete(q.request_id);
       updateBulkButton();
@@ -747,7 +784,7 @@ function renderBulk(total) {
       el("p", { class: "muted small" }, `Lote ${q.batch_id} · Solicitud ${q.request_id}`));
     return el("li", { class: "bulk-row", "data-request": q.request_id }, box, details);
   }));
-  $("bulk-page").textContent = `Página ${bulk.page} de ${bulk.pages} · ${total} por revisar`;
+  $("bulk-page").textContent = `Página ${bulk.page} de ${bulk.pages} · ${bulk.total} por revisar`;
   $("bulk-prev").disabled = bulk.page <= 1;
   $("bulk-next").disabled = bulk.page >= bulk.pages;
   updateBulkButton();
@@ -756,32 +793,124 @@ function renderBulk(total) {
 function updateBulkButton() {
   $("bulk-approve").textContent = `Aprobar seleccionadas (${bulk.selected.size})`;
   $("bulk-approve").disabled = bulk.busy || bulk.selected.size === 0;
+  $("bulk-select-all").textContent = `Seleccionar todas las pendientes (${bulk.total})`;
+  $("bulk-select-all").disabled = bulk.busy || bulk.total === 0;
+  $("bulk-select-page").disabled = bulk.busy;
+  $("bulk-clear").disabled = bulk.busy;
+  $("bulk-scope").textContent = bulk.all
+    ? `Seleccionadas ${bulk.selected.size} de ${bulk.all.items.length} pendientes en todas las páginas. ` +
+      scopeText(bulk.all.query)
+    : "";
 }
 
 function setAllBulk(checked) {
+  if (bulk.busy) return;
+  if (!checked) clearBulkSelection();
   for (const box of document.querySelectorAll(".bulk-check")) {
     box.checked = checked;
-    if (checked) bulk.selected.add(box.dataset.request); else bulk.selected.delete(box.dataset.request);
+    if (checked) bulk.selected.add(box.dataset.request);
   }
   updateBulkButton();
 }
 
-async function approveBulk() {
-  const ids = [...bulk.selected];
-  if (!ids.length || bulk.busy) return;
-  if (!window.confirm(`¿Aprobar ${ids.length} pregunta${ids.length === 1 ? "" : "s"}? ` +
-    "Quedarán disponibles para el estudiante.")) return;
+async function selectAllPending() {
+  if (bulk.busy) return;
   showError("");
-  bulk.busy = true; // no second submission while one is in flight
+  bulk.busy = true;
   updateBulkButton();
   try {
-    const out = await api("/api/tutor/review/bulk-approve", { method: "POST", body: JSON.stringify({ request_ids: ids }) });
-    const failed = out.results.filter((r) => r.status !== "approved")
-      .map((r) => `${r.request_id} (${BULK_STATUS_ES[r.status] || r.status})`);
-    const message = out.failed === 0 ? `Se aprobaron ${out.approved} de ${out.requested} preguntas.`
-      : `Se aprobaron ${out.approved} de ${out.requested} preguntas. No se aprobaron: ${failed.join(", ")}.`;
+    const query = bulk.query; // the filters the list shows, not unapplied form edits
+    const items = await fetchAllPending(query);
+    bulk.selected = new Set(items.map((i) => i.request_id));
+    bulk.all = { query, items };
+    for (const box of document.querySelectorAll(".bulk-check")) box.checked = bulk.selected.has(box.dataset.request);
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    bulk.busy = false;
+    updateBulkButton();
+  }
+}
+
+// Resolves true only on "Aprobar"; Cancelar, Escape or closing the dialog resolve false.
+function confirmBulk({ count, subjects, scope, dropped }) {
+  const dialog = $("bulk-dialog");
+  $("bulk-dialog-message").textContent = `¿Aprobar ${count} pregunta${count === 1 ? "" : "s"}?`;
+  $("bulk-dialog-subjects").textContent = `Materias: ${subjects.map(subjectName).join(", ")}.`;
+  $("bulk-dialog-scope").textContent = scope;
+  $("bulk-dialog-dropped").hidden = dropped === 0;
+  $("bulk-dialog-dropped").textContent = `${dropped} de las seleccionadas ya no están pendientes y no se enviarán.`;
+  return new Promise((resolve) => {
+    let answer = false;
+    const confirm = () => { answer = true; dialog.close(); };
+    const cancel = () => dialog.close();
+    $("bulk-dialog-confirm").addEventListener("click", confirm, { once: true });
+    $("bulk-dialog-cancel").addEventListener("click", cancel, { once: true });
+    dialog.addEventListener("close", () => {
+      $("bulk-dialog-confirm").removeEventListener("click", confirm);
+      $("bulk-dialog-cancel").removeEventListener("click", cancel);
+      resolve(answer);
+    }, { once: true });
+    dialog.showModal();
+  });
+}
+
+// Sends `ids` in sequential batches; stops at the first failed request and never retries it. The failed batch
+// is "unconfirmed" (the server may or may not have applied it); the batches after it are "unsent" (never attempted).
+async function approveInBatches(ids) {
+  const out = { approved: 0, requested: ids.length, refused: [], unconfirmed: 0, unsent: 0, error: "" };
+  for (let start = 0; start < ids.length; start += BULK_MAX) {
+    const chunk = ids.slice(start, start + BULK_MAX);
+    $("bulk-result").textContent = `Aprobando… ${start} de ${ids.length} enviadas.`;
+    let result;
+    try {
+      result = await api("/api/tutor/review/bulk-approve", { method: "POST", body: JSON.stringify({ request_ids: chunk }) });
+    } catch (error) {
+      out.unconfirmed = chunk.length;
+      out.unsent = ids.length - start - chunk.length;
+      out.error = error.message;
+      break;
+    }
+    out.approved += result.approved;
+    out.refused.push(...result.results.filter((r) => r.status !== "approved")
+      .map((r) => `${r.request_id} (${BULK_STATUS_ES[r.status] || r.status})`));
+  }
+  return out;
+}
+
+async function approveBulk() {
+  if (!bulk.selected.size || bulk.busy) return;
+  showError("");
+  bulk.busy = true; // no second submission, selection or confirmation while one is in flight
+  updateBulkButton();
+  try {
+    let ids = [...bulk.selected];
+    if (bulk.all) {
+      // Revalidate against the live queue: drop what is no longer pending, never add what appeared since.
+      const pending = new Map((await fetchAllPending(bulk.all.query)).map((i) => [i.request_id, i.subject]));
+      const kept = ids.filter((id) => pending.has(id));
+      const subjects = [...new Set(kept.map((id) => pending.get(id)))];
+      if (!kept.length) {
+        clearBulkSelection();
+        await openReview();
+        $("bulk-result").textContent = "Ninguna de las preguntas seleccionadas sigue pendiente. No se aprobó nada.";
+        return;
+      }
+      if (!(await confirmBulk({ count: kept.length, subjects, scope: scopeText(bulk.all.query),
+        dropped: ids.length - kept.length }))) return;
+      ids = kept;
+    } else if (!window.confirm(`¿Aprobar ${ids.length} pregunta${ids.length === 1 ? "" : "s"}? ` +
+      "Quedarán disponibles para el estudiante.")) return;
+    const out = await approveInBatches(ids);
+    const parts = [`Se aprobaron ${out.approved} de ${out.requested} preguntas.`];
+    if (out.refused.length) parts.push(`No se aprobaron: ${out.refused.join(", ")}.`);
+    if (out.unconfirmed) parts.push(`Sin confirmar por un error (${out.error}): ${out.unconfirmed}; ` +
+      "pudieron aprobarse o no, no se reintentaron; revise la cola actualizada.");
+    if (out.unsent) parts.push(`Sin enviar: ${out.unsent}; no se intentaron y siguen pendientes.`);
+    clearBulkSelection();
     await openReview();
-    $("bulk-result").textContent = message;
+    parts.push(`Quedan ${bulk.total} por revisar.`);
+    $("bulk-result").textContent = parts.join(" ");
   } catch (error) {
     showError(error.message);
   } finally {
@@ -791,9 +920,10 @@ async function approveBulk() {
 }
 
 $("bulk-select-page").addEventListener("click", () => setAllBulk(true));
+$("bulk-select-all").addEventListener("click", selectAllPending);
 $("bulk-clear").addEventListener("click", () => setAllBulk(false));
 $("bulk-approve").addEventListener("click", approveBulk);
-$("bulk-prev").addEventListener("click", () => { if (bulk.page > 1) { bulk.page -= 1; loadBulk(); } });
-$("bulk-next").addEventListener("click", () => { if (bulk.page < bulk.pages) { bulk.page += 1; loadBulk(); } });
+$("bulk-prev").addEventListener("click", () => { if (bulk.page > 1) { bulk.page -= 1; loadBulk({ keepAll: true }); } });
+$("bulk-next").addEventListener("click", () => { if (bulk.page < bulk.pages) { bulk.page += 1; loadBulk({ keepAll: true }); } });
 
 if (token()) openQueue();

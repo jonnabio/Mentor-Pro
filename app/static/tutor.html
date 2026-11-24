@@ -197,12 +197,14 @@
       <div id="bulk" hidden>
         <h3>Aprobación en bloque</h3>
         <p class="muted small">Abrí cada pregunta para revisar la respuesta y la explicación antes de marcarla.
-          La selección se limita a esta página.</p>
+          «Seleccionar todas las pendientes» incluye las otras páginas, solo con los filtros aplicados.</p>
         <div class="actions">
           <button type="button" id="bulk-select-page" class="secondary">Seleccionar toda la página</button>
+          <button type="button" id="bulk-select-all" class="secondary">Seleccionar todas las pendientes (0)</button>
           <button type="button" id="bulk-clear" class="secondary">Limpiar selección</button>
           <button type="button" id="bulk-approve" class="primary" disabled>Aprobar seleccionadas (0)</button>
         </div>
+        <p id="bulk-scope" class="muted small" aria-live="polite"></p>
         <p id="bulk-result" class="muted small" aria-live="polite"></p>
         <ul id="bulk-list" class="plain-list"></ul>
         <div class="actions">
@@ -277,6 +279,20 @@
       <div class="actions">
         <button type="button" id="tutor-dialog-stay" class="secondary">Seguir revisando</button>
         <button type="button" id="tutor-dialog-confirm" class="primary">Completar</button>
+      </div>
+    </dialog>
+    <!-- T071: confirmation of an approval across pages; nothing is sent before "Aprobar". -->
+    <dialog id="bulk-dialog" aria-labelledby="bulk-dialog-title" aria-describedby="bulk-dialog-message">
+      <h2 id="bulk-dialog-title">Confirmar aprobación</h2>
+      <p id="bulk-dialog-message"></p>
+      <p id="bulk-dialog-subjects" class="muted small"></p>
+      <p id="bulk-dialog-scope" class="muted small"></p>
+      <p id="bulk-dialog-dropped" class="muted small" hidden></p>
+      <p class="alert" role="alert">Son decisiones reales de aprobación del tutor: las preguntas quedarán
+        disponibles para el estudiante.</p>
+      <div class="actions">
+        <button type="button" id="bulk-dialog-cancel" class="secondary">Cancelar</button>
+        <button type="button" id="bulk-dialog-confirm" class="primary">Aprobar</button>
       </div>
     </dialog>
   </main>
