@@ -229,3 +229,37 @@ PO authorized. Production was not modified.
 - **`dev`** was fast-forwarded to `main` (`141d072`; it was an ancestor).
 - **Not done (separately gated):** deployment, automatic eligibility,
   scheduler resumption, T071/T072 human acceptance.
+
+## 8. Gate B: production deployment of `v2026.11.24-1` (2026-11-25)
+
+PO authorization `PO-T071-APPROVE-ALL-GATE-B-2026-11-24`, window
+`T071-APPROVE-ALL-2026-11-24`. Human functional acceptance (Gate C) is
+**pending**.
+
+- **Baseline:** `v2026.11.21-1` (`@sha256:22cfcbf3…bce1b2`),
+  `STATUS HEALTHY`.
+- **Helpers:** all three installed files match `git show 141d072:deploy/…`
+  (unchanged since `e039cd3`): `mentorpro` `da92f99e…`,
+  `mentorpro_deploy.py` `f76c89a1…`, `mentorpro_migrate.py` `880545d3…`.
+- **Manifest:** `/opt/mentor-pro/manifests/v2026.11.24-1.json`, sha256
+  `d0f4167b…311e60e`, matched locally and on the server.
+- **Preflight:** `report holds: enforced`, `PREFLIGHT OK: DEPLOY
+  COMPATIBLE` (schema 0001, live database current).
+- **Backup:** `mentor_pro_2026-11-25_002248.dump`, sha256
+  `b339d7b2ac7b00bc81bc929c18090e5db44589cb42af398573461d8ac9a609c6`
+  (38 tables, 2951 rows), `VERIFY OK`.
+- **Deploy:** 2026-11-25T00:23:13Z, `DEPLOY OK`, `SMOKE PASS (13/13)`,
+  `STATUS HEALTHY`; app and tutor on `@sha256:9948605d…e3a384`. The
+  previous image was `@sha256:22cfcbf3…bce1b2`. Rollback was not required.
+- **Data integrity:** fingerprints at 00:22:11Z and after the deploy
+  (`~/t072-helper/fp_t071ab_pre.txt`, `fp_t071ab_post.txt`): row counts
+  and md5 identical for all 38 tables; env key and value hashes and the
+  crontab hash unchanged. Verdicts 92 (77 approved, 15 quarantined, all by
+  the tutor; 33 approvals since the Gate C baseline were made by the
+  tutor before this deploy); 0 reports.
+- **UI:** the served `tutor.js` contains "Seleccionar todas las pendientes
+  (N)".
+- **Flags:** `MENTOR_PRO_AUTO_ELIGIBILITY` unset (off),
+  `OPENROUTER_ALLOW_PAID=false`; scheduler paused (last tick `skipped
+  (paused)`, 0 calls).
+- No question was approved or quarantined as part of the deployment.

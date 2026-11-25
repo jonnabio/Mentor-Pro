@@ -1,4 +1,4 @@
-# Active Context: 2026-11-24 (v2026.11.24-1 published, not deployed; Gate C pending; scheduler paused)
+# Active Context: 2026-11-25 (v2026.11.24-1 deployed; Gate C pending; scheduler paused)
 
 ## Session Metadata
 
@@ -21,11 +21,11 @@
   as production). Status "Published, not authorized for deployment".
   Details: [T071 result](../progress/task_T071_result.md) section 7.
 - **`dev` = `main` = `141d072`.**
-- **Production unchanged:** `v2026.11.21-1`, without approve-all.
+- **Production (Gate B, 2026-11-25T00:23Z):** `v2026.11.24-1` `@sha256:9948605d…e3a384`, `DEPLOY OK`, smoke 13/13, `STATUS HEALTHY`; backup `mentor_pro_2026-11-25_002248.dump` (`b339d7b2…a609c6`, `VERIFY OK`); fingerprints identical. Details: T071 result section 8.
 - **This record:** branch `handoff/T071-approve-all-release`, pushed, no
   PR (no-docs-only-PR rule). Fold it into the next functional PR or the
   Gate B records.
-- **Next:** PO Gate B for `v2026.11.24-1` (compare the manifest sha256
+- **Next:** consolidated Gate C (tutor). Gate B is done (compare the manifest sha256
   `d0f4167b…311e60e` before deploying); then Gate C. Scheduler, automatic
   eligibility and acceptance stay separately gated.
 
