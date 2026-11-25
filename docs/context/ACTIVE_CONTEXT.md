@@ -2,32 +2,115 @@
 
 ## Session Metadata
 
-- **Last Updated:** 2026-11-24, T071 approve-all Gate A.
+- **Last Updated:** 2026-11-25, session handoff.
 - **Active Role:** none; the session ended.
-- **Mode:** waiting for Gate B (deploy `v2026.11.24-1`), consolidated
-  Gate C (T071 and T072 human acceptance) and PO decisions.
+- **Mode:** waiting for consolidated Gate C (T071 and T072 human
+  acceptance) and PO decisions.
 
-## Update 2026-11-24, Gate A (supersedes the sections below where they differ)
+## Handoff 2026-11-25 (supersedes the sections below where they differ)
 
-- **PR #84** (corrected per the PO review: a failed batch is reported as
-  unconfirmed and never retried, later batches as not sent): head
-  `31dc74d`, CI 45417773859; merged into `dev` as `97e2964`, `dev` CI
-  45420176013, both success with 29 browser tests and 0 skipped.
-- **Release PR #85** (head `97e2964`, CI 45494892496) merged into `main` as
-  `141d0725eb1583579601885a3de215c5e03aab9f`; `main` CI 45496672372 green.
-- **Release `v2026.11.24-1`:** image
-  `ghcr.io/jonnabio/mentor-pro@sha256:9948605d…e3a384`, manifest sha256
-  `d0f4167b…311e60e`, labels `report-holds=1` and schema 0001..0001 (same
-  as production). Status "Published, not authorized for deployment".
-  Details: [T071 result](../progress/task_T071_result.md) section 7.
-- **`dev` = `main` = `141d072`.**
-- **Production (Gate B, 2026-11-25T00:23Z):** `v2026.11.24-1` `@sha256:9948605d…e3a384`, `DEPLOY OK`, smoke 13/13, `STATUS HEALTHY`; backup `mentor_pro_2026-11-25_002248.dump` (`b339d7b2…a609c6`, `VERIFY OK`); fingerprints identical. Details: T071 result section 8.
-- **This record:** branch `handoff/T071-approve-all-release`, pushed, no
-  PR (no-docs-only-PR rule). Fold it into the next functional PR or the
-  Gate B records.
-- **Next:** consolidated Gate C (tutor). Gate B is done (compare the manifest sha256
-  `d0f4167b…311e60e` before deploying); then Gate C. Scheduler, automatic
-  eligibility and acceptance stay separately gated.
+### Completed (2026-11-24 to 2026-11-25)
+
+- **PR #84 review correction:** a failed bulk-approve batch is reported as
+  **unconfirmed** (may or may not have applied; never retried; the tutor
+  is pointed to the refreshed queue), and later batches as **not sent**
+  (never attempted). The queue refresh is unchanged.
+  - Commit `31dc74d`; new test
+    `test_a_failed_last_batch_is_unconfirmed_with_nothing_unsent`.
+  - PR head `31dc74df3ade59e9a6a0eb4f80d5a037314d209d`, CI 45417773859.
+  - Merged into `dev` (exact-head guard) as
+    `97e29646192ac1b1edd6c70bfeeda37c7893de89`; `dev` CI 45420176013.
+  - Both runs green, browser tests executed=29 skipped=0.
+- **Gate A (release publication):**
+  - Release PR #85 (head `97e2964`, CI 45494892496) merged into `main` as
+    `141d0725eb1583579601885a3de215c5e03aab9f`; `main` CI 45496672372
+    green, including Tag and Release.
+  - Release `v2026.11.24-1`; image
+    `ghcr.io/jonnabio/mentor-pro@sha256:9948605d05bedf176543f7621a398e85f819862b75e9b98851f1fd5d57e3a384`
+    (registry digest checked independently).
+  - Manifest sha256
+    `d0f4167b3f2ec83abcf3c31b11b26f20f87fe2f6bfd7c9228757debb4311e60e`;
+    labels: version, revision, `report-holds=1`, schema 0001..0001.
+  - `dev` fast-forwarded to `main`.
+  - Evidence: [T071 result](../progress/task_T071_result.md) section 7.
+- **Gate B (production deployment)**
+  (`PO-T071-APPROVE-ALL-GATE-B-2026-11-24`, window
+  `T071-APPROVE-ALL-2026-11-24`):
+  - Helpers match the release (`mentorpro` `da92f99e…`,
+    `mentorpro_deploy.py` `f76c89a1…`, `mentorpro_migrate.py`
+    `880545d3…`).
+  - Preflight: `PREFLIGHT OK: DEPLOY COMPATIBLE`, report holds enforced.
+  - Backup `mentor_pro_2026-11-25_002248.dump`, sha256
+    `b339d7b2ac7b00bc81bc929c18090e5db44589cb42af398573461d8ac9a609c6`,
+    `VERIFY OK`.
+  - Deployed 2026-11-25T00:23:13Z: `DEPLOY OK`, `SMOKE PASS (13/13)`,
+    `STATUS HEALTHY`. Previous image `@sha256:22cfcbf3…bce1b2`.
+  - Fingerprints before and after: all 38 tables, env and crontab
+    hashes identical.
+  - The served `tutor.js` contains "Seleccionar todas las pendientes (N)".
+  - No question was approved or quarantined by the agent.
+  - Evidence: [T071 result](../progress/task_T071_result.md) section 8.
+
+### Current State (2026-11-25)
+
+- **Production:** `v2026.11.24-1` (`@sha256:9948605d…e3a384`, commit
+  `141d072`), healthy. It includes the approve-all enhancement.
+- **Flags:** `MENTOR_PRO_AUTO_ELIGIBILITY` unset (off),
+  `OPENROUTER_ALLOW_PAID=false`, bank-only for Matemáticas only.
+- **Scheduler:** paused (reason text is still the old "review queue 51 >
+  40"); ticks record `skipped (paused)` with 0 calls.
+- **Verdicts:** 92 (77 approved, 15 quarantined, all by the tutor). That is
+  33 approvals since the 2026-11-22 Gate C baseline, made by the tutor
+  before the deploy. 0 reports.
+- **Branches:** `main` = `141d072`; `dev` = `main` plus this handoff
+  record (merged from `handoff/T071-approve-all-release`).
+- **Tasks:** T071 and T072 stay `review` in `tasks.json` until the tutor
+  confirms Gate C.
+- **Locks:** none held; no lane claim.
+
+### Next Steps
+
+1. Get the tutor's Gate C results (checklist: T071 steps 1–5, including
+   "Seleccionar todas las pendientes (N)"; T072 steps 6–12).
+2. Post-acceptance verification, read only: run
+   `bash ~/t072-helper/fp.sh <out>` and compare with
+   `~/t072-helper/fp_t071ab_pre.txt` (the newest baseline, 2026-11-25);
+   check verdicts against the tutor's actions, reports, `status` and
+   smoke.
+3. If the tutor confirms: record separate T071 and T072 acceptance and set
+   both tasks to `done`.
+4. Scheduler resumption: PO decision only.
+
+### Blockers/Issues
+
+- **Gate C:** waiting for the tutor. Nothing is accepted without the
+  tutor's explicit confirmation. The 33 new approvals need to be confirmed
+  as the tutor's own Gate C actions.
+- **PO decisions pending:** resuming the scheduler; activating automatic
+  eligibility.
+- **Not tested in production:** the legacy-rollback write barrier.
+- **Approve-all residual risk:** concurrent approvals can shift pages and
+  miss a question; it stays pending, never wrongly approved.
+- **Local only:** `test_bulk_approval_in_the_browser` exceeds its 5 s
+  timeout on Windows; CI passes it.
+
+### Notes
+
+- **Server:** `ssh jonnabio@100.64.84.15`; the agent may run only
+  `sudo -n /usr/local/lib/mentor-pro/mentorpro`. Manifest:
+  `/opt/mentor-pro/manifests/v2026.11.24-1.json`.
+- **Staging files:** `~/t072-helper/` (`fp.sh` and fingerprints). Remove
+  only after Gate C closes.
+- **Verdict query:** `generation.bank_item_review` (`reviewer`,
+  `verdict`); there is no `generation.item_review` table, so `fp.sh`'s
+  verdicts section prints nothing.
+- **CI:** if a new push leaves an older PR run in progress, the new run
+  may be cancelled; cancel the stale run and `gh run rerun` the new one.
+- **GHCR without Docker:** an anonymous token from
+  `https://ghcr.io/token?scope=repository:jonnabio/mentor-pro:pull` reads
+  the manifest digest and config labels.
+- **Local browser tests:**
+  `MENTOR_PRO_BROWSER=1 .venv/Scripts/python.exe -m pytest tests/app/test_tutor_approve_all.py`.
 
 ## Handoff 2026-11-24 (supersedes the sections below where they differ)
 
