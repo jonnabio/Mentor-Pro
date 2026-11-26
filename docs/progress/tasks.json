@@ -2154,6 +2154,28 @@
           "docs/rca/regression-guards.yaml"
         ]
       }
+    },
+    {
+      "id": "T073",
+      "name": "Skip a question reported before answering (RCA-009)",
+      "objective": "A student who reports an unanswered question can move on; the question is skipped and not scored, and the result counts it (ADR-038 D3 amendment, PO 2026-11-26).",
+      "status": "in_progress",
+      "role": "Developer",
+      "files": {
+        "create": [
+          "docs/rca/RCA-009-reported-question-dead-end.md"
+        ],
+        "modify": [
+          "app/practice/question_reports.py",
+          "app/practice/routes.py",
+          "app/static/app.js",
+          "app/static/index.html",
+          "tests/app/test_question_reports.py",
+          "docs/adr/ADR-038-automatic-eligibility-and-student-reports.md",
+          "docs/rca/regression-guards.yaml",
+          "docs/progress/tasks.json"
+        ]
+      }
     }
   ]
 }

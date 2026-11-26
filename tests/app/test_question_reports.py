@@ -183,7 +183,7 @@ def test_report_holds_the_question_and_leaks_nothing(bank, url, catalog_conn, sy
     assert r.status_code == 200
     body = r.json()
     assert body == {"slot": 1, "reported": True, "already_reported": False,
-                    "message_es": "Gracias. Tu tutor revisará esta pregunta."}
+                    "message_es": "Gracias. Tu tutor revisará esta pregunta.", "summary": None}  # slot 2 open
     assert eligible(url, catalog_conn, 1) == []                                  # held from new practices
     assert [x["request_id"] for x in eligible(url, catalog_conn, 2)] == [cells[2]]
     with psycopg.connect(url) as conn:
@@ -205,6 +205,50 @@ def test_duplicate_and_concurrent_reports_store_one_row(bank, url, synthetic_cli
     with ThreadPoolExecutor(4) as pool:
         codes = list(pool.map(lambda _: report(synthetic_client, sid).status_code, range(4)))
     assert codes == [200] * 4 and len(report_rows(url)) == 1
+
+
+def answer(client, url, session_id, slot, correct=True):  # noqa: F811
+    with psycopg.connect(url) as conn:
+        key = conn.execute("SELECT item->>'answer_key' FROM practice.item WHERE session_id = %s AND slot = %s",
+                           (session_id, slot)).fetchone()[0]
+    label = key if correct else next(x for x in "ABCD" if x != key)
+    r = client.post(f"/api/practice/sessions/{session_id}/answers", json={"slot": slot, "label": label})
+    assert r.status_code == 200
+    return r.json()
+
+
+def test_a_question_reported_before_answering_is_skipped_and_not_scored(bank, url, synthetic_client):  # noqa: F811
+    """T073 (RCA-009): reporting an unanswered question must not block the practice."""
+    _, batch_id = bank
+    cells = by_cell(url, batch_id)
+    sid = practice(url, [cells[1], cells[2]])
+    report(synthetic_client, sid, 1)
+    session = synthetic_client.get(f"/api/practice/sessions/{sid}").json()
+    assert [(q["reported"], q["answered"]) for q in session["questions"]] == [(True, False), (False, False)]
+    assert session["summary"] is None                                            # slot 2 still open
+    result = answer(synthetic_client, url, sid, 2)["summary"]
+    assert (result["answered"], result["correct"], result["skipped"], result["percentage"]) == (1, 1, 1, 100)
+    assert synthetic_client.get(f"/api/practice/sessions/{sid}").json()["summary"] == result  # after a reload
+
+
+def test_reporting_the_last_open_question_returns_the_result(bank, url, synthetic_client):  # noqa: F811
+    _, batch_id = bank
+    cells = by_cell(url, batch_id)
+    sid = practice(url, [cells[1], cells[2]])
+    answer(synthetic_client, url, sid, 1, correct=False)
+    result = report(synthetic_client, sid, 2).json()["summary"]
+    assert (result["answered"], result["correct"], result["skipped"], result["percentage"]) == (1, 0, 1, 0)
+    sid = practice(url, [cells[3]])
+    result = report(synthetic_client, sid, 1).json()["summary"]                  # nothing answered at all
+    assert (result["answered"], result["skipped"], result["percentage"], result["objectives"]) == (0, 1, None, [])
+
+
+def test_a_question_reported_after_answering_keeps_its_score(bank, url, synthetic_client):  # noqa: F811
+    _, batch_id = bank
+    sid = practice(url, [by_cell(url, batch_id)[1]])
+    scored = answer(synthetic_client, url, sid, 1)["summary"]
+    assert report(synthetic_client, sid, 1).json()["summary"] == scored          # ADR-038: scores aren't rewritten
+    assert scored["skipped"] == 0
 
 
 def test_invalid_reports_are_refused(bank, url, synthetic_client, monkeypatch):  # noqa: F811
@@ -396,15 +440,24 @@ def test_student_reports_and_tutor_resolves_in_the_browser(bank, url, synthetic_
             expect(page.locator("#feedback")).to_be_visible()
             if shots:
                 page.screenshot(path=os.path.join(shots, "student-report.png"), full_page=True)
+            expect(page.locator("#report-skip")).to_be_hidden()                  # answered: "next" is the way on
             page.click("#next")                                                  # next question: can be reported
             expect(page.locator("#report-open")).to_be_visible()
+            page.click("#report-open")                                           # T073: report without answering
+            page.check("input[name=reason][value=confusing]")
+            page.click("#report-send")
+            expect(page.locator("#report-skip")).to_have_text("Ver resultados")
+            page.click("#report-skip")
+            expect(page.locator("#result-view")).to_be_visible()
+            expect(page.locator("#result-skipped")).to_have_text("1 pregunta reportada no se calificó.")
 
             page = browser.new_page(viewport={"width": 390, "height": 844})
             page.goto(tutor + "/tutor")
             page.fill("#tutor-token", TOKEN)
             page.click("#tutor-enter")
             page.click("#tutor-nav-review")
-            item = page.locator("#reports-list .report-item")
+            expect(page.locator("#reports-list .report-item")).to_have_count(2)  # T073 added the second report
+            item = page.locator("#reports-list .report-item").filter(has_text="Falta información")
             expect(item).to_have_count(1)
             expect(item).to_contain_text("Falta información")
             expect(item).to_contain_text("«Falta un dato.»")
@@ -414,9 +467,10 @@ def test_student_reports_and_tutor_resolves_in_the_browser(bank, url, synthetic_
                 page.screenshot(path=os.path.join(shots, "tutor-reports.png"), full_page=True)
             item.locator(".report-retain").click()
             expect(page.locator("#reports-result")).to_contain_text("Pregunta mantenida")
-            expect(page.locator("#reports-empty")).to_be_visible()
+            expect(page.locator("#reports-list .report-item")).to_have_count(1)
             browser.close()
-        assert [(r[1], r[2]) for r in report_rows(url)] == [("retained", "tutor")] and verdicts(url) == []
+        assert [(r[1], r[2]) for r in report_rows(url)] == [("retained", "tutor"), ("open", None)]
+        assert verdicts(url) == []
     finally:
         student_srv.should_exit = tutor_srv.should_exit = True
         student_thread.join(timeout=10)

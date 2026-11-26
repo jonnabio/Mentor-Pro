@@ -260,3 +260,28 @@ guards:
     review_triggers:
       - "Changes to verified_labels, rollback, deploy_locked, preflight or the release labels"
       - "A future feature whose safety depends on code that an older image lacks"
+
+  - id: RCA-009
+    title: "A question reported before answering blocks the practice"
+    severity: high
+    created: 2026-11-26
+    rca_file: docs/rca/RCA-009-reported-question-dead-end.md
+
+    guarded_files:
+      - app/practice/routes.py
+      - app/static/app.js
+
+    invariants:
+      - "A reported, unanswered question never blocks the next question or the result"
+      - "A reported, unanswered question is not scored and is counted as skipped"
+      - "A reported question that was answered keeps its score (ADR-038: scores aren't rewritten)"
+      - "The session view carries `reported` per question, so a reload keeps the skip"
+
+    tests:
+      - tests/app/test_question_reports.py
+
+    standard_rule: "RCA-009 Lessons Learned (test every way out of a step in a step-by-step flow)"
+
+    review_triggers:
+      - "Changes to summary(), question_view() or the report route"
+      - "Changes to the quiz navigation (#next, #report-skip, startQuiz, advance)"

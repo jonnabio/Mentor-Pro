@@ -77,6 +77,14 @@ go through revalidation, so a pending question never skips a gate.
 - **Exposure:** the response never includes the answer key or any tutor
   data.
 
+**Amendment 2026-11-26 (T073, RCA-009; PO decision).** A question the
+student reports before answering can be skipped: the practice offers
+"Siguiente pregunta" or "Ver resultados", the question doesn't block the
+result and isn't scored, and the result counts it as `skipped`. A
+question reported after it was answered keeps its score. The session view
+marks each question `reported`, and the report response returns the
+`summary`.
+
 ### D4. The report hold
 
 - An `open` report excludes the question from new practices at once.

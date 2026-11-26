@@ -121,6 +121,15 @@ def create(url: str, session_id: str, slot: int, reason: str, comment: str | Non
     return {**out, "already_reported": False}
 
 
+def reported_slots(url: str, session_id: str) -> set[int]:
+    """The slots of a session the student reported (any status). T073: a reported question that was not answered
+    is skipped: it does not block the result and is not scored."""
+    _ensure_schema(url)
+    with _connect(url) as conn:
+        return {r["slot"] for r in conn.execute(
+            "SELECT slot FROM generation.question_report WHERE session_id = %s", (session_id,))}
+
+
 def open_count(url: str) -> int:
     _ensure_schema(url)
     with _connect(url) as conn:

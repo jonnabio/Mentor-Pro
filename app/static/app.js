@@ -390,7 +390,7 @@ async function poll(sessionId) {
 // ------------------------------------------------------------------ questions
 
 function startQuiz(session) {
-  const firstOpen = session.questions.findIndex((q) => !q.answered);
+  const firstOpen = session.questions.findIndex((q) => !q.answered && !q.reported);
   if (firstOpen === -1 && session.summary) {
     renderResult(session.summary);
     return;
@@ -430,11 +430,43 @@ function renderQuestion() {
 
 // T072 (ADR-038): the student reports a question without leaving it. The question is held from new practices
 // until the tutor reviews it; this practice and its answers are unchanged.
+// T073 (RCA-009): a question reported before it was answered can be skipped; it is not scored.
 function showReportState(question) {
   $("report-open").hidden = Boolean(question.reported);
   $("report-done").hidden = !question.reported;
   $("report-done").textContent = question.reported ? "Gracias. Tu tutor revisará esta pregunta." : "";
+  const skip = question.reported && !question.answered;
+  $("report-skip").hidden = !skip;
+  $("report-skip").textContent = isLastQuestion() ? "Ver resultados" : "Siguiente pregunta";
 }
+
+function isLastQuestion() {
+  return state.current >= state.session.questions.length - 1;
+}
+
+// The next unanswered, unskipped question after the current one, then from the start; -1 when none remain.
+function nextOpenQuestion() {
+  const questions = state.session.questions;
+  const open = (q) => !q.answered && !q.reported;
+  for (let i = state.current + 1; i < questions.length; i += 1) if (open(questions[i])) return i;
+  return questions.findIndex(open);
+}
+
+function advance() {
+  const session = state.session;
+  if (!isLastQuestion()) {
+    state.current += 1;
+    renderQuestion();
+  } else if (session.summary) {
+    renderResult(session.summary);
+  } else {
+    const open = nextOpenQuestion();
+    state.current = open === -1 ? 0 : open;
+    renderQuestion();
+  }
+}
+
+$("report-skip").addEventListener("click", advance);
 
 const reportDialog = $("report-dialog");
 
@@ -461,12 +493,14 @@ $("report-form").addEventListener("submit", async (event) => {
   const question = state.session.questions[state.current];
   const comment = $("report-comment").value.trim();
   try {
-    await api(`/api/practice/sessions/${state.session.session_id}/reports`, {
+    const result = await api(`/api/practice/sessions/${state.session.session_id}/reports`, {
       method: "POST", body: JSON.stringify({ slot: question.slot, reason, comment: comment || null }),
     });
     question.reported = true;
+    if (result.summary) state.session.summary = result.summary;
     reportDialog.close();
     showReportState(question);
+    if (!$("report-skip").hidden) $("report-skip").focus();
   } catch (error) {
     showError($("report-error"), error.message);
     button.disabled = false;
@@ -499,6 +533,7 @@ function showFeedback(result) {
   const last = state.current >= state.session.questions.length - 1;
   $("next").textContent = last ? "Ver resultados" : "Siguiente pregunta";
   $("feedback").hidden = false;
+  showReportState(result); // `result` is the question: answered now, so the skip button goes away
   $("next").focus();
 }
 
@@ -524,17 +559,7 @@ $("answer-form").addEventListener("submit", async (event) => {
   }
 });
 
-$("next").addEventListener("click", () => {
-  const session = state.session;
-  if (state.current < session.questions.length - 1) {
-    state.current += 1;
-    renderQuestion();
-  } else if (session.summary) {
-    renderResult(session.summary);
-  } else {
-    startQuiz(session); // an unanswered question remains
-  }
-});
+$("next").addEventListener("click", advance);
 
 // ------------------------------------------------------------------ result
 
@@ -542,7 +567,12 @@ function renderResult(summary) {
   show("result-view");
   $("result-correct").textContent = String(summary.correct);
   $("result-incorrect").textContent = String(summary.incorrect);
-  $("result-percentage").textContent = `${summary.percentage} %`;
+  $("result-percentage").textContent = summary.percentage === null ? "—" : `${summary.percentage} %`;
+  const skipped = summary.skipped || 0;
+  $("result-skipped").hidden = !skipped;
+  $("result-skipped").textContent = skipped === 1
+    ? "1 pregunta reportada no se calificó."
+    : `${skipped} preguntas reportadas no se calificaron.`;
   const list = $("result-objectives");
   list.replaceChildren();
   for (const objective of summary.objectives) {
