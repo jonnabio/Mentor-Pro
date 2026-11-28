@@ -437,11 +437,17 @@ function showReportState(question) {
   $("report-done").textContent = question.reported ? "Gracias. Tu tutor revisará esta pregunta." : "";
   const skip = question.reported && !question.answered;
   $("report-skip").hidden = !skip;
-  $("report-skip").textContent = isLastQuestion() ? "Ver resultados" : "Siguiente pregunta";
+  $("report-skip").textContent = nextLabel();
 }
 
 function isLastQuestion() {
   return state.current >= state.session.questions.length - 1;
+}
+
+// T073 review: "Ver resultados" only when the result exists, i.e. every question is answered or skipped
+// (the server's summary). Otherwise "Siguiente pregunta". advance() follows the same rule.
+function nextLabel() {
+  return state.session.summary ? "Ver resultados" : "Siguiente pregunta";
 }
 
 // The next unanswered, unskipped question after the current one, then from the start; -1 when none remain.
@@ -454,11 +460,11 @@ function nextOpenQuestion() {
 
 function advance() {
   const session = state.session;
-  if (!isLastQuestion()) {
+  if (session.summary) {
+    renderResult(session.summary);
+  } else if (!isLastQuestion()) {
     state.current += 1;
     renderQuestion();
-  } else if (session.summary) {
-    renderResult(session.summary);
   } else {
     const open = nextOpenQuestion();
     state.current = open === -1 ? 0 : open;
@@ -530,8 +536,7 @@ function showFeedback(result) {
   $("feedback-result").textContent = resultText;
   $("feedback-result").className = `feedback-result ${result.correct ? "ok" : "bad"}`;
   $("feedback-explanation").textContent = result.explanation;
-  const last = state.current >= state.session.questions.length - 1;
-  $("next").textContent = last ? "Ver resultados" : "Siguiente pregunta";
+  $("next").textContent = nextLabel();
   $("feedback").hidden = false;
   showReportState(result); // `result` is the question: answered now, so the skip button goes away
   $("next").focus();

@@ -276,6 +276,7 @@ guards:
       - "A reported, unanswered question is not scored and is counted as skipped"
       - "A reported question that was answered keeps its score (ADR-038: scores aren't rewritten)"
       - "The session view carries `reported` per question, so a reload keeps the skip"
+      - "\"Ver resultados\" only when the session summary exists; otherwise \"Siguiente pregunta\""
 
     tests:
       - tests/app/test_question_reports.py

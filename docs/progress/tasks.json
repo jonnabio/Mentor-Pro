@@ -2173,7 +2173,8 @@
           "tests/app/test_question_reports.py",
           "docs/adr/ADR-038-automatic-eligibility-and-student-reports.md",
           "docs/rca/regression-guards.yaml",
-          "docs/progress/tasks.json"
+          "docs/progress/tasks.json",
+          ".github/workflows/ci.yml"
         ]
       }
     }

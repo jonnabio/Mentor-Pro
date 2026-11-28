@@ -475,3 +475,67 @@ def test_student_reports_and_tutor_resolves_in_the_browser(bank, url, synthetic_
         student_srv.should_exit = tutor_srv.should_exit = True
         student_thread.join(timeout=10)
         tutor_thread.join(timeout=10)
+
+
+@pytest.mark.skipif(not os.environ.get("MENTOR_PRO_BROWSER"), reason="set MENTOR_PRO_BROWSER=1")
+def test_navigation_labels_follow_the_result_not_the_position(bank, url, synthetic_client):  # noqa: F811
+    """T073 review: "Ver resultados" only once every question is answered or skipped; the last position alone
+    never shows it. Covers the skip button and the normal "next" button."""
+    from playwright.sync_api import expect, sync_playwright
+
+    _, batch_id = bank
+    cells = by_cell(url, batch_id)
+    skip_sid = practice(url, [cells[1], cells[2], cells[3]])
+    next_sid = practice(url, [cells[4], cells[5]])
+    srv, thread, student = _serve(synthetic_client.app)
+
+    def open_last(page, sid):
+        """The last question on screen while an earlier one is still open (the quiz itself starts at the first
+        open question, so the position is set directly)."""
+        page.add_init_script(f"sessionStorage.setItem('mentorpro.session', '{sid}')")
+        page.goto(student + "/")
+        expect(page.locator("#quiz-position")).to_have_text("Pregunta 1 de " + ("3" if sid == skip_sid else "2"))
+        page.evaluate("state.current = state.session.questions.length - 1; renderQuestion()")
+
+    def answer_first_option(page):
+        page.locator("#quiz-options .option").first.click()
+        page.click("#answer-submit")
+        expect(page.locator("#feedback")).to_be_visible()
+        expect(page.locator("#report-skip")).to_be_hidden()                      # never next to #next
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch()
+            page = browser.new_page(viewport={"width": 390, "height": 844})
+            open_last(page, skip_sid)                                             # skip: last, earlier open
+            page.click("#report-open")
+            page.check("input[name=reason][value=display]")
+            page.click("#report-send")
+            expect(page.locator("#report-skip")).to_have_text("Siguiente pregunta")
+            expect(page.locator("#feedback")).to_be_hidden()
+            page.click("#report-skip")
+            expect(page.locator("#quiz-position")).to_have_text("Pregunta 1 de 3")  # back to the open question
+            answer_first_option(page)
+            expect(page.locator("#next")).to_have_text("Siguiente pregunta")        # slot 2 still open
+            page.click("#next")
+            expect(page.locator("#quiz-position")).to_have_text("Pregunta 2 de 3")
+            answer_first_option(page)
+            expect(page.locator("#next")).to_have_text("Ver resultados")            # all answered or skipped
+            page.click("#next")
+            expect(page.locator("#result-skipped")).to_have_text("1 pregunta reportada no se calificó.")
+
+            page = browser.new_page(viewport={"width": 390, "height": 844})
+            open_last(page, next_sid)                                             # normal: last, earlier open
+            answer_first_option(page)
+            expect(page.locator("#next")).to_have_text("Siguiente pregunta")
+            page.click("#next")
+            expect(page.locator("#quiz-position")).to_have_text("Pregunta 1 de 2")
+            answer_first_option(page)
+            expect(page.locator("#next")).to_have_text("Ver resultados")
+            page.click("#next")
+            expect(page.locator("#result-view")).to_be_visible()
+            expect(page.locator("#result-skipped")).to_be_hidden()
+            browser.close()
+    finally:
+        srv.should_exit = True
+        thread.join(timeout=10)

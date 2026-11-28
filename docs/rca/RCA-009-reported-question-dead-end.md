@@ -91,6 +91,14 @@ skipped and is not scored (ADR-038 D3 amendment).
 - `test_student_reports_and_tutor_resolves_in_the_browser` now reports a
   question without answering it, skips it and reaches the result.
 
+- `test_navigation_labels_follow_the_result_not_the_position` (PR #87
+  review): "Ver resultados" appears only when the result exists; on the
+  last question with an earlier one still open, both the skip button and
+  the normal button say "Siguiente pregunta" and lead to the open
+  question.
+- Both report browser tests run in the required CI browser suite (floor
+  raised to 31, none skipped).
+
 ### Regression Guard
 
 `RCA-009` in `docs/rca/regression-guards.yaml`.
