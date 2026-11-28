@@ -119,11 +119,11 @@ def message_es(session: dict[str, Any], available: int) -> str:
     return f"{reason} No se pudo preparar ninguna pregunta. Intente de nuevo más tarde."
 
 
-def question_view(row: dict[str, Any]) -> dict[str, Any]:
+def question_view(row: dict[str, Any], reported: frozenset[int] | set[int] = frozenset()) -> dict[str, Any]:
     item = row["item"]
     view = {"slot": row["slot"], "objective_code": row["objective_code"], "stimulus": item["stimulus"],
             "stem": item["stem"], "options": [{"label": o["label"], "text": o["text"]} for o in item["options"]],
-            "answered": row["chosen_label"] is not None}
+            "answered": row["chosen_label"] is not None, "reported": row["slot"] in reported}
     if view["answered"]:
         view.update(feedback(row, row["chosen_label"], row["is_correct"]))
     return view
@@ -134,9 +134,14 @@ def feedback(row: dict[str, Any], chosen: str, correct: bool) -> dict[str, Any]:
             "explanation": row["item"]["explanation"]}
 
 
-def summary(session: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any] | None:
-    if not rows or any(r["chosen_label"] is None for r in rows):
+def summary(session: dict[str, Any], rows: list[dict[str, Any]],
+            reported: frozenset[int] | set[int] = frozenset()) -> dict[str, Any] | None:
+    """The result once every question is answered or skipped. T073 (RCA-009): a question the student reported
+    without answering is skipped; it is not scored. A reported question that was answered is scored as usual."""
+    if not rows or any(r["chosen_label"] is None and r["slot"] not in reported for r in rows):
         return None
+    skipped = sum(1 for r in rows if r["chosen_label"] is None)
+    rows = [r for r in rows if r["chosen_label"] is not None]
     texts = {row["workbook_code"]: row.get("text_es", "") for row in session["allocation"]}
     objectives: dict[str, dict[str, Any]] = {}
     for r in rows:
@@ -148,8 +153,8 @@ def summary(session: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, An
         evidence["correct"] += int(r["is_correct"])
     correct = sum(1 for r in rows if r["is_correct"])
     return {
-        "answered": len(rows), "correct": correct, "incorrect": len(rows) - correct,
-        "percentage": round(100 * correct / len(rows)),
+        "answered": len(rows), "correct": correct, "incorrect": len(rows) - correct, "skipped": skipped,
+        "percentage": round(100 * correct / len(rows)) if rows else None,
         "objectives": [{**o, "evidences": list(o["evidences"].values())} for o in objectives.values()],
     }
 
@@ -166,8 +171,12 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
             raise api_error(404, "session_not_found", "No encontramos esta práctica. Configure una nueva.")
         return store, session
 
+    def reported_slots(session_id: str, rows: list[dict[str, Any]]) -> set[int]:
+        return question_reports.reported_slots(service.get()[2].url, session_id) if rows else set()
+
     def view(store: PracticeStore, session: dict[str, Any]) -> dict[str, Any]:
         rows = store.items(session["session_id"]) if session["status"] in ("complete", "partial") else []
+        reported = reported_slots(session["session_id"], rows)
         texts = {row["workbook_code"]: row.get("text_es", "") for row in session["allocation"]}
         return {
             "session_id": session["session_id"],
@@ -183,8 +192,8 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
                             "generated": sum(1 for r in rows if r.get("source") == "generated")},
             "objectives": [{"code": row["workbook_code"], "text_es": texts[row["workbook_code"]],
                             "questions": row["questions"]} for row in session["allocation"]],
-            "questions": [question_view(r) for r in rows],
-            "summary": summary(session, rows),
+            "questions": [question_view(r, reported) for r in rows],
+            "summary": summary(session, rows, reported),
         }
 
     @router.post("/availability")
@@ -306,13 +315,13 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
         row = {**row, "chosen_label": stored["chosen_label"], "is_correct": stored["is_correct"]}
         rows = [row if r["slot"] == request.slot else r for r in rows]
         return {"slot": request.slot, **feedback(row, stored["chosen_label"], stored["is_correct"]),
-                "already_answered": not first, "summary": summary(session, rows)}
+                "already_answered": not first, "summary": summary(session, rows, reported_slots(session_id, rows))}
 
     @router.post("/sessions/{session_id}/reports")
     def report(request: ReportRequest, session_id: str = SESSION_ID) -> dict:
         """T072 (ADR-038): the student reports a question of this practice. It is held from new practices until the
         tutor resolves it; this practice, its answers and its score are unchanged. No answer key is returned."""
-        load(session_id)  # 404 for an unknown session
+        store, session = load(session_id)  # 404 for an unknown session
         bank = service.get()[2]
         try:
             out = question_reports.create(bank.url, session_id, request.slot, request.reason, request.comment)
@@ -324,8 +333,10 @@ def build_practice_router(catalog_dependency: Callable, baseline: str, service: 
             raise api_error(429, "report_limit", "Ya recibimos muchos reportes hoy. Intentá de nuevo mañana.") from None
         except question_reports.ReportError:
             raise api_error(422, "invalid_report", "El reporte no es válido.") from None
+        rows = store.items(session_id)  # T073: the result may now be ready (a reported question is skipped)
         return {"slot": request.slot, "reported": True, "already_reported": out["already_reported"],
-                "message_es": "Gracias. Tu tutor revisará esta pregunta."}
+                "message_es": "Gracias. Tu tutor revisará esta pregunta.",
+                "summary": summary(session, rows, reported_slots(session_id, rows))}
 
     @router.post("/sessions/{session_id}/cancel")
     def cancel(session_id: str = SESSION_ID) -> dict:

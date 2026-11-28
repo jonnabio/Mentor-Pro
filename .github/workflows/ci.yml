@@ -75,15 +75,19 @@ jobs:
 
       # T069: also a 30-question practice (desktop and phone) and the tutor coverage view (desktop and phone).
       # T071: bulk approval, structured stimuli and approve-all (their API tests also run; skips still fail).
-      - name: Browser acceptance tests (T068 tutor review, T069 sizes and coverage, T071 bulk approval)
+      - name: Browser acceptance tests (T068 tutor review, T069 sizes and coverage, T071 bulk approval, T072/T073 reports)
         env:
           MENTOR_PRO_BROWSER: "1"
         run: |
           python -m pytest -p no:warnings -rA --junitxml=browser-results.xml \
             "tests/app/test_tutor_review.py::test_review_in_the_browser" \
             "tests/app/test_quiz_sizes_subjects.py::test_a_thirty_question_practice_in_the_browser" \
-            "tests/app/test_tutor_coverage.py::test_coverage_in_the_browser"             "tests/app/test_tutor_bulk_approve.py"             "tests/app/test_tutor_approve_all.py"
-          python -c "import sys, xml.etree.ElementTree as E; r = E.parse('browser-results.xml').getroot(); s = r if r.tag == 'testsuite' else r.find('testsuite'); n, k = int(s.get('tests')), int(s.get('skipped')); print(f'browser tests executed={n - k} skipped={k}'); sys.exit(0 if n >= 18 and k == 0 else 1)"
+            "tests/app/test_tutor_coverage.py::test_coverage_in_the_browser" \
+            "tests/app/test_tutor_bulk_approve.py" \
+            "tests/app/test_tutor_approve_all.py" \
+            "tests/app/test_question_reports.py::test_student_reports_and_tutor_resolves_in_the_browser" \
+            "tests/app/test_question_reports.py::test_navigation_labels_follow_the_result_not_the_position"
+          python -c "import sys, xml.etree.ElementTree as E; r = E.parse('browser-results.xml').getroot(); s = r if r.tag == 'testsuite' else r.find('testsuite'); n, k = int(s.get('tests')), int(s.get('skipped')); print(f'browser tests executed={n - k} skipped={k}'); sys.exit(0 if n >= 31 and k == 0 else 1)"
 
       - name: Validate ACE skills
         run: python .ace/scripts/validate_skills.py
